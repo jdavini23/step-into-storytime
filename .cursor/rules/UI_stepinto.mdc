@@ -1,0 +1,62 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+I love the hybrid approach you’ve outlined for *Step Into Storytime*\! It blends the playful, user-friendly wizard from Option 1, the practical dashboard features from Option 2, and the cozy, accessible bedtime elements from Option 3—perfectly balancing the needs of Sarah, Mr. Thomas, and Grandma Susan. Since you’ve confirmed this direction, I’ll now generate the final User Interface Description Document in markdown using the required headings.
+
+---
+
+**Step Into Storytime \- User Interface Description Document**
+
+**Layout Structure**
+
+* A step-by-step wizard format guides users through story creation (Character → Setting → Theme → Length) on a single page.  
+* A progress bar at the top tracks creation stages.  
+* A collapsible left sidebar houses saved stories and child profiles, expandable with a toggle.  
+* Main content area features a dynamic preview pane showing the story as it builds.
+
+**Core Components**
+
+* **Large, Colorful Buttons:** For selecting customization options (e.g., character traits, settings), with animated character previews appearing on click.  
+* **Preview Pane:** Displays the evolving story text in real-time as choices are made.  
+* **Sidebar:** Lists saved stories and child profiles with quick-access thumbnails.  
+* **“Generate Story” Button:** Triggers story creation with a twinkling star animation.  
+* **“Listen Now” Button:** Launches AI narration with a glowing effect.
+
+**Interaction Patterns**
+
+* **Click/Tap Navigation:** Users tap large buttons or dropdowns to make selections; each step auto-scrolls to the next.  
+* **Dynamic Preview:** Story text updates instantly as options are chosen.  
+* **Narration Controls:** Floating audio bar with play/pause and speed slider for narration playback.  
+* **Sidebar Toggle:** Click to expand/collapse saved stories and profiles.  
+* **Hover Tooltips:** Explain options (e.g., “Medium: 10 min”) on web.
+
+**Visual Design Elements & Color Scheme**
+
+* **Base Palette:** Bright pastels (pink, blue, yellow) for daytime mode; navy background with warm accents (gold, coral) for dark mode.  
+* **Style:** Kid-friendly with soft edges, subtle gradients, and glowing effects (e.g., twinkling stars).  
+* **Animations:** Animated character previews and a shimmering “Generate” transition for delight.
+
+**Mobile, Web App, Desktop Considerations**
+
+* **Mobile:** Responsive web design with large touch targets and vertical scrolling for bedtime use on phones.  
+* **Web App:** Tablet-optimized with sidebar visible by default; supports classroom and home use.  
+* **Desktop:** Wider layout with preview pane and sidebar side-by-side, ideal for video calls or multi-tasking.
+
+**Typography**
+
+* **Primary Font:** A playful, rounded sans-serif (e.g., Comic Neue) for headers and buttons, size 18-24pt for readability.  
+* **Body Text:** Clean sans-serif (e.g., Open Sans) at 16pt for story previews and narration text.  
+* **Contrast:** High contrast in dark mode (white text on navy) for nighttime legibility.
+
+**Accessibility**
+
+* **Dark Mode:** Optional toggle for reduced eye strain during bedtime.  
+* **Large Elements:** Oversized buttons and text (min 16pt) for aging users like Grandma Susan.  
+* **Audio Support:** Narration with speed adjustments for auditory learners or low-vision users.  
+* **Keyboard Navigation:** Tab-through options and tooltips for screen reader compatibility.
+
+---
+
+This document reflects your hybrid vision for *Step Into Storytime*. Let me know if you’d like any final adjustments before it’s ready for use by other large language models\!  

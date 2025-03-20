@@ -24,12 +24,16 @@ export default function DashboardPage() {
 
     // Fetch stories
     const loadStories = async () => {
-      try {
-        await fetchStories()
-      } catch (error) {
-        console.error("Error fetching stories:", error)
-      } finally {
-        setIsLoading(false)
+      if (!isLoading) {
+        // Prevent duplicate calls when already loading
+        try {
+          setIsLoading(true)
+          await fetchStories()
+        } catch (error) {
+          console.error("Error fetching stories:", error)
+        } finally {
+          setIsLoading(false)
+        }
       }
     }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useReducer, useEffect } from "react"
+import { createContext, useContext, useReducer, useEffect, useCallback } from "react"
 
 // Define types
 type Story = {
@@ -145,7 +145,10 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
 
   // API functions
   const fetchStories = async () => {
-    dispatch({ type: "SET_LOADING", payload: true })
+    // Don't set loading state if already loading to prevent additional renders
+    if (!state.isLoading) {
+      dispatch({ type: "SET_LOADING", payload: true })
+    }
     dispatch({ type: "SET_ERROR", payload: null }) // Clear previous errors
 
     try {
@@ -266,12 +269,16 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
+  // Add this near the top of the component, after the reducer
+  const memoizedFetchStories = useCallback(fetchStories, [])
+
+  // Then in the return statement, use the memoized version
   return (
     <StoryContext.Provider
       value={{
         state,
         dispatch,
-        fetchStories,
+        fetchStories: memoizedFetchStories,
         fetchStory,
         createStory,
         updateStory,

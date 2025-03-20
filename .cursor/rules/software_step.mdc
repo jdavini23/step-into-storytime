@@ -1,0 +1,84 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Thanks for the insight\! Since you’re using AI tools to build *Step Into Storytime* and have limited JavaScript experience, I’ll tailor the Software Requirements Specification (SRS) to leverage beginner-friendly, AI-supported tools and frameworks. I’ll keep the stack simple, leaning on platforms like Supabase (which you mentioned in the PRD) and low-code/no-code integrations where possible, while still supporting the PRD and UI requirements. Here’s the finalized SRS in markdown:
+
+---
+
+**Step Into Storytime \- Software Requirements Specification Document**
+
+**System Design**
+
+* Web-based, mobile-responsive single-page application (SPA) built with AI assistance.  
+* Client-server model: frontend for UI, backend for story generation and storage.  
+* Designed for scalability to support future mobile app features.
+
+**Architecture Pattern**
+
+* **Pattern:** Component-Based Architecture.  
+  * UI broken into reusable components (e.g., wizard, sidebar, preview).  
+  * Backend handles AI logic and data persistence separately.  
+  * Simple structure for AI tools to generate and connect components.
+
+**State Management**
+
+* Local state in frontend for wizard inputs (character, setting, theme).  
+* Backend-managed state for user profiles and saved stories via Supabase.  
+* Minimal complexity to align with basic JavaScript skills.
+
+**Data Flow**
+
+* **Input:** User selects options in wizard → frontend sends to backend.  
+* **Processing:** Backend uses AI to generate story → returns text and narration.  
+* **Storage:** Stories saved to Supabase database → fetched for display.  
+* **Preview:** Real-time story updates rendered on frontend as user chooses.
+
+**Technical Stack**
+
+* **Frontend:** JavaScript with React (via Create React App or Vite) for simplicity; TailwindCSS for styling (easy to apply via classes).  
+* **Backend:** Supabase (pre-built backend) for database, auth, and API; Node.js (via Supabase Edge Functions) for custom logic.  
+* **AI Story Generation:** OpenAI API (integrated via Supabase Edge Functions).  
+* **Text-to-Speech:** Google Text-to-Speech API (simple HTTP call for narration).  
+* **Tools:** AI coding assistants (e.g., GitHub Copilot) to scaffold JavaScript code.
+
+**Authentication Process**
+
+* Supabase Auth handles sign-up/login (email, Google, Apple) with pre-built UI components.  
+* Tokens stored in browser local storage for session persistence.  
+* Single user account links to multiple child profiles in database.
+
+**Route Design**
+
+* /: Landing page with login and sample story.  
+* /dashboard: Main hub with sidebar and story wizard.  
+* /create: Alias for dashboard’s wizard view.  
+* /story/:id: Displays a saved story with narration option.  
+* /pricing: Subscription details (free vs. premium).
+
+**API Design**
+
+* **POST /api/story/generate:** Inputs (character, setting, theme, length) → Returns (story text, narration URL).  
+  * Handled by Supabase Edge Function calling OpenAI API.  
+* **GET /api/story/:id:** Fetch story by ID from Supabase.  
+* **POST /api/story/save:** Save story to Supabase database.  
+* **GET /api/user/profile:** Retrieve user and child profile data.  
+* **PUT /api/user/subscription:** Update subscription status.
+
+**Database Design ERD**
+
+* **Users Table:**  
+  * id (PK), email (unique), auth\_provider, subscription\_tier, created\_at.  
+* **Child\_Profiles Table:**  
+  * id (PK), user\_id (FK), name, age, favorite\_topics.  
+* **Stories Table:**  
+  * id (PK), user\_id (FK), child\_profile\_id (FK), title, text, narration\_url, created\_at.  
+* **Relationships:**  
+  * Users 1:N Child\_Profiles.  
+  * Users 1:N Stories.  
+  * Child\_Profiles 1:N Stories.
+
+---
+
+This SRS is optimized for your context: using AI tools and basic JavaScript knowledge. Supabase simplifies backend work (auth, database, APIs), while React with TailwindCSS keeps the frontend manageable. AI tools like Copilot can help you write the JavaScript code step-by-step. Let me know if you’d like me to adjust anything further\! This should now be ready for other large language models to interpret.  

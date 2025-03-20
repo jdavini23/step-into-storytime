@@ -1,7 +1,3 @@
-/**
- * Mock authentication function
- * In a real application, this would make an API call to your authentication endpoint
- */
 export async function authenticateUser(username: string, password: string): Promise<boolean> {
   // Simulate API call delay
   await new Promise((resolve) => setTimeout(resolve, 1500))
