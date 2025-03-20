@@ -53,33 +53,47 @@ export async function POST(request: NextRequest) {
     `;
 
     // Generate story using AI with timeout handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
     try {
-      const { text } = await generateText({
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 30000)
+      );
+
+      const storyPromise = generateText({
         model: openai('gpt-4o'),
         prompt,
         system:
           "You are a creative children's story writer who specializes in magical, engaging bedtime stories with positive messages.",
-        signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-      return NextResponse.json({ content: text });
-    } catch (error) {
-      if (error.name === 'AbortError') {
+      const result = (await Promise.race([storyPromise, timeoutPromise])) as {
+        text: string;
+      };
+
+      return NextResponse.json({ content: result.text });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.message === 'Timeout') {
+          return NextResponse.json(
+            { error: 'Story generation timed out. Please try again.' },
+            { status: 408 }
+          );
+        }
+        console.error('Error generating story:', error.message);
         return NextResponse.json(
-          { error: 'Story generation timed out. Please try again.' },
-          { status: 408 }
+          { error: error.message || 'Failed to generate story' },
+          { status: 500 }
         );
       }
-      throw error;
+      console.error('Unknown error generating story');
+      return NextResponse.json(
+        { error: 'Failed to generate story' },
+        { status: 500 }
+      );
     }
   } catch (error) {
     console.error('Error generating story:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to generate story' },
+      { error: (error as any).message || 'Failed to generate story' },
       { status: 500 }
     );
   }

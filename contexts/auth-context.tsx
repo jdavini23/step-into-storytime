@@ -600,7 +600,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       toast({
         title: 'Account created',
         description: 'Your account has been successfully created',
-        variant: 'success',
+        variant: 'default',
       });
 
       // Auth state listener will handle the state update
