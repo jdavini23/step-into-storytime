@@ -153,6 +153,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   >(null);
   const router = useRouter();
 
+  // Debug logging for auth context
+  useEffect(() => {
+    console.log('[DEBUG] AuthContext mounted:', {
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      isClient: typeof window !== 'undefined',
+      state: {
+        isAuthenticated: state.isAuthenticated,
+        isLoading: state.isLoading,
+        isInitialized: state.isInitialized,
+        hasUser: !!state.user,
+        hasProfile: !!state.profile,
+      },
+    });
+  }, [state]);
+
   // Initialize auth state
   const initializeAuth = useCallback(async () => {
     try {
@@ -162,13 +178,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const session = await getSession();
       const user = session ? await getCurrentUser() : null;
 
-      // If user exists, fetch their profile
+      // If user exists, fetch their profile with retries
       let profile = null;
       if (user) {
-        try {
-          profile = await fetchUserProfile(user.id);
-        } catch (error) {
-          console.error('Error fetching user profile:', error);
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        while (retryCount < maxRetries) {
+          try {
+            console.log(
+              '[DEBUG] Attempting to fetch profile, attempt:',
+              retryCount + 1
+            );
+            profile = await fetchUserProfile(user.id);
+            break;
+          } catch (error) {
+            console.error('[DEBUG] Error fetching profile:', {
+              attempt: retryCount + 1,
+              error,
+            });
+
+            retryCount++;
+            if (retryCount === maxRetries) {
+              console.error(
+                '[DEBUG] Failed to fetch profile after max retries'
+              );
+              // Don't throw, just continue with null profile
+              break;
+            }
+
+            // Wait before retrying with exponential backoff
+            await new Promise((resolve) =>
+              setTimeout(
+                resolve,
+                Math.min(1000 * Math.pow(2, retryCount), 5000)
+              )
+            );
+          }
         }
       }
 
@@ -180,7 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       });
     } catch (error) {
-      console.error('Error initializing auth:', error);
+      console.error('[DEBUG] Error initializing auth:', error);
       dispatch({ type: 'INITIALIZE', payload: { user: null, profile: null } });
     }
   }, []);
@@ -554,7 +600,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       toast({
         title: 'Account created',
         description: 'Your account has been successfully created',
-        variant: 'success' as 'default' | 'destructive' | 'success' | undefined,
+        variant: 'success',
       });
 
       // Auth state listener will handle the state update

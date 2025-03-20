@@ -8,31 +8,148 @@ export type TypedSupabaseClient = SupabaseClient<Database>;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Debug logging for environment variables
+console.log('[DEBUG] Supabase Environment Variables:', {
+  url: supabaseUrl ? 'Set (length: ' + supabaseUrl.length + ')' : 'Missing',
+  anonKey: supabaseAnonKey
+    ? 'Set (length: ' + supabaseAnonKey.length + ')'
+    : 'Missing',
+  isDevelopment: process.env.NODE_ENV === 'development',
+  isClient: typeof window !== 'undefined',
+});
+
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    'Missing Supabase environment variables. Authentication and database features may not work correctly.',
-    'Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.'
+  console.error(
+    'Missing Supabase environment variables. Authentication and database features will not work.',
+    'Required variables:',
+    {
+      NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set ✓' : 'Missing ✗',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey ? 'Set ✓' : 'Missing ✗',
+    }
   );
+  throw new Error('Missing required Supabase environment variables');
 }
 
+// Validate URL format
+try {
+  new URL(supabaseUrl);
+} catch (error) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error('Invalid Supabase URL format');
+}
+
+// Custom fetch with retry logic and improved error handling
+const customFetch = async (
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> => {
+  const retries = 3;
+  const baseDelay = 1000; // 1 second base delay
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      // Ensure proper URL handling
+      const url = input instanceof URL ? input : new URL(input.toString());
+
+      // Log attempt for debugging
+      console.log(
+        `[DEBUG] Attempt ${i + 1}/${retries} - Fetching: ${url.toString()}`
+      );
+
+      // Ensure headers object exists
+      const headers = new Headers(init?.headers || {});
+
+      // Add required Supabase headers if not present
+      if (!headers.has('apikey')) {
+        headers.set('apikey', supabaseAnonKey);
+      }
+      if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${supabaseAnonKey}`);
+      }
+
+      const response = await fetch(url.toString(), {
+        ...init,
+        headers: {
+          ...Object.fromEntries(headers.entries()),
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
+
+      // If response is not ok, try to get the error details
+      if (!response.ok) {
+        const errorBody = await response
+          .text()
+          .catch(() => 'Failed to read error response');
+        console.error('[DEBUG] Error response details:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+        throw new Error(
+          `HTTP error! status: ${response.status}, body: ${errorBody}`
+        );
+      }
+
+      return response;
+    } catch (error) {
+      const isLastAttempt = i === retries - 1;
+
+      // Log detailed error information
+      console.error(`[DEBUG] Fetch attempt ${i + 1} failed:`, {
+        error,
+        url: input.toString(),
+        isLastAttempt,
+        requestHeaders: init?.headers,
+        requestBody: init?.body,
+      });
+
+      if (isLastAttempt) {
+        throw error;
+      }
+
+      const delay = Math.min(
+        1000 * Math.pow(2, i) + Math.random() * 1000,
+        10000
+      );
+      console.log(`[DEBUG] Retrying in ${Math.round(delay)}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Failed to fetch after retries');
+};
+
 // Initialize Supabase client with additional options
-export const supabase = createClient<Database>(
-  supabaseUrl || '',
-  supabaseAnonKey || '',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-    global: {
-      fetch: (...args) => {
-        return fetch(...args);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'sb-auth-token',
+    storage: {
+      getItem: (key) => {
+        if (typeof window === 'undefined') return null;
+        return window.localStorage.getItem(key);
+      },
+      setItem: (key, value) => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem(key, value);
+      },
+      removeItem: (key) => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.removeItem(key);
       },
     },
-  }
-);
+  },
+  global: {
+    fetch: customFetch,
+    headers: {
+      'X-Client-Info': 'step-into-storytime',
+    },
+  },
+});
 
 // Helper function to create a Supabase client for server components
 export const createServerSupabaseClient = () => {
@@ -40,61 +157,112 @@ export const createServerSupabaseClient = () => {
     auth: {
       persistSession: false,
     },
+    global: {
+      fetch: customFetch,
+    },
   });
 };
 
 // User authentication helpers with improved error handling
-export async function signInWithEmail(email: string, password: string) {
+export const signInWithEmail = async (
+  email: string,
+  password: string
+): Promise<any> => {
   try {
-    // For development/demo purposes, allow a mock login when Supabase is not configured
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn(
-        'Using mock authentication because Supabase is not configured'
-      );
-
-      // Mock successful login for demo purposes
-      if (password === 'password123') {
-        return {
-          user: {
-            id: 'mock-user-id',
-            email: email,
-            user_metadata: {
-              name: email.split('@')[0],
-            },
-          },
-          session: {
-            access_token: 'mock-token',
-            refresh_token: 'mock-refresh-token',
-            expires_at: Date.now() + 3600000,
-          },
-        };
-      } else {
-        throw new Error('Invalid login credentials');
-      }
+    // Input validation
+    if (!email || !password) {
+      throw new Error('Email and password are required');
     }
+
+    // Validate email format
+    const isValidEmail = /\S+@\S+\.\S+/.test(email);
+    console.log('[DEBUG] Email validation:', {
+      email: email.slice(0, 3) + '***@' + email.split('@')[1],
+      isValidEmail,
+    });
+
+    if (!isValidEmail) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    // Log the attempt (without sensitive data)
+    console.log('[DEBUG] Attempting Supabase login:', {
+      email: email.slice(0, 3) + '***@' + email.split('@')[1],
+      passwordLength: password?.length,
+    });
 
     // Real Supabase authentication
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password,
     });
 
+    // DEBUG: Log authentication response
+    console.log('[DEBUG] Supabase auth response:', {
+      success: !error,
+      hasData: !!data,
+      errorType: error?.name,
+      errorMessage: error?.message,
+      errorDetails: error,
+    });
+
     if (error) {
-      throw error;
+      // Log the error type (for debugging)
+      console.error('[DEBUG] Supabase auth error details:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+        fullError: error,
+      });
+
+      // Map Supabase errors to user-friendly messages
+      if (error.message?.includes('Invalid login credentials')) {
+        throw new Error('Invalid email or password. Please try again.');
+      } else if (error.message?.includes('Email not confirmed')) {
+        throw new Error('Please verify your email address before logging in.');
+      } else {
+        throw new Error(
+          error.message || 'An error occurred during login. Please try again.'
+        );
+      }
+    }
+
+    if (!data?.user) {
+      console.error('[DEBUG] No user data in successful response');
+      throw new Error('No user data received from authentication service.');
     }
 
     return data;
   } catch (error) {
-    console.error('Authentication error:', error);
-    if (error instanceof Error && error.message?.includes('Failed to fetch')) {
-      throw new Error(
-        'Unable to connect to authentication service. Please check your internet connection and try again.'
-      );
+    console.error('[DEBUG] Authentication error details:', {
+      error,
+      type: error instanceof Error ? error.name : typeof error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    // Network or connection errors
+    if (error instanceof Error) {
+      if (error.message?.includes('Failed to fetch')) {
+        throw new Error(
+          'Unable to connect to authentication service. Please check your internet connection and try again.'
+        );
+      }
+      // Re-throw user-friendly errors we created above
+      if (
+        error.message.includes('Invalid email or password') ||
+        error.message.includes('Please verify your email') ||
+        error.message.includes('Email and password are required') ||
+        error.message.includes('Please enter a valid email')
+      ) {
+        throw error;
+      }
     }
 
-    throw error;
+    // Generic error for unexpected cases
+    throw new Error('An unexpected error occurred. Please try again later.');
   }
-}
+};
 
 export async function signUpWithEmail(
   email: string,
@@ -253,42 +421,109 @@ export async function getCurrentUser() {
 }
 
 // Data fetching helpers with mock data for development
-export async function fetchUserProfile(userId: string) {
+export const fetchUserProfile = async (userId: string) => {
   try {
-    // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn('Using mock profile because Supabase is not configured');
+    console.log('[DEBUG] Fetching user profile:', { userId });
 
-      return {
-        id: userId,
-        name: 'Demo User',
-        email: 'user@example.com',
-        avatar_url: null,
-        subscription_tier: 'free',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+    // Get the current session
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('[DEBUG] Session error:', sessionError);
+      throw new Error('Failed to get session');
     }
 
-    const { data, error } = await supabase
+    if (!session) {
+      console.error('[DEBUG] No active session found');
+      throw new Error('No active session');
+    }
+
+    // First try to fetch the existing profile
+    const { data: existingProfile, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single to handle no results case
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // No profile found
-      }
-      throw error;
+    // If there's an error that's not a "no rows" error, throw it
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('[DEBUG] Profile fetch error:', {
+        error: fetchError,
+        userId,
+        sessionExists: !!session,
+      });
+      throw fetchError;
     }
 
-    return data;
+    // If profile exists, return it
+    if (existingProfile) {
+      return existingProfile;
+    }
+
+    console.log('[DEBUG] No profile found, creating new profile');
+
+    // Get user's email from session
+    const userEmail = session.user.email;
+
+    try {
+      // Attempt to create a new profile
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email: userEmail,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            subscription_tier: 'free',
+          },
+        ])
+        .select()
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
+
+      return newProfile;
+    } catch (error: any) {
+      // Type as any since we need to check for PostgreSQL error code
+      // If we get a unique constraint violation, it means another request created the profile
+      // between our check and insert. Try to fetch the profile one more time.
+      if (error.code === '23505') {
+        console.log(
+          '[DEBUG] Profile creation failed due to conflict, retrying fetch'
+        );
+        const { data: retryProfile, error: retryError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (retryError) {
+          console.error('[DEBUG] Retry profile fetch error:', retryError);
+          throw retryError;
+        }
+
+        return retryProfile;
+      }
+
+      // If it's not a unique constraint violation, rethrow the error
+      console.error('[DEBUG] Profile creation error:', error);
+      throw error;
+    }
   } catch (error) {
-    console.error('Fetch user profile error:', error);
-    return null;
+    console.error('[DEBUG] Fetch user profile error:', {
+      error,
+      userId,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw error;
   }
-}
+};
 
 export async function updateUserProfile(
   userId: string,

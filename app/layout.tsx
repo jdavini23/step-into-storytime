@@ -8,6 +8,7 @@ import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
 import '@/styles/globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
+import { Metadata as NextMetadata } from 'next';
 
 // Initialize font
 const inter = Inter({
@@ -18,60 +19,18 @@ const inter = Inter({
 
 // Define metadata
 export const metadata: Metadata = {
-  title: {
-    template: '%s | Step Into Storytime',
-    default: 'Step Into Storytime - AI-Powered Bedtime Stories',
-  },
-  description:
-    'Create magical, personalized bedtime stories for children with AI technology',
-  keywords: [
-    'bedtime stories',
-    'children stories',
-    'AI stories',
-    'personalized stories',
-    'storytelling',
-    'kids',
-    'learning',
-  ],
-  authors: [{ name: 'Step Into Storytime Team' }],
-  creator: 'Step Into Storytime',
-  publisher: 'Step Into Storytime',
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-    },
-  },
+  title: 'Step Into Storytime',
+  description: 'Create magical, personalized bedtime stories for children',
+  metadataBase: new URL('http://localhost:3002'),
   openGraph: {
+    title: 'Step Into Storytime',
+    description: 'Create magical, personalized bedtime stories for children',
     type: 'website',
-    locale: 'en_US',
-    url: 'https://stepintostorytime.com',
-    title: 'Step Into Storytime - AI-Powered Bedtime Stories',
-    description:
-      'Create magical, personalized bedtime stories for children with AI technology',
-    siteName: 'Step Into Storytime',
-    images: [
-      {
-        url: '/images/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Step Into Storytime - AI-Powered Bedtime Stories',
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Step Into Storytime - AI-Powered Bedtime Stories',
-    description:
-      'Create magical, personalized bedtime stories for children with AI technology',
-    images: ['/images/twitter-image.jpg'],
+    title: 'Step Into Storytime',
+    description: 'Create magical, personalized bedtime stories for children',
   },
 };
 
