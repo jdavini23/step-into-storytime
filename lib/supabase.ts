@@ -741,7 +741,11 @@ export async function createStory(
 
     const { data, error } = await supabase
       .from('stories')
-      .insert([{ ...storyData, user_id: userId }])
+      .insert({
+        user_id: userId,
+        title: storyData.title || 'Untitled Story',
+        ...storyData,
+      })
       .select()
       .single();
 
