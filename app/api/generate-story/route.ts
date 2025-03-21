@@ -79,11 +79,41 @@ export async function POST(request: NextRequest) {
       });
 
       const response = await Promise.race([storyPromise, timeoutPromise]);
-      const stream = await OpenAIStream(
+      const stream = OpenAIStream(
         response as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>
       );
-      return new StreamingTextResponse(stream);
+
+      // Collect the entire story content into a string
+      let storyContent = '';
+      const resolvedStream = await stream;
+      const reader = resolvedStream.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          storyContent += decoder.decode(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Sanitize the story content
+      const sanitizedStoryContent = storyContent.replace(
+        /[\u0000-\u001F\u007F-\u009F]/g,
+        ''
+      );
+
+      // Wrap the story content in a JSON object
+      const jsonResponse = { content: sanitizedStoryContent };
+
+      // Return the JSON response
+      return NextResponse.json(jsonResponse);
     } catch (error: unknown) {
+      console.error('Error generating story:', error);
       if (error instanceof Error) {
         if (error.message === 'Timeout') {
           return NextResponse.json(
