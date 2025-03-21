@@ -1,56 +1,87 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { v4 as uuidv4 } from "uuid"
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// In a real app, this would connect to a database
-// For now, we'll simulate with an in-memory store
-const stories: any[] = []
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+);
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    // In a real app, you would fetch from a database
-    // and include authentication/authorization checks
+    // Get user ID from session
+    const userId = request.headers.get('x-user-id');
 
-    // Get user ID from session (simulated)
-    const userId = request.headers.get("x-user-id") || "demo-user"
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
-    // Filter stories by user ID
-    const userStories = stories.filter((story) => story.userId === userId)
+    // Get stories for the user
+    const { data: stories, error } = await supabase
+      .from('stories')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-    return NextResponse.json(userStories)
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(stories);
   } catch (error) {
-    console.error("Error fetching stories:", error)
-    return NextResponse.json({ error: "Failed to fetch stories" }, { status: 500 })
+    console.error('Error fetching stories:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch stories' },
+      { status: 500 }
+    );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await request.json();
+    const userId = request.headers.get('x-user-id');
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
     // Validate required fields
-    if (!body.title || !body.mainCharacter?.name) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    if (!body.title || !body.content) {
+      return NextResponse.json(
+        { error: 'Title and content are required' },
+        { status: 400 }
+      );
     }
 
-    // Get user ID from session (simulated)
-    const userId = request.headers.get("x-user-id") || "demo-user"
+    // Insert new story
+    const { data: story, error } = await supabase
+      .from('stories')
+      .insert([
+        {
+          user_id: userId,
+          title: body.title,
+          content: body.content,
+        },
+      ])
+      .select()
+      .single();
 
-    // Create new story
-    const newStory = {
-      id: uuidv4(),
-      userId,
-      ...body,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Save to database (simulated)
-    stories.push(newStory)
-
-    return NextResponse.json(newStory, { status: 201 })
+    return NextResponse.json(story);
   } catch (error) {
-    console.error("Error creating story:", error)
-    return NextResponse.json({ error: "Failed to create story" }, { status: 500 })
+    console.error('Error creating story:', error);
+    return NextResponse.json(
+      { error: 'Failed to create story' },
+      { status: 500 }
+    );
   }
 }
-

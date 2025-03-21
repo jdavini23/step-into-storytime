@@ -86,15 +86,15 @@
   }
 
   /* Custom styling for the audio player range input */
-  input[type="range"] {
+  input[type='range'] {
     @apply h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer;
   }
 
-  input[type="range"]::-webkit-slider-thumb {
+  input[type='range']::-webkit-slider-thumb {
     @apply appearance-none w-4 h-4 rounded-full bg-violet-600;
   }
 
-  input[type="range"]::-moz-range-thumb {
+  input[type='range']::-moz-range-thumb {
     @apply w-4 h-4 rounded-full bg-violet-600 border-0;
   }
 }
@@ -165,4 +165,3 @@
     @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl;
   }
 }
-

@@ -1,70 +1,62 @@
 'use client';
 
-import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import Image from "next/image";
+import {  useState, useEffect  } from 'react';
 
 interface ImageWithFallbackProps {
-  src: string;
-  alt: string;
-  width: number;
+  src: string,alt: string,width: number;
   height: number;
   className?: string;
-  priority?: boolean;
-}
-
+  priority?: boolean
+};
 export function ImageWithFallback({
   src,
   alt,
   width,
   height,
-  className = '',
-  priority = false,
+  className=""
+  priority
 }: ImageWithFallbackProps) {
-  const [error, setError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false))
+  const [isLoading, setIsLoading] = useState(true))
 
   useEffect(() => {
-    console.log(`[ImageWithFallback] Loading image: ${src}`);
+    console.log(`[ImageWithFallback] Loading image: ${src}`))
   }, [src]);
 
-  const handleError = (e: any) => {
-    console.error(`[ImageWithFallback] Error loading image: ${src}`, e);
-    setError(true);
-    setIsLoading(false);
+   setError(true))
+    setIsLoading(false))
   };
 
-  const handleLoad = () => {
-    console.log(`[ImageWithFallback] Successfully loaded image: ${src}`);
-    setIsLoading(false);
+   setIsLoading(false))
   };
 
   if (error) {
     return (
       <div
-        className={`bg-gray-100 flex items-center justify-center ${className}`}
-        style={{ width, height }}
+        className={`bg-gray-100 flex items-center justify-center ${className}`};
+        style={{ width, height }};
       >
-        <span className="text-gray-400">Failed to load image</span>
-      </div>
+        <span className=""
+      </div>/
     );
-  }
-
+  };
   return (
-    <div className={`relative ${className}`} style={{ width, height }}>
+    <div className=""
       {isLoading && (
-        <div className="absolute inset-0 bg-gray-100 animate-pulse" />
-      )}
+        <div className=""
+      )};
       <Image
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-        onError={handleError}
-        onLoad={handleLoad}
-        priority={priority}
-        style={{ width: '100%', height: 'auto' }}
-      />
-    </div>
+        src={src};
+        alt={alt};
+        width={width};
+        height={height};
+        className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'}`};
+        onError={handleError};
+        onLoad={handleLoad};
+        priority={priority};
+        style={{ width: '100%', height: 'auto' }};
+      />/
+    </div>/
   );
-}
+};

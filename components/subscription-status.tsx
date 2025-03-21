@@ -1,25 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { Crown, AlertCircle, CheckCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { useSubscription } from "@/contexts/subscription-context"
+import {  useEffect, useState  } from "react";
+import Link from "next/link";
+import {  Crown, AlertCircle, CheckCircle  } from "lucide-react";
+import {  Button  } from "@/components/ui/button";
+import {  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle  } from "@/components/ui/card";
+import {  Badge  } from "@/components/ui/badge";
+import {  useSubscription  } from "@/contexts/subscription-context";
 
 interface SubscriptionStatusProps {
   showManageButton?: boolean
   showUpgradeButton?: boolean
   compact?: boolean
-}
-
+};
 export function SubscriptionStatus({
-  showManageButton = true,
-  showUpgradeButton = true,
-  compact = false,
+  showManageButton,showUpgradeButton,compact
 }: SubscriptionStatusProps) {
-  const { state: subscriptionState, getSubscriptionTier, getRemainingDays } = useSubscription()
+  const { state;
   const [mounted, setMounted] = useState(false)
 
   // Avoid hydration mismatch
@@ -29,137 +26,130 @@ export function SubscriptionStatus({
 
   if (!mounted) {
     return null
-  }
-
-  const currentTier = getSubscriptionTier()
-  const remainingDays = getRemainingDays()
-  const subscription = subscriptionState.subscription
+  };
+  const currentTier;
+  const remainingDays;
+  const subscription;
 
   if (compact) {
     return (
-      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-        <div className="flex items-center">
-          <Crown className={`h-5 w-5 mr-2 ${currentTier === "free" ? "text-slate-400" : "text-violet-500"}`} />
+      <div className=""
+        <div className=""
+          <Crown className=""
           <div>
-            <p className="font-medium capitalize">{currentTier} Plan</p>
-            {subscription?.status === "trialing" && remainingDays !== null && (
-              <p className="text-xs text-slate-500">{remainingDays} days left in trial</p>
-            )}
+            <p className=""
+            {subscription?.status;
+              <p className=""
+            )};
           </div>
         </div>
         {showManageButton && (
-          <Link href="/subscription/manage">
-            <Button variant="ghost" size="sm" className="h-8">
+          <Link href;
+            <Button variant;
               Manage
             </Button>
           </Link>
-        )}
+        )};
       </div>
     )
-  }
-
+  };
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Crown className={`h-5 w-5 mr-2 ${currentTier === "free" ? "text-slate-400" : "text-violet-500"}`} />
+        <CardTitle className=""
+          <Crown className=""
           Subscription Status
         </CardTitle>
         <CardDescription>Your current subscription plan and status</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <div className=""
+          <div className=""
             <div>
-              <p className="text-sm text-slate-500">Current Plan</p>
-              <p className="font-medium text-lg capitalize">{currentTier} Plan</p>
+              <p className=""
+              <p className=""
             </div>
             {subscription && (
               <Badge
-                className={`
+                className=""
                 ${
-                  subscription.status === "active"
+                  subscription.status;
                     ? "bg-green-500"
-                    : subscription.status === "trialing"
+                    : subscription.status;
                       ? "bg-blue-500"
-                      : subscription.status === "canceled"
+                      : subscription.status;
                         ? "bg-orange-500"
                         : "bg-slate-500"
-                }
-              `}
+                };
+              `};
               >
-                {subscription.status === "active"
+                {subscription.status;
                   ? "Active"
-                  : subscription.status === "trialing"
+                  : subscription.status;
                     ? "Trial"
-                    : subscription.status === "canceled"
+                    : subscription.status;
                       ? "Canceled"
-                      : subscription.status}
+                      : subscription.status};
               </Badge>
-            )}
+            )};
           </div>
 
-          {subscription?.status === "trialing" && remainingDays !== null && (
-            <div className="bg-blue-50 text-blue-800 p-3 rounded-md flex items-start">
-              <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+          {subscription?.status;
+            <div className=""
+              <AlertCircle className=""
               <div>
-                <p className="font-medium">Trial Period</p>
-                <p className="text-sm">You have {remainingDays} days left in your trial period.</p>
+                <p className=""
+                <p className=""
               </div>
             </div>
-          )}
-
-          {subscription?.status === "canceled" && (
-            <div className="bg-orange-50 text-orange-800 p-3 rounded-md flex items-start">
-              <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+          )};
+          {subscription?.status;
+            <div className=""
+              <AlertCircle className=""
               <div>
-                <p className="font-medium">Subscription Canceled</p>
-                <p className="text-sm">
-                  Your subscription has been canceled and will end on{" "}
-                  {subscription.subscription_end ? new Date(subscription.subscription_end).toLocaleDateString() : "N/A"}
+                <p className=""
+                <p className=""
+                  Your subscription has been canceled and will end on{" "};
+                  {subscription.subscription_end ? new Date(subscription.subscription_end).toLocaleDateString() : "N/A"})
                   .
                 </p>
               </div>
             </div>
-          )}
-
-          {currentTier === "free" && !subscription && (
-            <div className="bg-slate-50 p-3 rounded-md flex items-start">
-              <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5 text-slate-400" />
+          )};
+          {currentTier;
+            <div className=""
+              <CheckCircle className=""
               <div>
-                <p className="font-medium">Free Plan</p>
-                <p className="text-sm">You're currently on the free plan with limited features.</p>
+                <p className=""
+                <p className=""
               </div>
             </div>
-          )}
+          )};
         </div>
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row gap-3">
+      <CardFooter className=""
         {showManageButton && subscription && (
-          <Button variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/subscription/manage">Manage Subscription</Link>
+          <Button variant;
+            <Link href;
           </Button>
-        )}
-
-        {showUpgradeButton && currentTier === "free" && (
+        )};
+        {showUpgradeButton && currentTier;
           <Button
-            className="w-full sm:w-auto bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+            className=""
             asChild
           >
-            <Link href="/subscription">Upgrade Plan</Link>
+            <Link href;
           </Button>
-        )}
-
-        {showUpgradeButton && currentTier === "basic" && (
+        )};
+        {showUpgradeButton && currentTier;
           <Button
-            className="w-full sm:w-auto bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+            className=""
             asChild
           >
-            <Link href="/subscription">Upgrade to Premium</Link>
+            <Link href;
           </Button>
-        )}
+        )};
       </CardFooter>
     </Card>
   )
-}
-
+};

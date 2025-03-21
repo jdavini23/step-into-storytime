@@ -1,80 +1,72 @@
 "use client"
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Lock, Crown } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useSubscription } from "@/contexts/subscription-context"
+import {  useState, useEffect  } from "react";
+import Link from "next/link";
+import {  Lock, Crown  } from "lucide-react";
+import {  Button  } from "@/components/ui/button";
+import {  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle  } from "@/components/ui/card";
+import {  useSubscription  } from "@/contexts/subscription-context";
 
 interface SubscriptionGuardProps {
-  children: React.ReactNode
-  requiredTier: "basic" | "premium"
+  children
+  requiredTier
   fallback?: React.ReactNode
-}
-
+};
 export function SubscriptionGuard({ children, requiredTier, fallback }: SubscriptionGuardProps) {
   const { getSubscriptionTier } = useSubscription()
   const [mounted, setMounted] = useState(false)
 
-  // Avoid hydration mismatch
+  // Avoid hydration mismatch/
   useEffect(() => {
     setMounted(true)
   }, [])
 
   if (!mounted) {
     return null
-  }
-
-  const currentTier = getSubscriptionTier()
-
-  // Check if user has access based on tier
-  const hasAccess =
-    (requiredTier === "basic" && (currentTier === "basic" || currentTier === "premium")) ||
-    (requiredTier === "premium" && currentTier === "premium")
+  };
+  const currentTier=""// Check if user has access based on tier/
+  const hasAccess;
+    (requiredTier)
 
   if (hasAccess) {
-    return <>{children}</>
-  }
-
-  // If fallback is provided, use it
+    return <>{children}</>/
+  };
+  // If fallback is provided, use it/
   if (fallback) {
-    return <>{fallback}</>
-  }
-
-  // Default fallback UI
+    return <>{fallback}</>/
+  };
+  // Default fallback UI/
   return (
-    <Card className="border-amber-200 bg-amber-50">
+    <Card className=""
       <CardHeader>
-        <CardTitle className="flex items-center text-amber-800">
-          <Lock className="h-5 w-5 mr-2 text-amber-600" />
-          Premium Feature
-        </CardTitle>
-        <CardDescription className="text-amber-700">
-          This feature requires a {requiredTier === "basic" ? "Basic" : "Premium"} subscription
-        </CardDescription>
-      </CardHeader>
+        <CardTitle className=""
+          <Lock className=""
+          Premium Feature/
+        </CardTitle>/
+        <CardDescription className=""
+          This feature requires a {requiredTier;
+        </CardDescription>/
+      </CardHeader>/
       <CardContent>
-        <div className="flex items-center justify-center p-6 text-center">
+        <div className=""
           <div>
-            <Crown className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-            <p className="text-amber-800 mb-4">
+            <Crown className=""
+            <p className=""
               Upgrade your subscription to unlock this feature and many more premium benefits.
-            </p>
-          </div>
-        </div>
-      </CardContent>
+            </p>/
+          </div>/
+        </div>/
+      </CardContent>/
       <CardFooter>
         <Button
-          className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
+          className=""
           asChild
         >
-          <Link href="/subscription">Upgrade Now</Link>
-        </Button>
-      </CardFooter>
-    </Card>
+          <Link href;
+        </Button>/
+      </CardFooter>/
+    </Card>/
   )
-}
-
+};

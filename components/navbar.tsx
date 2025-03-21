@@ -6,48 +6,52 @@ import { useRouter, usePathname } from 'next/navigation';
 import { BookOpen, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/contexts/auth-context';
+// import { useAuth } from '@/contexts/auth-context';
 
 export default function Navbar() {
-  const { state: authState, logout } = useAuth();
+  // const { state: authState, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const router = useRouter();
   const pathname = usePathname();
 
-  // Handle scroll events for navbar appearance
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
   useEffect(() => {
     const handleScroll = () => {
-      const offset = window.scrollY;
-      if (offset > 50) {
+      if (window.scrollY > 50) {
         setScrolled(true);
       } else {
         setScrolled(false);
       }
-
-      // Only determine active section on homepage
-      if (pathname === '/') {
-        // Determine active section based on scroll position
-        const sections = [
-          'home',
-          'features',
-          'how-it-works',
-          'stories',
-          'pricing',
-        ];
-        for (const section of sections.reverse()) {
-          const element = document.getElementById(section);
-          if (element && window.scrollY >= element.offsetTop - 100) {
-            setActiveSection(section);
-            break;
-          }
-        }
-      }
     };
 
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+    // Only determine active section on homepage
+    if (pathname) {
+      // Determine active section based on scroll position
+      const sections = [
+        'home',
+        'features',
+        'how-it-works',
+        'stories',
+        'pricing',
+      ];
+      for (const section of sections.reverse()) {
+        if (element && window.scrollY >= element.offsetTop - 100) {
+          setActiveSection(section);
+          break
+        }
+      }
+    }
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -59,247 +63,96 @@ export default function Navbar() {
     }
   };
 
-  const handleAuthButtonClick = () => {
-    if (authState.isAuthenticated) {
-      router.push('/dashboard');
-    } else {
-      router.push('/sign-in');
-    }
-  };
-
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`${
         scrolled
           ? 'bg-white/90 backdrop-blur-md shadow-sm py-3'
           : 'bg-transparent py-5'
       }`}
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center group">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mr-3 shadow-md transition-transform duration-300 group-hover:scale-110">
-              <BookOpen className="h-5 w-5 text-white" />
-            </div>
-            <span
-              className={`text-lg font-bold transition-colors duration-300 ${
-                scrolled ? 'text-slate-900' : 'text-slate-800'
-              }`}
-            >
-              Step Into Storytime
-            </span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            <NavLink
-              href="/#home"
-              active={activeSection === 'home'}
-              scrolled={scrolled}
-            >
-              Home
-            </NavLink>
-            <NavLink
-              href="/#features"
-              active={activeSection === 'features'}
-              scrolled={scrolled}
-            >
-              Features
-            </NavLink>
-            <NavLink
-              href="/#how-it-works"
-              active={activeSection === 'how-it-works'}
-              scrolled={scrolled}
-            >
-              How It Works
-            </NavLink>
-            <NavLink
-              href="/#stories"
-              active={activeSection === 'stories'}
-              scrolled={scrolled}
-            >
-              Stories
-            </NavLink>
-            <NavLink
-              href="/#pricing"
-              active={activeSection === 'pricing'}
-              scrolled={scrolled}
-            >
-              Pricing
-            </NavLink>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex">
+            <Link href="/" className="flex items-center">
+              <BookOpen className="h-8 w-8 text-primary" />
+              <span
+                className={`${scrolled ? 'text-slate-900' : 'text-slate-800'}`}
+              >
+                Step Into Storytime
+              </span>
+            </Link>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="hidden md:flex items-center space-x-3">
-            {authState.isAuthenticated ? (
-              <>
-                <Button
-                  variant="ghost"
-                  className={`rounded-lg px-4 transition-colors ${
-                    scrolled
-                      ? 'text-slate-700 hover:text-violet-600 hover:bg-violet-50'
-                      : 'text-slate-700 hover:text-violet-600 hover:bg-white/20'
-                  }`}
-                  onClick={handleLogout}
-                >
-                  Log out
-                </Button>
-                <Button
-                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg px-5 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
-                  onClick={() => router.push('/dashboard')}
-                >
-                  Dashboard
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="ghost"
-                  className={`rounded-lg px-4 transition-colors ${
-                    scrolled
-                      ? 'text-slate-700 hover:text-violet-600 hover:bg-violet-50'
-                      : 'text-slate-700 hover:text-violet-600 hover:bg-white/20'
-                  }`}
-                  onClick={() => router.push('/sign-in')}
-                >
-                  Log in
-                </Button>
-                <Button
-                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg px-5 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
-                  onClick={() => router.push('/sign-up')}
-                >
-                  Get Started
-                </Button>
-              </>
-            )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
-            <button
-              type="button"
-              className={`p-2 rounded-lg transition-colors ${
-                scrolled
-                  ? 'text-slate-700 hover:bg-slate-100'
-                  : 'text-slate-700 hover:bg-white/20'
-              }`}
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={isMenuOpen}
-              aria-controls="mobile-menu"
+          {/* Mobile menu button */}
+          <div className="flex items-center sm:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMenu}
+              aria-label="Toggle menu"
             >
               {isMenuOpen ? (
                 <X className="h-6 w-6" />
               ) : (
                 <Menu className="h-6 w-6" />
               )}
-            </button>
+            </Button>
+          </div>
+
+          {/* Desktop menu */}
+          <div className="hidden sm: flex,sm:items-center sm:space-x-4">
+            <Link
+              href="/create"
+              className={`px-3 py-2 rounded-md text-sm font-medium ${
+                pathname === '/create'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground hover:bg-muted'
+              }`}
+            >
+              Create Story
+            </Link>
+            <Link
+              href="/dashboard"
+              className={`px-3 py-2 rounded-md text-sm font-medium ${
+                pathname === '/dashboard'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground hover:bg-muted'
+              }`}
+            >
+              Dashboard
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu with Animation */}
-      <AnimatePresence mode="wait">
-        {isMenuOpen && (
-          <motion.div
-            key="mobile-menu"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="md:hidden bg-white border-b border-slate-100 shadow-lg overflow-hidden"
-            id="mobile-menu"
-            aria-label="Mobile navigation menu"
-          >
-            <div className="container mx-auto px-4 py-5 space-y-1">
-              <MobileNavLink
-                href="/#home"
-                active={activeSection === 'home'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Home
-              </MobileNavLink>
-              <MobileNavLink
-                href="/#features"
-                active={activeSection === 'features'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Features
-              </MobileNavLink>
-              <MobileNavLink
-                href="/#how-it-works"
-                active={activeSection === 'how-it-works'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                How It Works
-              </MobileNavLink>
-              <MobileNavLink
-                href="/#stories"
-                active={activeSection === 'stories'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Stories
-              </MobileNavLink>
-              <MobileNavLink
-                href="/#pricing"
-                active={activeSection === 'pricing'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Pricing
-              </MobileNavLink>
-
-              <div className="pt-4 flex flex-col space-y-3">
-                {authState.isAuthenticated ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-center rounded-lg border-slate-200"
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        router.push('/dashboard');
-                      }}
-                    >
-                      Dashboard
-                    </Button>
-                    <Button
-                      className="w-full justify-center bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg shadow-md"
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        handleLogout();
-                      }}
-                    >
-                      Log out
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-center rounded-lg border-slate-200"
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        router.push('/sign-in');
-                      }}
-                    >
-                      Log in
-                    </Button>
-                    <Button
-                      className="w-full justify-center bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg shadow-md"
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        router.push('/sign-up');
-                      }}
-                    >
-                      Get Started
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Mobile menu */}
+      {isMenuOpen && (
+        <div className="sm:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            <Link
+              href="/create"
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                pathname === '/create'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground hover:bg-muted'
+              }`}
+            >
+              Create Story
+            </Link>
+            <Link
+              href="/dashboard"
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                pathname === '/dashboard'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground hover:bg-muted'
+              }`}
+            >
+              Dashboard
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
@@ -311,31 +164,34 @@ function NavLink({
   scrolled,
   children,
 }: {
-  href: string;
-  active: boolean;
-  scrolled: boolean;
-  children: React.ReactNode;
+  href: string,
+  active: boolean,
+  scrolled: boolean,
+  children: React.ReactNode
 }) {
   return (
     <Link
       href={href}
-      className={`relative px-4 py-2 rounded-lg font-medium transition-all duration-300 group ${
+      className={`${
         active
           ? scrolled
             ? 'text-violet-600'
             : 'text-violet-600'
           : scrolled
-          ? 'text-slate-600 hover:text-violet-600'
-          : 'text-slate-700 hover:text-violet-600'
+            ? 'text-slate-600 hover'
+            : 'text-slate-700 hover'
       }`}
     >
       {children}
       {active && (
         <motion.div
-          layoutId="activeIndicator"
-          className="absolute bottom-0 left-0 right-0 h-1 mx-4 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full"
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          layoutId="underline"
+          className="transition-transform duration-300"
           initial={false}
+          animate={{
+            scaleX: active ? 1 : 0,
+            originX: active ? 0 : 1,
+          }}
         />
       )}
     </Link>
@@ -349,18 +205,16 @@ function MobileNavLink({
   onClick,
   children,
 }: {
-  href: string;
-  active: boolean;
+  href: string,
+  active: boolean,
   onClick?: () => void;
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <Link
       href={href}
-      className={`block py-3 px-4 rounded-lg font-medium transition-colors ${
-        active
-          ? 'bg-violet-50 text-violet-600'
-          : 'text-slate-600 hover:bg-slate-50 hover:text-violet-600'
+      className={`${
+        active ? 'bg-violet-50 text-violet-600' : 'text-slate-600 hover'
       }`}
       onClick={onClick}
     >

@@ -1,17 +1,16 @@
 "use client"
 
-import type React from "react"
+import type React from "react";
 
-import { createContext, useContext, useReducer, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
-import { useAuth } from "@/contexts/auth-context"
+import {  createContext, useContext, useReducer, useEffect, useCallback  } from "react";
+import {  useRouter  } from "next/navigation";
+import {  toast  } from "@/hooks/use-toast";
+import {  supabase  } from "@/lib/supabase";
+import {  useAuth  } from "@/contexts/auth-context";
 
-// Define types
-export type SubscriptionTier = "free" | "basic" | "premium"
-export type SubscriptionStatus =
-  | "trialing"
+// Define types/
+export type SubscriptionTier = {
+export type SubscriptionStatus = {
   | "active"
   | "canceled"
   | "incomplete"
@@ -20,156 +19,94 @@ export type SubscriptionStatus =
   | "unpaid"
 
 export interface SubscriptionFeature {
-  id: string
-  name: string
-  description: string
-  quantity: number
-}
-
+  id
+  name
+  description,quantity
+};
 export interface Subscription {
-  id: string
-  user_id: string
-  status: SubscriptionStatus
-  plan_id: string
-  subscription_start: string | null
-  subscription_end: string | null
-  trial_end: string | null
-  payment_provider: "stripe" | "paypal" | null
-  payment_provider_id: string | null
-  created_at: string
-  updated_at: string
+  id
+  user_id
+  status,plan_id,subscription_start,subscription_end,trial_end,payment_provider,payment_provider_id,created_at,updated_at;
   features?: SubscriptionFeature[]
-}
-
+};
 export interface SubscriptionPlan {
-  id: string
-  name: string
-  description: string
-  price: number
-  interval: "month" | "year"
-  tier: SubscriptionTier
-  features: string[]
+  id
+  name
+  description,price,interval,tier,features;
   is_popular?: boolean
-}
-
+};
 export interface SubscriptionState {
-  subscription: Subscription | null
-  availablePlans: SubscriptionPlan[]
-  isLoading: boolean
-  error: string | null
-  isInitialized: boolean
-}
-
-type SubscriptionAction =
-  | { type: "INITIALIZE"; payload: { subscription: Subscription | null; plans: SubscriptionPlan[] } }
-  | { type: "SET_SUBSCRIPTION"; payload: Subscription | null }
-  | { type: "SET_PLANS"; payload: SubscriptionPlan[] }
-  | { type: "SET_LOADING"; payload: boolean }
-  | { type: "SET_ERROR"; payload: string | null }
-  | { type: "CLEAR_SUBSCRIPTION" }
-
-// Create initial state
-const initialState: SubscriptionState = {
-  subscription: null,
-  availablePlans: [],
-  isLoading: false,
-  error: null,
-  isInitialized: false,
-}
-
-// Create reducer
-const subscriptionReducer = (state: SubscriptionState, action: SubscriptionAction): SubscriptionState => {
+  subscription
+  availablePlans
+  isLoading,error,isInitialized
+};
+type SubscriptionAction = {
+  | { type: "INITIALIZE"; payload={ subscription: Subscription| null; plans: SubscriptionPlan[] } };
+  | { type: "SET_SUBSCRIPTION"; payload: Subscription| null };
+  | { type: "SET_PLANS"; payload: SubscriptionPlan[] };
+  | { type: "SET_LOADING"; payload: boolean};
+  | { type: "SET_ERROR"; payload: string| null };
+  | { type: "CLEAR_SUBSCRIPTION" };
+// Create initial state/
+const initialState: SubscriptionState,subscription,availablePlans,isLoading,error,isInitialized
+};
+// Create reducer/
+const subscriptionReducer;
   switch (action.type) {
     case "INITIALIZE":
       return {
         ...state,
-        subscription: action.payload.subscription,
-        availablePlans: action.payload.plans,
-        isLoading: false,
-        isInitialized: true,
-      }
+        subscription,availablePlans,isLoading,isInitialized
+      };
     case "SET_SUBSCRIPTION":
       return {
         ...state,
-        subscription: action.payload,
-        isLoading: false,
-      }
+        subscription,isLoading
+      };
     case "SET_PLANS":
       return {
         ...state,
-        availablePlans: action.payload,
-        isLoading: false,
-      }
+        availablePlans,isLoading
+      };
     case "SET_LOADING":
-      return { ...state, isLoading: action.payload }
+      return { ...state, isLoading: action.payload };
     case "SET_ERROR":
-      return { ...state, error: action.payload, isLoading: false }
+      return { ...state, error: action.payload, isLoading: false};
     case "CLEAR_SUBSCRIPTION":
       return {
         ...state,
-        subscription: null,
-        isLoading: false,
-      }
-    default:
-      return state
-  }
-}
-
-// Create context
+        subscription,isLoading
+      };
+    default
+  };
+};
+// Create context/
 interface SubscriptionContextType {
-  state: SubscriptionState
-  fetchSubscription: () => Promise<void>
-  createSubscription: (planId: string) => Promise<void>
-  cancelSubscription: () => Promise<void>
-  updateSubscription: (planId: string) => Promise<void>
-  getSubscriptionTier: () => SubscriptionTier
-  hasFeature: (featureId: string) => boolean
-  getRemainingDays: () => number | null
-}
-
-const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined)
-
-// Create provider
-export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  state
+  fetchSubscription
+  createSubscription,cancelSubscription,updateSubscription,getSubscriptionTier,hasFeature,getRemainingDays
+};
+const SubscriptionContext=""// Create provider/
+export const SubscriptionProvider;
   const [state, dispatch] = useReducer(subscriptionReducer, initialState)
-  const { state: authState } = useAuth()
-  const router = useRouter()
-
-  // Sample subscription plans - in a real app, these would come from your database
-  const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  const { state;
+  const router=""// Sample subscription plans - in a real app, these would come from your database/
+  const SUBSCRIPTION_PLANS;
     {
-      id: "free",
-      name: "Free",
-      description: "Basic access with limited features",
-      price: 0,
-      interval: "month",
-      tier: "free",
-      features: ["3 stories per month", "Basic themes", "Web reading"],
+      id,name,description,price,interval,tier,features
     },
     {
-      id: "basic",
-      name: "Unlimited Adventures",
-      description: "Unlimited stories and more features",
-      price: 9.99,
-      interval: "month",
-      tier: "basic",
-      features: [
+      id,name,description,price,interval,tier,features;
         "Unlimited stories",
         "All themes & settings",
         "Advanced character creation",
         "Download as PDF",
         "New themes monthly",
       ],
-      is_popular: true,
+      is_popular
     },
     {
-      id: "premium",
-      name: "Family Plan",
-      description: "Everything for the whole family",
-      price: 14.99,
-      interval: "month",
-      tier: "premium",
-      features: [
+      id,name,description,price,interval,tier,features;
         "Everything in Unlimited",
         "Up to 5 family profiles",
         "Audio narration",
@@ -180,26 +117,22 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     },
   ]
 
-  // Initialize subscription state
-  const initializeSubscription = useCallback(async () => {
-    const userId = authState.user?.id
+  // Initialize subscription state/
+  const initializeSubscription;
+    const userId;
 
     if (!userId) {
       dispatch({
-        type: "INITIALIZE",
-        payload: {
-          subscription: null,
-          plans: SUBSCRIPTION_PLANS,
+        type,payload,subscription,plans
         },
       })
       return
-    }
-
+    };
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
+      dispatch({ type)
 
-      // Fetch user's subscription
-      const { data: subscription, error } = await supabase
+      // Fetch user's subscription/
+      const { data;
         .from("subscriptions")
         .select(`
           *,
@@ -209,52 +142,42 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         .single()
 
       if (error && error.code !== "PGRST116") {
-        // PGRST116 means no rows returned, which is fine for new users
-        console.error("Error fetching subscription:", error)
+        // PGRST116 means no rows returned, which is fine for new users/
+        console.error("Error fetching subscription)
         throw error
-      }
-
+      };
       dispatch({
-        type: "INITIALIZE",
-        payload: {
-          subscription: subscription as Subscription | null,
-          plans: SUBSCRIPTION_PLANS,
+        type,payload,subscription,plans
         },
       })
     } catch (error) {
-      console.error("Error initializing subscription:", error)
+      console.error("Error initializing subscription)
       dispatch({
-        type: "INITIALIZE",
-        payload: {
-          subscription: null,
-          plans: SUBSCRIPTION_PLANS,
+        type,payload,subscription,plans
         },
       })
-    }
-  }, []) // Remove dependencies to break the circular dependency
+    };
+  }, []) // Remove dependencies to break the circular dependency/
 
-  // Initialize subscription when auth state changes
+  // Initialize subscription when auth state changes/
   useEffect(() => {
     if (authState.isInitialized) {
       initializeSubscription()
-    }
+    };
   }, [authState.isInitialized, initializeSubscription])
 
-  // Fetch user's subscription
-  const fetchSubscription = async () => {
+  // Fetch user's subscription/
+  const fetchSubscription;
     if (!authState.user) {
       toast({
-        title: "Authentication required",
-        description: "Please sign in to view your subscription",
-        variant: "destructive",
+        title,description,variant
       })
       return
-    }
-
+    };
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
+      dispatch({ type)
 
-      const { data: subscription, error } = await supabase
+      const { data;
         .from("subscriptions")
         .select(`
           *,
@@ -265,183 +188,150 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (error && error.code !== "PGRST116") {
         throw error
-      }
-
+      };
       dispatch({
-        type: "SET_SUBSCRIPTION",
-        payload: subscription as Subscription | null,
+        type,payload
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch subscription. Please try again."
+      const errorMessage;
 
-      dispatch({ type: "SET_ERROR", payload: errorMessage })
+      dispatch({ type)
       toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+        title,description,variant
       })
-    }
-  }
-
-  // Create a new subscription
-  const createSubscription = async (planId: string) => {
+    };
+  };
+  // Create a new subscription/
+  const createSubscription;
     if (!authState.user) {
       toast({
-        title: "Authentication required",
-        description: "Please sign in to create a subscription",
-        variant: "destructive",
+        title,description,variant
       })
-      router.push("/sign-in")
+      router.push("/sign-in")/
       return
-    }
-
+    };
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
+      dispatch({ type)
 
-      // In a real app, this would create a checkout session with Stripe or another payment provider
-      // For this demo, we'll create a subscription record directly
+      // In a real app, this would create a checkout session with Stripe or another payment provider/
+      // For this demo, we'll create a subscription record directly/
 
-      const plan = SUBSCRIPTION_PLANS.find((p) => p.id === planId)
+      const plan;
 
       if (!plan) {
         throw new Error("Invalid subscription plan")
-      }
-
-      // Create subscription record
-      const { data: subscription, error } = await supabase
+      };
+      // Create subscription record/
+      const { data;
         .from("subscriptions")
         .insert({
-          user_id: authState.user.id,
-          status: plan.price === 0 ? "active" : "trialing",
-          plan_id: planId,
-          subscription_start: new Date().toISOString(),
-          subscription_end: plan.price === 0 ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          trial_end: plan.price === 0 ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          payment_provider: plan.price === 0 ? null : "stripe",
-          payment_provider_id: plan.price === 0 ? null : `demo_${Date.now()}`,
+          user_id;
+          status: plan.price,plan_id,subscription_start;
+          subscription_end: plan.price;
+          trial_end: plan.price;
+          payment_provider: plan.price;
+          payment_provider_id: plan.price
         })
         .select()
         .single()
 
       if (error) throw error
 
-      // Update user profile with subscription tier
-      await supabase.from("profiles").update({ subscription_tier: plan.tier }).eq("id", authState.user.id)
+      // Update user profile with subscription tier/
+      await supabase.from("profiles").update({ subscription_tier)
 
       dispatch({
-        type: "SET_SUBSCRIPTION",
-        payload: subscription as Subscription,
+        type,payload
       })
 
       toast({
-        title: "Subscription created",
-        description: `You are now subscribed to the ${plan.name} plan`,
-        variant: "success",
+        title,description,variant
       })
 
-      router.push("/dashboard")
+      router.push("/dashboard")/
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to create subscription. Please try again."
+      const errorMessage;
 
-      dispatch({ type: "SET_ERROR", payload: errorMessage })
+      dispatch({ type)
       toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+        title,description,variant
       })
     } finally {
-      dispatch({ type: "SET_LOADING", payload: false })
-    }
-  }
-
-  // Cancel subscription
-  const cancelSubscription = async () => {
+      dispatch({ type
+    };
+  };
+  // Cancel subscription/
+  const cancelSubscription;
     if (!authState.user || !state.subscription) {
       toast({
-        title: "No active subscription",
-        description: "You don't have an active subscription to cancel",
-        variant: "destructive",
+        title,description,variant
       })
       return
-    }
-
+    };
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
+      dispatch({ type)
 
-      // In a real app, this would cancel the subscription with the payment provider
+      // In a real app, this would cancel the subscription with the payment provider/
 
-      // Update subscription status
+      // Update subscription status/
       const { error } = await supabase
         .from("subscriptions")
         .update({
-          status: "canceled",
-          subscription_end: new Date().toISOString(),
+          status,subscription_end
         })
         .eq("id", state.subscription.id)
         .eq("user_id", authState.user.id)
 
       if (error) throw error
 
-      // Update user profile
-      await supabase.from("profiles").update({ subscription_tier: "free" }).eq("id", authState.user.id)
+      // Update user profile/
+      await supabase.from("profiles").update({ subscription_tier)
 
-      // Refresh subscription data
+      // Refresh subscription data/
       await fetchSubscription()
 
       toast({
-        title: "Subscription canceled",
-        description: "Your subscription has been canceled",
-        variant: "success",
+        title,description,variant
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to cancel subscription. Please try again."
+      const errorMessage;
 
-      dispatch({ type: "SET_ERROR", payload: errorMessage })
+      dispatch({ type)
       toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+        title,description,variant
       })
     } finally {
-      dispatch({ type: "SET_LOADING", payload: false })
-    }
-  }
-
-  // Update subscription
-  const updateSubscription = async (planId: string) => {
+      dispatch({ type
+    };
+  };
+  // Update subscription/
+  const updateSubscription;
     if (!authState.user) {
       toast({
-        title: "Authentication required",
-        description: "Please sign in to update your subscription",
-        variant: "destructive",
+        title,description,variant
       })
-      router.push("/sign-in")
+      router.push("/sign-in")/
       return
-    }
-
+    };
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
+      dispatch({ type)
 
-      const plan = SUBSCRIPTION_PLANS.find((p) => p.id === planId)
+      const plan;
 
       if (!plan) {
         throw new Error("Invalid subscription plan")
-      }
-
+      };
       if (!state.subscription) {
-        // Create new subscription if none exists
+        // Create new subscription if none exists/
         return await createSubscription(planId)
-      }
+      };
+      // In a real app, this would update the subscription with the payment provider/
 
-      // In a real app, this would update the subscription with the payment provider
-
-      // Update subscription record
-      const { data: subscription, error } = await supabase
+      // Update subscription record/
+      const { data;
         .from("subscriptions")
         .update({
-          plan_id: planId,
-          status: "active",
-          updated_at: new Date().toISOString(),
+          plan_id,status,updated_at
         })
         .eq("id", state.subscription.id)
         .eq("user_id", authState.user.id)
@@ -450,83 +340,69 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (error) throw error
 
-      // Update user profile
-      await supabase.from("profiles").update({ subscription_tier: plan.tier }).eq("id", authState.user.id)
+      // Update user profile/
+      await supabase.from("profiles").update({ subscription_tier)
 
       dispatch({
-        type: "SET_SUBSCRIPTION",
-        payload: subscription as Subscription,
+        type,payload
       })
 
       toast({
-        title: "Subscription updated",
-        description: `Your subscription has been updated to the ${plan.name} plan`,
-        variant: "success",
+        title,description,variant
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to update subscription. Please try again."
+      const errorMessage;
 
-      dispatch({ type: "SET_ERROR", payload: errorMessage })
+      dispatch({ type)
       toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+        title,description,variant
       })
     } finally {
-      dispatch({ type: "SET_LOADING", payload: false })
-    }
-  }
-
-  // Get current subscription tier
-  const getSubscriptionTier = (): SubscriptionTier => {
+      dispatch({ type
+    };
+  };
+  // Get current subscription tier/
+  const getSubscriptionTier;
     if (!state.subscription || state.subscription.status !== "active") {
       return "free"
-    }
-
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.id === state.subscription.plan_id)
+    };
+    const plan;
     return plan?.tier || "free"
-  }
-
-  // Check if subscription has a specific feature
-  const hasFeature = (featureId: string): boolean => {
+  };
+  // Check if subscription has a specific feature/
+  const hasFeature;
     if (!state.subscription || state.subscription.status !== "active") {
-      // Free tier features
-      const freePlan = SUBSCRIPTION_PLANS.find((p) => p.id === "free")
+      // Free tier features/
+      const freePlan;
       return freePlan?.features.includes(featureId) || false
-    }
-
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.id === state.subscription.plan_id)
+    };
+    const plan;
     return plan?.features.includes(featureId) || false
-  }
-
-  // Get remaining days in subscription or trial
-  const getRemainingDays = (): number | null => {
+  };
+  // Get remaining days in subscription or trial/
+  const getRemainingDays;
     if (!state.subscription) {
       return null
-    }
+    };
+    const now;
+    let endDate: Date| null;
 
-    const now = new Date()
-    let endDate: Date | null = null
-
-    if (state.subscription.status === "trialing" && state.subscription.trial_end) {
-      endDate = new Date(state.subscription.trial_end)
+    if (state.subscription.status)
+      endDate
     } else if (state.subscription.subscription_end) {
-      endDate = new Date(state.subscription.subscription_end)
-    }
-
+      endDate
+    };
     if (!endDate) {
       return null
-    }
+    };
+    const diffTime;
+    const diffDays;
 
-    const diffTime = endDate.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-    return diffDays > 0 ? diffDays : 0
-  }
-
+    return diffDays > 0 ? diffDays
+  };
   return (
     <SubscriptionContext.Provider
-      value={{
+      value;
         state,
         fetchSubscription,
         createSubscription,
@@ -535,21 +411,18 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         getSubscriptionTier,
         hasFeature,
         getRemainingDays,
-      }}
+      }};
     >
-      {children}
-    </SubscriptionContext.Provider>
+      {children};
+    </SubscriptionContext.Provider>/
   )
-}
+};
+// Create hook for using the context/
+export const useSubscription;
+  const context;
 
-// Create hook for using the context
-export const useSubscription = () => {
-  const context = useContext(SubscriptionContext)
-
-  if (context === undefined) {
+  if (context)
     throw new Error("useSubscription must be used within a SubscriptionProvider")
-  }
-
+  };
   return context
-}
-
+};

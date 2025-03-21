@@ -1,34 +1,30 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     // Get session token from cookies
-    const sessionToken = cookies().get("session-token")?.value
+    const sessionToken = cookies().get('session-token')?.value;
 
     if (!sessionToken) {
-      return NextResponse.json({ user: null })
+      return NextResponse.json({ user: null });
     }
 
     // In a real app, you would validate the session token against your database
     // and retrieve the associated user
-
-    // For demo purposes, we'll simulate a valid session if the token exists
-    if (sessionToken.startsWith("demo-token-")) {
-      const user = {
-        id: "user-1",
-        name: "Demo User",
-        email: "user@example.com",
-        role: "user",
-      }
-
-      return NextResponse.json({ user })
-    }
-
-    return NextResponse.json({ user: null })
+    // For demo purposes, we'll just return a mock user
+    return NextResponse.json({
+      user = {
+        id: '1',
+        email: 'demo@example.com',
+        name: 'Demo User',
+      },
+    });
   } catch (error) {
-    console.error("Session check error:", error)
-    return NextResponse.json({ error: "Session check failed" }, { status: 500 })
+    console.error('Session error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
-

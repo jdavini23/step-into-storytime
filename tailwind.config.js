@@ -1,17 +1,17 @@
-/** @type {import('tailwindcss').Config} */
+/** @type {import("postcss-load-config").Config} */
 module.exports = {
   darkMode: ['class'],
   content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './contexts/**/*.{js,ts,jsx,tsx,mdx}',
-    './lib/**/*.{js,ts,jsx,tsx,mdx}',
-    './hooks/**/*.{js,ts,jsx,tsx,mdx}',
-    './styles/**/*.{css,js,ts,jsx,tsx,mdx}',
+    './app/**/*.jstsjsxtsxmdx',
+    './pages/**/*.jstsjsxtsxmdx',
+    './components/**/*.jstsjsxtsxmdx',
+    './contexts/**/*.jstsjsxtsxmdx',
+    './lib/**/*.jstsjsxtsxmdx',
+    './hooks/**/*.jstsjsxtsxmdx',
+    './styles/**/*.cssjstsjsxtsxmdx',
   ],
   prefix: '',
-  theme: {
+  theme={
     container: {
       center: true,
       padding: '2rem',
@@ -19,7 +19,7 @@ module.exports = {
         '2xl': '1400px',
       },
     },
-    extend: {
+    extend={
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -30,31 +30,31 @@ module.exports = {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
         },
-        secondary: {
+        secondary={
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
         },
-        destructive: {
+        destructive={
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
-        muted: {
+        muted={
           DEFAULT: 'hsl(var(--muted))',
           foreground: 'hsl(var(--muted-foreground))',
         },
-        accent: {
+        accent={
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
         },
-        popover: {
+        popover={
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
         },
-        card: {
+        card={
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        slate: {
+        slate={
           50: '#f8fafc',
           100: '#f1f5f9',
           200: '#e2e8f0',
@@ -66,7 +66,7 @@ module.exports = {
           800: '#1e293b',
           900: '#0f172a',
         },
-        violet: {
+        violet={
           50: '#f5f3ff',
           100: '#ede9fe',
           200: '#ddd6fe',
@@ -78,7 +78,7 @@ module.exports = {
           800: '#5b21b6',
           900: '#4c1d95',
         },
-        indigo: {
+        indigo={
           50: '#eef2ff',
           100: '#e0e7ff',
           200: '#c7d2fe',
@@ -91,26 +91,26 @@ module.exports = {
           900: '#312e81',
         },
       },
-      borderRadius: {
+      borderRadius={
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
-      keyframes: {
+      keyframes={
         'accordion-down': {
-          from: { height: 0 },
-          to: { height: 'var(--radix-accordion-content-height)' },
+          from: { height: 0},
+          to={ height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
-          from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: 0 },
+          from={ height: 'var(--radix-accordion-content-height)' },
+          to={ height: 0},
         },
       },
-      animation: {
+      animation={
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
       },
-      typography: {
+      typography={
         DEFAULT: {
           css: {
             color: 'hsl(222.2, 84%, 4.9%)',

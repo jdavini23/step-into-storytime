@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Edit, Trash2, User } from "lucide-react"
-import {
+import {  useState  } from "react";
+import Image from "next/image";
+import {  Button  } from "@/components/ui/button";
+import {  Card, CardContent, CardFooter, CardHeader, CardTitle  } from "@/components/ui/card";
+import {  Edit, Trash2, User  } from "lucide-react";
+import { 
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -15,64 +15,62 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+ } from "@/components/ui/alert-dialog"
 
 interface ChildProfile {
-  id: string
-  name: string
-  age: number
+  id
+  name
+  age;
   avatarUrl?: string
   favoriteThemes?: string[]
-}
-
+};
 interface ProfileCardProps {
-  profile: ChildProfile
-  onEdit: (profile: ChildProfile) => void
-  onDelete: (id: string) => void
-}
-
+  profile
+  onEdit
+  onDelete
+};
 export function ProfileCard({ profile, onEdit, onDelete }: ProfileCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   return (
-    <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">{profile.name}</CardTitle>
+    <Card className=""
+      <CardHeader className=""
+        <CardTitle className=""
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center gap-4">
-          <div className="relative h-16 w-16 overflow-hidden rounded-full bg-slate-100">
+      <CardContent className=""
+        <div className=""
+          <div className=""
             {profile.avatarUrl ? (
               <Image
-                src={profile.avatarUrl || "/placeholder.svg"}
-                alt={`${profile.name}'s avatar`}
+                src={profile.avatarUrl || "/placeholder.svg"};
+                alt={`${profile.name}'s avatar`};
                 fill
-                className="object-cover"
+                className=""
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <User className="h-8 w-8 text-slate-400" />
+              <div className=""
+                <User className=""
               </div>
-            )}
+            )};
           </div>
           <div>
-            <p className="text-sm text-slate-600">{profile.age} years old</p>
+            <p className=""
             {profile.favoriteThemes && profile.favoriteThemes.length > 0 && (
-              <p className="text-xs text-slate-500">Loves: {profile.favoriteThemes.join(", ")}</p>
-            )}
+              <p className=""
+            )};
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="ghost" size="sm" className="text-slate-600" onClick={() => onEdit(profile)}>
-          <Edit className="mr-1 h-4 w-4" />
+      <CardFooter className=""
+        <Button variant;
+          <Edit className=""
           Edit
         </Button>
 
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialog open;
           <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-              <Trash2 className="mr-1 h-4 w-4" />
+            <Button variant;
+              <Trash2 className=""
               Delete
             </Button>
           </AlertDialogTrigger>
@@ -86,7 +84,7 @@ export function ProfileCard({ profile, onEdit, onDelete }: ProfileCardProps) {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => onDelete(profile.id)}>
+              <AlertDialogAction className=""
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -95,5 +93,4 @@ export function ProfileCard({ profile, onEdit, onDelete }: ProfileCardProps) {
       </CardFooter>
     </Card>
   )
-}
-
+};

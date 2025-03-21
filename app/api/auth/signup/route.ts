@@ -1,7 +1,7 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const { email, password, name } = await request.json();
 
@@ -13,18 +13,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create server-side Supabase client
-    const supabase = createServerSupabaseClient();
+    // Create Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+    );
 
     // Sign up the user
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          name,
-        },
-      },
     });
 
     if (signUpError) {
@@ -32,35 +30,28 @@ export async function POST(request: NextRequest) {
     }
 
     if (!authData.user) {
-      return NextResponse.json(
-        { error: 'Failed to create user' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Signup failed' }, { status: 400 });
     }
 
     // Create user profile
-    const { error: profileError } = await supabase.from('profiles').insert([
-      {
-        id: authData.user.id,
-        email: email,
-        name: name,
-        subscription_tier: 'free',
-      },
-    ]);
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert([{ id: authData.user.id, name }]);
 
     if (profileError) {
       console.error('Error creating profile:', profileError);
       // Don't fail the signup if profile creation fails
-      // We can handle this case separately
     }
 
     return NextResponse.json({
       user: authData.user,
-      session: authData.session,
-      message: 'User created successfully',
+      message: 'Signup successful',
     });
   } catch (error) {
     console.error('Signup error:', error);
-    return NextResponse.json({ error: 'Registration failed' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

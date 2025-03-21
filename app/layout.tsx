@@ -2,13 +2,11 @@ import type React from 'react';
 import type { Metadata, Viewport } from 'next/types';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
-import { ErrorBoundary } from '@/components/error-boundary';
 import { AuthProvider } from '@/contexts/auth-context';
 import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
 import '@/styles/globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
-import { Metadata as NextMetadata } from 'next';
 
 // Initialize font
 const inter = Inter({
@@ -20,25 +18,24 @@ const inter = Inter({
 // Define metadata
 export const metadata: Metadata = {
   title: 'Step Into Storytime',
-  description: 'Create magical, personalized bedtime stories for children',
-  metadataBase: new URL('http://localhost:3002'),
-  openGraph: {
+  description: 'Create magical, personalized stories for children',
+  openGraph = {
     title: 'Step Into Storytime',
-    description: 'Create magical, personalized bedtime stories for children',
+    description: 'Create magical, personalized stories for children',
     type: 'website',
   },
-  twitter: {
+  twitter = {
     card: 'summary_large_image',
     title: 'Step Into Storytime',
-    description: 'Create magical, personalized bedtime stories for children',
+    description: 'Create magical, personalized stories for children',
   },
 };
 
 // Define viewport
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+    { media: '(prefers-color-scheme: light)', color: 'white' },
+    { media: '(prefers-color-scheme: dark)', color: 'black' },
   ],
   width: 'device-width',
   initialScale: 1,
@@ -52,25 +49,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
-      <body className="min-h-screen bg-background font-sans antialiased">
-        <ErrorBoundary>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <AuthProvider>
-              <SubscriptionProvider>
-                <StoryProvider>
-                  {children}
-                  <Toaster />
-                </StoryProvider>
-              </SubscriptionProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </ErrorBoundary>
+    <html lang="en">
+      <body className={inter.variable}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <SubscriptionProvider>
+              <StoryProvider>
+                {children}
+                <Toaster />
+              </StoryProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
