@@ -76,6 +76,7 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
         },
       ]);
       setIsTyping(false);
+      setCurrentStep(-1); // Start at -1 so first step increment goes to 0
     }, 500);
 
     return () => clearTimeout(timer);
@@ -92,23 +93,23 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
   const validateStoryData = (): string[] => {
     const errors: string[] = [];
 
-    if (!storyData.title.trim()) {
+    if (!storyData.title?.trim()) {
       errors.push('Please provide a title for your story');
     }
 
-    if (!storyData.mainCharacter.name.trim()) {
+    if (!storyData.mainCharacter?.name?.trim()) {
       errors.push('Please provide a name for the main character');
     }
 
-    if (!storyData.mainCharacter.age.trim()) {
+    if (!storyData.mainCharacter?.age?.trim()) {
       errors.push('Please provide an age for the main character');
     }
 
-    if (!storyData.setting.trim()) {
+    if (!storyData.setting?.trim()) {
       errors.push('Please select a setting for your story');
     }
 
-    if (!storyData.theme.trim()) {
+    if (!storyData.theme?.trim()) {
       errors.push('Please select a theme for your story');
     }
 
@@ -124,18 +125,13 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
           ...prev,
           [parent]: {
             ...prev[parent],
-            [child]: value,
+            [child]: Array.isArray(value) ? value : value.trim(),
           },
-        }));
-      } else if (field === 'traits' || field === 'plotElements') {
-        setStoryData((prev) => ({
-          ...prev,
-          [field]: Array.isArray(value) ? value : [value],
         }));
       } else {
         setStoryData((prev) => ({
           ...prev,
-          [field]: value,
+          [field]: Array.isArray(value) ? value : value.trim(),
         }));
       }
 
@@ -149,14 +145,29 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
       // Show typing indicator
       setIsTyping(true);
 
-      // Get next step
+      // Get next step from storySteps array
       const nextStep = currentStep + 1;
-      setCurrentStep(nextStep);
 
-      // Add system message after delay
-      setTimeout(() => {
-        if (nextStep < storySteps.length) {
-          const step = storySteps[nextStep];
+      // Ensure we're showing the character name step after title
+      if (field === 'title') {
+        const characterNameStep = storySteps[0]; // First step is character name
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: 'system',
+              content: characterNameStep.message,
+              inputType: characterNameStep.inputType,
+              field: characterNameStep.field,
+              options: characterNameStep.options,
+            },
+          ]);
+          setIsTyping(false);
+          setCurrentStep(0);
+        }, 1000);
+      } else if (nextStep < storySteps.length) {
+        const step = storySteps[nextStep];
+        setTimeout(() => {
           setMessages((prev) => [
             ...prev,
             {
@@ -168,8 +179,11 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
             },
           ]);
           setIsTyping(false);
-        } else {
-          // Final step - generate story
+          setCurrentStep(nextStep);
+        }, 1000);
+      } else {
+        // Final step - show review/generate options
+        setTimeout(() => {
           setMessages((prev) => [
             ...prev,
             {
@@ -185,8 +199,9 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
             },
           ]);
           setIsTyping(false);
-        }
-      }, 1000);
+          setCurrentStep(nextStep);
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error handling user input:', error);
       if (onError) {
@@ -393,7 +408,16 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
         return (
           <UserInput
             onSubmit={(value) => handleUserInput(value, message.field)}
-            placeholder={`Type your ${message.field}...`}
+            placeholder={
+              message.field === 'mainCharacter.name'
+                ? "Type your character's name..."
+                : message.field === 'mainCharacter.age'
+                ? "Type your character's age..."
+                : message.field === 'title'
+                ? 'Type your story title...'
+                : `Type your ${message.field.split('.').pop()}...`
+            }
+            key={message.field}
           />
         );
       case 'choice':
@@ -456,29 +480,50 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="font-medium">
-                      {storyData.mainCharacter.name},{' '}
-                      {storyData.mainCharacter.age}
+                      {storyData.mainCharacter?.name || 'Unnamed Character'}{' '}
+                      {storyData.mainCharacter?.age
+                        ? `(${storyData.mainCharacter.age})`
+                        : ''}
                     </p>
                     <p className="text-sm text-slate-600">
-                      Traits: {storyData.mainCharacter.traits.join(', ')}
+                      Traits:{' '}
+                      {storyData.mainCharacter?.traits?.join(', ') || 'None'}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-violet-600"
-                    onClick={() => {
-                      const newName = prompt(
-                        'Edit character name:',
-                        storyData.mainCharacter.name
-                      );
-                      if (newName)
-                        handleEditField('mainCharacter.name', newName);
-                    }}
-                  >
-                    <Edit className="h-3.5 w-3.5 mr-1" />
-                    Edit
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-violet-600"
+                      onClick={() => {
+                        const newName = prompt(
+                          'Edit character name:',
+                          storyData.mainCharacter?.name || ''
+                        );
+                        if (newName)
+                          handleEditField('mainCharacter.name', newName);
+                      }}
+                    >
+                      <Edit className="h-3.5 w-3.5 mr-1" />
+                      Edit Name
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-violet-600"
+                      onClick={() => {
+                        const newAge = prompt(
+                          'Edit character age:',
+                          storyData.mainCharacter?.age || ''
+                        );
+                        if (newAge)
+                          handleEditField('mainCharacter.age', newAge);
+                      }}
+                    >
+                      <Edit className="h-3.5 w-3.5 mr-1" />
+                      Edit Age
+                    </Button>
+                  </div>
                 </div>
               </div>
 

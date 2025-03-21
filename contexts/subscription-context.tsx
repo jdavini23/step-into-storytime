@@ -225,12 +225,7 @@ export function SubscriptionProvider({
       // Fetch user's subscription
       const { data, error } = (await supabase
         .from('subscriptions')
-        .select(
-          `
-          *,
-          subscription_items(*)
-        `
-        )
+        .select('*')
         .eq('user_id', userId)
         .single()) as unknown as { data: Subscription | null; error: any };
 
@@ -269,12 +264,7 @@ export function SubscriptionProvider({
 
       const { data, error } = (await supabase
         .from('subscriptions')
-        .select(
-          `
-          *,
-          subscription_items(*)
-        `
-        )
+        .select('*')
         .eq('user_id', userId)
         .single()) as unknown as { data: Subscription | null; error: any };
 
