@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
 
 // Type for Supabase instance with all tables
@@ -128,37 +130,32 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storageKey: 'sb-auth-token',
-    storage: {
-      getItem: (key) => {
-        if (typeof window === 'undefined') return null;
-        return window.localStorage.getItem(key);
-      },
-      setItem: (key, value) => {
-        if (typeof window === 'undefined') return;
-        window.localStorage.setItem(key, value);
-      },
-      removeItem: (key) => {
-        if (typeof window === 'undefined') return;
-        window.localStorage.removeItem(key);
-      },
-    },
-  },
-  global: {
-    fetch: customFetch,
-    headers: {
-      'X-Client-Info': 'step-into-storytime',
-    },
   },
 });
 
 // Helper function to create a Supabase client for server components
 export const createServerSupabaseClient = () => {
-  return createClient<Database>(supabaseUrl || '', supabaseAnonKey || '', {
-    auth: {
-      persistSession: false,
-    },
-    global: {
-      fetch: customFetch,
+  const cookieStore = cookies();
+
+  return createServerClient(supabaseUrl || '', supabaseAnonKey || '', {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+      set(name: string, value: string, options: any) {
+        try {
+          cookieStore.set({ name, value, ...options });
+        } catch (error) {
+          // Handle cookie setting error
+        }
+      },
+      remove(name: string, options: any) {
+        try {
+          cookieStore.delete({ name, ...options });
+        } catch (error) {
+          // Handle cookie removal error
+        }
+      },
     },
   });
 };
@@ -475,10 +472,10 @@ export const fetchUserProfile = async (userId: string) => {
         .insert([
           {
             id: userId,
-            email: userEmail,
+            email: userEmail || '',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            subscription_tier: 'free',
+            subscription_tier: 'free' as const,
           },
         ])
         .select()

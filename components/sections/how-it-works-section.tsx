@@ -1,6 +1,28 @@
-import Image from "next/image"
-import { Zap } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Image from 'next/image';
+import { Zap } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+
+type ColorKey = 'violet' | 'indigo' | 'sky';
+
+interface ColorStyles {
+  bg: string;
+  gradient: string;
+  nextGradient: string;
+}
+
+interface StepCardProps {
+  number: number;
+  title: string;
+  description: string;
+  image: string;
+  color: ColorKey;
+}
 
 export default function HowItWorksSection() {
   return (
@@ -11,7 +33,9 @@ export default function HowItWorksSection() {
             <Zap className="h-4 w-4 mr-2" />
             <span>Simple Process</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">How the Magic Happens</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+            How the Magic Happens
+          </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
             Creating personalized stories has never been easier
           </p>
@@ -44,27 +68,30 @@ export default function HowItWorksSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
-function StepCard({ number, title, description, image, color }) {
-  const colorMap = {
+function StepCard({ number, title, description, image, color }: StepCardProps) {
+  const colorMap: Record<ColorKey, ColorStyles> = {
     violet: {
-      bg: "bg-violet-600",
-      gradient: "bg-gradient-to-r from-transparent via-violet-300 to-violet-600",
-      nextGradient: "bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600",
+      bg: 'bg-violet-600',
+      gradient:
+        'bg-gradient-to-r from-transparent via-violet-300 to-violet-600',
+      nextGradient:
+        'bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600',
     },
     indigo: {
-      bg: "bg-indigo-600",
-      gradient: "bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600",
-      nextGradient: "bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent",
+      bg: 'bg-indigo-600',
+      gradient: 'bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600',
+      nextGradient:
+        'bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent',
     },
     sky: {
-      bg: "bg-sky-600",
-      gradient: "bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent",
-      nextGradient: "",
+      bg: 'bg-sky-600',
+      gradient: 'bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent',
+      nextGradient: '',
     },
-  }
+  };
 
   return (
     <div className="relative">
@@ -73,7 +100,9 @@ function StepCard({ number, title, description, image, color }) {
       >
         {number}
       </div>
-      <div className={`h-1 ${colorMap[color].gradient} absolute top-0 left-1/2 w-full`}></div>
+      <div
+        className={`h-1 ${colorMap[color].gradient} absolute top-0 left-1/2 w-full`}
+      ></div>
       <Card className="border-0 shadow-xl h-full">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl text-slate-900">{title}</CardTitle>
@@ -81,17 +110,18 @@ function StepCard({ number, title, description, image, color }) {
         <CardContent>
           <div className="h-40 w-full mb-4 rounded-lg overflow-hidden">
             <Image
-              src={image || "/placeholder.svg"}
+              src={image || '/placeholder.svg'}
               alt={title}
               width={300}
               height={160}
               className="w-full h-full object-cover"
             />
           </div>
-          <CardDescription className="text-slate-600">{description}</CardDescription>
+          <CardDescription className="text-slate-600">
+            {description}
+          </CardDescription>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
-

@@ -12,15 +12,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
-import {
-  supabase,
-  signInWithEmail,
-  signUpWithEmail,
-  signOut as supabaseSignOut,
-  getCurrentUser,
-  getSession,
-  fetchUserProfile,
-} from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 // Define types
@@ -175,8 +167,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       dispatch({ type: 'SET_LOADING', payload: true });
 
       // Get current session and user
-      const session = await getSession();
-      const user = session ? await getCurrentUser() : null;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user?.id) throw new Error('No user ID found');
 
       // If user exists, fetch their profile with retries
       let profile = null;
@@ -190,7 +188,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               '[DEBUG] Attempting to fetch profile, attempt:',
               retryCount + 1
             );
-            profile = await fetchUserProfile(user.id);
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+
+            if (error) throw error;
+            profile = data;
             break;
           } catch (error) {
             console.error('[DEBUG] Error fetching profile:', {
@@ -236,136 +241,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     initializeAuth();
 
     // Set up auth state change listener
-    let subscription: { unsubscribe: () => void } | null = null;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (event: AuthChangeEvent, session: Session | null) => {
+        if (event === 'SIGNED_IN' && session) {
+          try {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            if (!user?.id) throw new Error('No user ID found');
 
-    try {
-      // Only set up the listener if Supabase is properly configured
-      if (
-        process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        const { data } = supabase.auth.onAuthStateChange(
-          async (event: AuthChangeEvent, session: Session | null) => {
-            if (event === 'SIGNED_IN' && session) {
-              try {
-                const user = session.user as User;
-                let profile = null;
-
-                try {
-                  profile = await fetchUserProfile(user.id);
-                } catch (profileError) {
-                  console.error(
-                    'Error fetching profile on auth change:',
-                    profileError
-                  );
-                }
-
-                dispatch({
-                  type: 'LOGIN_SUCCESS',
-                  payload: {
-                    user,
-                    profile: profile as UserProfile | null,
-                  },
-                });
-              } catch (error) {
-                console.error('Error handling sign in:', error);
-              }
-            } else if (event === 'SIGNED_OUT') {
-              dispatch({ type: 'LOGOUT' });
-            }
-          }
-        );
-
-        subscription = data.subscription;
-      } else {
-        // For development without Supabase, check localStorage for auth token
-        const checkLocalAuth = () => {
-          const token = localStorage.getItem('auth-token');
-          if (token) {
-            // Mock a signed-in user
-            const mockUser = {
-              id: 'mock-user-id',
-              email: 'user@example.com',
-              user_metadata: {
-                name: 'Demo User',
-              },
-            };
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
 
             dispatch({
               type: 'LOGIN_SUCCESS',
               payload: {
-                user: mockUser as User,
-                profile: null,
+                user: user as User,
+                profile: profile as UserProfile | null,
               },
             });
+          } catch (error) {
+            console.error('[DEBUG] Error handling auth state change:', error);
           }
-        };
-
-        checkLocalAuth();
+        } else if (event === 'SIGNED_OUT') {
+          dispatch({ type: 'LOGOUT' });
+        }
       }
-    } catch (error) {
-      console.error('Error setting up auth listener:', error);
-    }
+    );
 
-    // Store unsubscribe function
-    if (subscription) {
-      setAuthChangeUnsubscribe(() => subscription!.unsubscribe);
-    }
+    setAuthChangeUnsubscribe(() => subscription.unsubscribe);
 
-    // Cleanup function
     return () => {
-      if (subscription) {
-        subscription.unsubscribe();
+      if (authChangeUnsubscribe) {
+        authChangeUnsubscribe();
       }
     };
   }, [initializeAuth]);
 
-  // Auth functions
   const login = async (email: string, password: string) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
-
     try {
-      const { user } = await signInWithEmail(email, password);
+      dispatch({ type: 'SET_LOADING', payload: true });
 
-      if (!user) {
-        throw new Error(
-          'Login failed. Please check your credentials and try again.'
-        );
-      }
-
-      // For development without Supabase, store a token in localStorage
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        localStorage.setItem('auth-token', 'demo-token-12345');
-      }
-
-      // Profile will be loaded by the auth state change listener
-      toast({
-        title: 'Login successful',
-        description: 'Welcome back!',
-        variant: 'default',
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
       });
 
-      return;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Login failed. Please try again.';
+      if (error) throw error;
 
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: {
+          user: data.user as User,
+          profile: profile as UserProfile | null,
+        },
+      });
+
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('[DEBUG] Login error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to login',
+      });
       toast({
-        title: 'Login failed',
-        description: errorMessage,
+        title: 'Error',
+        description: (error as Error).message || 'Failed to login',
         variant: 'destructive',
       });
-
-      throw error;
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -373,36 +327,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      // For development without Supabase
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        console.warn('Mock Google login because Supabase is not configured');
-        localStorage.setItem('auth-token', 'google-mock-token');
-
-        // Simulate successful login
-        const mockUser = {
-          id: 'google-user-id',
-          email: 'google-user@example.com',
-          user_metadata: {
-            name: 'Google User',
-          },
-        };
-
-        dispatch({
-          type: 'LOGIN_SUCCESS',
-          payload: {
-            user: mockUser as User,
-            profile: null,
-          },
-        });
-
-        router.push('/dashboard');
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -410,22 +335,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
 
       if (error) throw error;
-
-      // Redirect happens automatically
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Google login failed. Please try again.';
-
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      console.error('[DEBUG] Google login error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to login with Google',
+      });
       toast({
-        title: 'Login failed',
-        description: errorMessage,
+        title: 'Error',
+        description: (error as Error).message || 'Failed to login with Google',
         variant: 'destructive',
       });
-
-      throw error;
     }
   };
 
@@ -433,36 +353,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      // For development without Supabase
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        console.warn('Mock Facebook login because Supabase is not configured');
-        localStorage.setItem('auth-token', 'facebook-mock-token');
-
-        // Simulate successful login
-        const mockUser = {
-          id: 'facebook-user-id',
-          email: 'facebook-user@example.com',
-          user_metadata: {
-            name: 'Facebook User',
-          },
-        };
-
-        dispatch({
-          type: 'LOGIN_SUCCESS',
-          payload: {
-            user: mockUser as User,
-            profile: null,
-          },
-        });
-
-        router.push('/dashboard');
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'facebook',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -470,47 +361,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
 
       if (error) throw error;
-
-      // Redirect happens automatically
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Facebook login failed. Please try again.';
-
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      console.error('[DEBUG] Facebook login error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to login with Facebook',
+      });
       toast({
-        title: 'Login failed',
-        description: errorMessage,
+        title: 'Error',
+        description:
+          (error as Error).message || 'Failed to login with Facebook',
         variant: 'destructive',
       });
-
-      throw error;
     }
   };
 
   const sendMagicLink = async (email: string) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-
     try {
-      // For development without Supabase
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        console.warn('Mock magic link because Supabase is not configured');
+      dispatch({ type: 'SET_LOADING', payload: true });
 
-        toast({
-          title: 'Magic link sent',
-          description: 'Check your email for the login link (demo mode)',
-        });
-
-        dispatch({ type: 'SET_LOADING', payload: false });
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -519,191 +390,160 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (error) throw error;
 
       toast({
-        title: 'Magic link sent',
-        description: 'Check your email for the login link',
+        title: 'Success',
+        description: 'Magic link sent to your email',
       });
-
-      dispatch({ type: 'SET_LOADING', payload: false });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to send magic link. Please try again.';
-
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      console.error('[DEBUG] Magic link error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to send magic link',
+      });
       toast({
         title: 'Error',
-        description: errorMessage,
+        description: (error as Error).message || 'Failed to send magic link',
         variant: 'destructive',
       });
-
-      throw error;
     }
   };
 
   const logout = async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      await supabaseSignOut();
 
-      // For development without Supabase
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        localStorage.removeItem('auth-token');
-      }
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
 
-      // Auth state listener will handle the state update
-      router.push('/');
-
-      toast({
-        title: 'Logged out',
-        description: 'You have been successfully logged out',
-      });
-    } catch (error) {
-      console.error('Error during logout:', error);
-
-      // Force logout on client side even if API call fails
       dispatch({ type: 'LOGOUT' });
-
-      // For development without Supabase
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        localStorage.removeItem('auth-token');
-      }
-
       router.push('/');
+    } catch (error) {
+      console.error('[DEBUG] Logout error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to logout',
+      });
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to logout',
+        variant: 'destructive',
+      });
     }
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-
     try {
-      const { user } = await signUpWithEmail(email, password, { name });
+      dispatch({ type: 'SET_LOADING', payload: true });
 
-      if (!user) {
-        throw new Error('Signup failed. Please try again.');
-      }
-
-      // For development without Supabase
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        localStorage.setItem('auth-token', 'demo-token-12345');
-      }
-
-      toast({
-        title: 'Account created',
-        description: 'Your account has been successfully created',
-        variant: 'default',
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            name,
+          },
+        },
       });
 
-      // Auth state listener will handle the state update
-      router.push('/dashboard');
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Signup failed. Please try again.';
+      if (error) throw error;
 
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert([
+          {
+            id: data.user.id,
+            name,
+            email: email.trim().toLowerCase(),
+          },
+        ]);
+
+        if (profileError) throw profileError;
+      }
+
       toast({
-        title: 'Signup failed',
-        description: errorMessage,
+        title: 'Success',
+        description: 'Please check your email to verify your account',
+      });
+
+      router.push('/auth/verify');
+    } catch (error) {
+      console.error('[DEBUG] Signup error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to sign up',
+      });
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to sign up',
         variant: 'destructive',
       });
-
-      throw error;
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const updateProfile = async (data: Partial<UserProfile>) => {
-    if (!state.user) {
-      throw new Error('You must be logged in to update your profile');
-    }
-
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      // For development without Supabase
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ) {
-        console.warn('Mock profile update because Supabase is not configured');
+      if (!state.user) throw new Error('No user found');
 
-        const updatedProfile = {
-          ...state.profile,
-          ...data,
-          updated_at: new Date().toISOString(),
-        };
-
-        dispatch({
-          type: 'UPDATE_PROFILE',
-          payload: updatedProfile as Partial<UserProfile>,
-        });
-
-        toast({
-          title: 'Profile updated',
-          description: 'Your profile has been successfully updated (demo mode)',
-          variant: 'default',
-        });
-
-        return;
-      }
-
-      const { data: updatedProfile, error } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update(data)
-        .eq('id', state.user.id)
-        .select()
-        .single();
+        .eq('id', state.user.id);
 
       if (error) throw error;
 
-      dispatch({
-        type: 'UPDATE_PROFILE',
-        payload: updatedProfile as Partial<UserProfile>,
-      });
+      dispatch({ type: 'UPDATE_PROFILE', payload: data });
 
       toast({
-        title: 'Profile updated',
-        description: 'Your profile has been successfully updated',
-        variant: 'default',
+        title: 'Success',
+        description: 'Profile updated successfully',
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to update profile. Please try again.';
-
+      console.error('[DEBUG] Profile update error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to update profile',
+      });
       toast({
-        title: 'Update failed',
-        description: errorMessage,
+        title: 'Error',
+        description: (error as Error).message || 'Failed to update profile',
         variant: 'destructive',
       });
-
-      throw error;
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const refreshSession = async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      await initializeAuth();
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: {
+          user: user as User,
+          profile: profile as UserProfile | null,
+        },
+      });
     } catch (error) {
-      console.error('Error refreshing session:', error);
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      console.error('[DEBUG] Session refresh error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to refresh session',
+      });
     }
   };
 

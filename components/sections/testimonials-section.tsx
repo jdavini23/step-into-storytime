@@ -1,6 +1,6 @@
-import Image from "next/image"
-import { Users, Star } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import Image from 'next/image';
+import { Users, Star } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function TestimonialsSection() {
   return (
@@ -11,7 +11,9 @@ export default function TestimonialsSection() {
             <Users className="h-4 w-4 mr-2" />
             <span>Happy Families</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">What Families Are Saying</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+            What Families Are Saying
+          </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
             Join thousands of families creating unforgettable bedtime moments
           </p>
@@ -41,17 +43,30 @@ export default function TestimonialsSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
-function TestimonialCard({ quote, name, role, image }) {
+interface TestimonialCardProps {
+  quote: string;
+  name: string;
+  role: string;
+  image: string;
+}
+
+function TestimonialCard({ quote, name, role, image }: TestimonialCardProps) {
   return (
     <Card className="border-0 shadow-xl h-full transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
       <CardContent className="pt-6">
         <div className="flex items-center mb-4">
           <div className="mr-4">
             <div className="h-12 w-12 rounded-full overflow-hidden">
-              <Image src={image || "/placeholder.svg"} alt={name} width={48} height={48} className="object-cover" />
+              <Image
+                src={image || '/placeholder.svg'}
+                alt={name}
+                width={48}
+                height={48}
+                className="object-cover"
+              />
             </div>
           </div>
           <div>
@@ -69,6 +84,5 @@ function TestimonialCard({ quote, name, role, image }) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
-

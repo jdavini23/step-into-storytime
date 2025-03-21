@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import OpenAI from 'openai';
+import { OpenAIStream, StreamingTextResponse } from '@/lib/openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,18 +62,27 @@ export async function POST(request: NextRequest) {
         setTimeout(() => reject(new Error('Timeout')), 30000)
       );
 
-      const storyPromise = generateText({
-        model: openai('gpt-4o'),
-        prompt,
-        system:
-          "You are a creative children's story writer who specializes in magical, engaging bedtime stories with positive messages.",
+      const storyPromise = openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content:
+              "You are a creative children's story writer who specializes in magical, engaging bedtime stories with positive messages.",
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        stream: true,
       });
 
-      const result = (await Promise.race([storyPromise, timeoutPromise])) as {
-        text: string;
-      };
-
-      return NextResponse.json({ content: result.text });
+      const response = await Promise.race([storyPromise, timeoutPromise]);
+      const stream = await OpenAIStream(
+        response as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>
+      );
+      return new StreamingTextResponse(stream);
     } catch (error: unknown) {
       if (error instanceof Error) {
         if (error.message === 'Timeout') {

@@ -1,14 +1,23 @@
-"use client"
+'use client';
 
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { BookOpen, ChevronRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { BookOpen, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+interface StoryCardProps {
+  title: string;
+  description: string;
+  image: string;
+  author: string;
+  date: string;
+  onReadClick: () => void;
+}
 
 export default function StoriesSection() {
-  const router = useRouter()
+  const router = useRouter();
 
   return (
     <section className="py-20 md:py-28" id="stories">
@@ -18,9 +27,12 @@ export default function StoriesSection() {
             <BookOpen className="h-4 w-4 mr-2" />
             <span>Story Showcase</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Featured Stories</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+            Featured Stories
+          </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            Explore our collection of magical adventures created by families like yours
+            Explore our collection of magical adventures created by families
+            like yours
           </p>
         </div>
 
@@ -60,7 +72,7 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Emma's family"
                 date="2 days ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
               <StoryCard
                 title="The Dragon's Treasure"
@@ -68,7 +80,7 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Noah's family"
                 date="1 week ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
             </div>
           </TabsContent>
@@ -81,7 +93,7 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Zoe's family"
                 date="3 days ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
               <StoryCard
                 title="The Moon Picnic"
@@ -89,7 +101,7 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Sam's family"
                 date="5 days ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
             </div>
           </TabsContent>
@@ -102,7 +114,7 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Lily's family"
                 date="1 day ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
               <StoryCard
                 title="Ocean Friends"
@@ -110,7 +122,7 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Oliver's family"
                 date="4 days ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
             </div>
           </TabsContent>
@@ -123,7 +135,7 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Emma's family"
                 date="6 days ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
               <StoryCard
                 title="The Invisible Friend"
@@ -131,22 +143,29 @@ export default function StoriesSection() {
                 image="/placeholder.svg?height=300&width=500"
                 author="Created by Tyler's family"
                 date="2 weeks ago"
-                onReadClick={() => router.push("/story")}
+                onReadClick={() => router.push('/story')}
               />
             </div>
           </TabsContent>
         </Tabs>
       </div>
     </section>
-  )
+  );
 }
 
-function StoryCard({ title, description, image, author, date, onReadClick }) {
+function StoryCard({
+  title,
+  description,
+  image,
+  author,
+  date,
+  onReadClick,
+}: StoryCardProps) {
   return (
     <Card className="border-0 shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group">
       <div className="relative h-56 overflow-hidden">
         <Image
-          src={image || "/placeholder.svg"}
+          src={image || '/placeholder.svg'}
           alt={title}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -174,6 +193,5 @@ function StoryCard({ title, description, image, author, date, onReadClick }) {
         </Button>
       </CardFooter>
     </Card>
-  )
+  );
 }
-
