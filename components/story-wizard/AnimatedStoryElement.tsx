@@ -7,7 +7,7 @@ import { useInView } from 'react-intersection-observer';
 interface AnimatedStoryElementProps {
   children: ReactNode;
   delay?: number;
-  type?: 'paragraph' | 'heading1' | 'heading2';
+  type?: 'paragraph' | 'heading1' | 'heading2' | 'heading3';
 }
 
 export default function AnimatedStoryElement({
@@ -27,9 +27,9 @@ export default function AnimatedStoryElement({
         opacity: 1, 
         y: 0,
         transition: { 
-          duration: 0.6, 
-          delay: delay * 0.2,
-          ease: 'easeOut' 
+          duration: 0.7, 
+          delay: delay * 0.15,
+          ease: 'easeOut'
         }
       }
     },
@@ -39,9 +39,9 @@ export default function AnimatedStoryElement({
         opacity: 1, 
         y: 0,
         transition: { 
-          duration: 0.8, 
-          delay: delay * 0.1,
-          ease: 'easeOut' 
+          duration: 0.9, 
+          delay: delay * 0.08,
+          ease: 'easeOut'
         }
       }
     },
@@ -51,9 +51,21 @@ export default function AnimatedStoryElement({
         opacity: 1, 
         x: 0,
         transition: { 
+          duration: 0.8, 
+          delay: delay * 0.1,
+          ease: 'easeOut'
+        }
+      }
+    },
+    heading3: {
+      hidden: { opacity: 0, x: -15 },
+      visible: { 
+        opacity: 1, 
+        x: 0,
+        transition: { 
           duration: 0.7, 
-          delay: delay * 0.15,
-          ease: 'easeOut' 
+          delay: delay * 0.12,
+          ease: 'easeOut'
         }
       }
     }
@@ -65,7 +77,7 @@ export default function AnimatedStoryElement({
       initial="hidden"
       animate={inView ? 'visible' : 'hidden'}
       variants={animations[type]}
-      className="animation-wrapper"
+      className="animation-wrapper relative"
     >
       {children}
     </motion.div>

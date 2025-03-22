@@ -5,11 +5,13 @@ import { Volume, VolumeX } from 'lucide-react';
 
 interface AmbientSoundPlayerProps {
   setting: string;
+  theme?: string;
   isEnabled?: boolean;
 }
 
 export default function AmbientSoundPlayer({ 
   setting, 
+  theme,
   isEnabled = false 
 }: AmbientSoundPlayerProps) {
   const [playing, setPlaying] = useState(false);
@@ -32,19 +34,43 @@ export default function AmbientSoundPlayer({
       default: '/sounds/soft-ambient.mp3'
     };
     
+    // Theme-based sounds
+    const themeMap: Record<string, string> = {
+      adventure: '/sounds/adventure-theme.mp3',
+      mystery: '/sounds/mystery-theme.mp3',
+      friendship: '/sounds/friendship-theme.mp3',
+      courage: '/sounds/courage-theme.mp3',
+      discovery: '/sounds/discovery-theme.mp3',
+      default: '/sounds/soft-ambient.mp3'
+    };
+    
     // Find matching sound or use default
     const lowerSetting = setting.toLowerCase();
+    const lowerTheme = theme?.toLowerCase() || '';
     let selectedSound = 'default';
     
+    // First try to match by setting
     Object.keys(audioMap).forEach(key => {
       if (lowerSetting.includes(key)) {
         selectedSound = key;
       }
     });
     
+    // If theme is provided and matches a theme sound, use that instead
+    if (theme) {
+      Object.keys(themeMap).forEach(key => {
+        if (lowerTheme.includes(key)) {
+          // Use theme-based sound
+          setAudioSrc(themeMap[key]);
+          return;
+        }
+      });
+    }
+    
+    // Otherwise use setting-based sound
     setAudioSrc(audioMap[selectedSound]);
     setAudioError(false); // Reset error state when changing audio source
-  }, [setting]);
+  }, [setting, theme]);
   
   // Handle tab visibility changes
   useEffect(() => {

@@ -47,19 +47,14 @@ export interface AuthState {
 }
 
 type AuthAction =
-  | {
-      type: 'INITIALIZE';
-      payload: { user: User | null; profile: UserProfile | null };
-    }
-  | {
-      type: 'LOGIN_SUCCESS';
-      payload: { user: User; profile: UserProfile | null };
-    }
+  | { type: 'INITIALIZE'; payload: { user: User | null; profile: UserProfile | null } }
+  | { type: 'LOGIN_SUCCESS'; payload: { user: User; profile: UserProfile | null } }
   | { type: 'PROFILE_LOADED'; payload: UserProfile }
   | { type: 'LOGOUT' }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'UPDATE_PROFILE'; payload: Partial<UserProfile> };
+  | { type: 'UPDATE_PROFILE'; payload: Partial<UserProfile> }
+  | { type: 'UPDATE_USER'; payload: { user: User } };
 
 // Create initial state
 const initialState: AuthState = {
@@ -115,6 +110,8 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         ...state,
         profile: state.profile ? { ...state.profile, ...action.payload } : null,
       };
+    case 'UPDATE_USER':
+      return { ...state, user: action.payload.user };
     default:
       return state;
   }
@@ -166,60 +163,114 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      // Get current session and user
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        console.log('[DEBUG] Server-side rendering, skipping auth initialization');
+        dispatch({ 
+          type: 'INITIALIZE', 
+          payload: { user: null, profile: null } 
+        });
+        return;
+      }
+
+      console.log('[DEBUG] Initializing auth on client-side');
+      
+      // Get current session first
       const {
         data: { session },
+        error: sessionError
       } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('[DEBUG] Error getting session:', sessionError);
+        dispatch({ 
+          type: 'INITIALIZE', 
+          payload: { user: null, profile: null } 
+        });
+        return;
+      }
+
+      // If no session, initialize with null values (not an error case)
+      if (!session) {
+        console.log('[DEBUG] No active session found');
+        dispatch({ 
+          type: 'INITIALIZE', 
+          payload: { user: null, profile: null } 
+        });
+        return;
+      }
+
+      console.log('[DEBUG] Session found, getting user data');
+
+      // Session exists, now try to get the user
       const {
         data: { user },
+        error: userError
       } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error('[DEBUG] Error getting user:', userError);
+        dispatch({ 
+          type: 'INITIALIZE', 
+          payload: { user: null, profile: null } 
+        });
+        return;
+      }
 
-      if (!user?.id) throw new Error('No user ID found');
+      // If no user despite having a session, handle this edge case
+      if (!user) {
+        console.log('[DEBUG] No authenticated user found despite having session');
+        dispatch({ 
+          type: 'INITIALIZE', 
+          payload: { user: null, profile: null } 
+        });
+        return;
+      }
+
+      console.log('[DEBUG] User found, fetching profile');
 
       // If user exists, fetch their profile with retries
       let profile = null;
-      if (user) {
-        let retryCount = 0;
-        const maxRetries = 3;
+      let retryCount = 0;
+      const maxRetries = 3;
 
-        while (retryCount < maxRetries) {
-          try {
-            console.log(
-              '[DEBUG] Attempting to fetch profile, attempt:',
-              retryCount + 1
+      while (retryCount < maxRetries) {
+        try {
+          console.log(
+            '[DEBUG] Attempting to fetch profile, attempt:',
+            retryCount + 1
+          );
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+          if (error) throw error;
+          profile = data;
+          break;
+        } catch (error) {
+          console.error('[DEBUG] Error fetching profile:', {
+            attempt: retryCount + 1,
+            error,
+          });
+
+          retryCount++;
+          if (retryCount === maxRetries) {
+            console.error(
+              '[DEBUG] Failed to fetch profile after max retries'
             );
-            const { data, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', user.id)
-              .single();
-
-            if (error) throw error;
-            profile = data;
+            // Don't throw, just continue with null profile
             break;
-          } catch (error) {
-            console.error('[DEBUG] Error fetching profile:', {
-              attempt: retryCount + 1,
-              error,
-            });
-
-            retryCount++;
-            if (retryCount === maxRetries) {
-              console.error(
-                '[DEBUG] Failed to fetch profile after max retries'
-              );
-              // Don't throw, just continue with null profile
-              break;
-            }
-
-            // Wait before retrying with exponential backoff
-            await new Promise((resolve) =>
-              setTimeout(
-                resolve,
-                Math.min(1000 * Math.pow(2, retryCount), 5000)
-              )
-            );
           }
+
+          // Wait before retrying with exponential backoff
+          await new Promise((resolve) =>
+            setTimeout(
+              resolve,
+              Math.min(1000 * Math.pow(2, retryCount), 5000)
+            )
+          );
         }
       }
 
@@ -232,55 +283,140 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     } catch (error) {
       console.error('[DEBUG] Error initializing auth:', error);
+      // Provide more detailed error information
+      if (error instanceof Error) {
+        console.error('[DEBUG] Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+      }
       dispatch({ type: 'INITIALIZE', payload: { user: null, profile: null } });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, []);
 
-  // Set up auth state listener
+  // Listen for auth state changes
   useEffect(() => {
-    initializeAuth();
+    console.log('[AUTH] Setting up auth listener');
+    
+    // Initialize auth first - only on client side
+    if (typeof window !== 'undefined') {
+      initializeAuth();
+    } else {
+      console.log('[AUTH] Skipping auth initialization on server');
+      dispatch({ 
+        type: 'INITIALIZE', 
+        payload: { user: null, profile: null } 
+      });
+    }
+    
+    // Skip setting up listener on server
+    if (typeof window === 'undefined') {
+      console.log('[AUTH] Skipping auth listener on server');
+      return () => {};
+    }
+    
+    try {
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          console.log('[AUTH] Auth state changed:', { event, hasSession: !!session });
+          
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            console.log('[AUTH] User signed in or token refreshed');
+            
+            if (session?.user?.id) {
+              console.log('[AUTH] Fetching user profile after sign in');
+              
+              // Fetch user profile
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
 
-    // Set up auth state change listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        if (event === 'SIGNED_IN' && session) {
-          try {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-            if (!user?.id) throw new Error('No user ID found');
-
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', user.id)
-              .single();
-
-            dispatch({
-              type: 'LOGIN_SUCCESS',
-              payload: {
-                user: user as User,
-                profile: profile as UserProfile | null,
-              },
-            });
-          } catch (error) {
-            console.error('[DEBUG] Error handling auth state change:', error);
+              if (error) {
+                console.error('[AUTH] Error fetching profile after sign in:', error);
+                
+                // Check if error is because profile doesn't exist
+                if (error.code === 'PGRST116') {
+                  console.log('[AUTH] Profile not found, creating new profile');
+                  
+                  // Create a new profile
+                  const { data: newProfile, error: createError } = await supabase
+                    .from('profiles')
+                    .insert({
+                      id: session.user.id,
+                      name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+                      email: session.user.email || '',  
+                      avatar_url: session.user.user_metadata.avatar_url || null,
+                      created_at: new Date().toISOString(),
+                    })
+                    .select()
+                    .single();
+                  
+                  if (createError) {
+                    console.error('[AUTH] Error creating profile:', createError);
+                  } else {
+                    console.log('[AUTH] New profile created successfully');
+                    
+                    dispatch({
+                      type: 'LOGIN_SUCCESS',
+                      payload: {
+                        user: session.user as User,
+                        profile: newProfile as unknown as UserProfile | null,
+                      },
+                    });
+                  }
+                }
+              } else {
+                console.log('[AUTH] Profile fetched successfully');
+                
+                dispatch({
+                  type: 'LOGIN_SUCCESS',
+                  payload: {
+                    user: session.user as User,
+                    profile: profile as unknown as UserProfile | null,
+                  },
+                });
+              }
+            }
+          } else if (event === 'SIGNED_OUT') {
+            console.log('[AUTH] User signed out');
+            dispatch({ type: 'LOGOUT' });
+          } else if (event === 'USER_UPDATED') {
+            console.log('[AUTH] User updated');
+            // Update the user in the state
+            if (session?.user) {
+              dispatch({
+                type: 'UPDATE_USER',
+                payload: { user: session.user as User },
+              });
+            }
           }
-        } else if (event === 'SIGNED_OUT') {
-          dispatch({ type: 'LOGOUT' });
         }
-      }
-    );
+      );
 
-    setAuthChangeUnsubscribe(() => subscription.unsubscribe);
+      setAuthChangeUnsubscribe(() => data.subscription.unsubscribe);
 
-    return () => {
-      if (authChangeUnsubscribe) {
-        authChangeUnsubscribe();
+      return () => {
+        console.log('[AUTH] Cleaning up auth listener');
+        if (authChangeUnsubscribe) {
+          authChangeUnsubscribe();
+        }
+      };
+    } catch (error) {
+      console.error('[AUTH] Error setting up auth listener:', error);
+      if (error instanceof Error) {
+        console.error('[AUTH] Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
       }
-    };
+      return () => {};
+    }
   }, [initializeAuth]);
 
   const login = async (email: string, password: string) => {

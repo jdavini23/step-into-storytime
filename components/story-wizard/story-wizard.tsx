@@ -599,9 +599,12 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
   };
 
   // Calculate progress percentage
-  const progress = Math.min(
-    100,
-    Math.round((currentStep / (storySteps.length + 1)) * 100)
+  const progress = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round((currentStep / (storySteps.length)) * 100)
+    )
   );
 
   return (
