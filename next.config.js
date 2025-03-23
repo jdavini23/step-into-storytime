@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  compiler: {
+    emotion: {
+      sourceMap: true,
+      autoLabel: 'dev-only',
+      labelFormat: '[local]',
+    },
+  },
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

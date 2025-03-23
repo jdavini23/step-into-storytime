@@ -1,12 +1,21 @@
 /** @jsxImportSource @emotion/react */
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { 
-  ArrowLeft, Download, Share2, Save, Edit, 
-  Volume2, VolumeX, Sparkles, BookOpen, 
-  ChevronLeft, ChevronRight, Zap
+import { css } from '@emotion/react';
+import {
+  ArrowLeft,
+  Download,
+  Share2,
+  Save,
+  Edit,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
@@ -24,7 +33,7 @@ const THEME_COLORS = {
   kindness: { primary: '#FF96AD', secondary: '#B5DEFF', accent: '#AFF6D6' },
   imagination: { primary: '#A78BFA', secondary: '#34D399', accent: '#F472B6' },
   teamwork: { primary: '#0EA5E9', secondary: '#A3E635', accent: '#FB923C' },
-  default: { primary: '#8B5CF6', secondary: '#FF9800', accent: '#2DD4BF' }
+  default: { primary: '#8B5CF6', secondary: '#FF9800', accent: '#2DD4BF' },
 };
 
 interface StoryPreviewProps {
@@ -48,7 +57,7 @@ type FontSize = 'small' | 'medium' | 'large';
 const WORDS_PER_PAGE: Record<FontSize, number> = {
   small: 250,
   medium: 200,
-  large: 150
+  large: 150,
 };
 
 export default function StoryPreview({
@@ -72,100 +81,114 @@ export default function StoryPreview({
   // Get theme colors based on the story theme
   const themeColors = useMemo(() => {
     const theme = storyData.theme?.toLowerCase() || 'default';
-    return THEME_COLORS[theme as keyof typeof THEME_COLORS] || THEME_COLORS.default;
+    return (
+      THEME_COLORS[theme as keyof typeof THEME_COLORS] || THEME_COLORS.default
+    );
   }, [storyData.theme]);
 
   // Story text formatting function
-  const formatStoryText = useCallback((text: string): { title: string; content: string } => {
-    if (!text || typeof text !== 'string') return { title: '', content: '' };
-    
-    // Split text into lines and normalize line endings
-    const lines = text.trim().replace(/\r\n/g, '\n').split('\n');
-    const firstLine = lines[0] || '';
-    
-    // Extract title and story content
-    let title = '';
-    let content = text;
-    
-    // Find the title - look for "in" followed by location name
-    const inIndex = firstLine.indexOf(' in ');
-    if (inIndex > -1) {
-      const locationStart = inIndex + 4; // length of " in "
-      const locationEnd = firstLine.indexOf('Once upon a time');
-      if (locationEnd > -1) {
-        title = firstLine.substring(0, locationEnd).trim();
-        content = firstLine.substring(locationEnd) + '\n' + lines.slice(1).join('\n');
+  const formatStoryText = useCallback(
+    (text: string): { title: string; content: string } => {
+      if (!text || typeof text !== 'string') return { title: '', content: '' };
+
+      // Split text into lines and normalize line endings
+      const lines = text.trim().replace(/\r\n/g, '\n').split('\n');
+      const firstLine = lines[0] || '';
+
+      // Extract title and story content
+      let title = '';
+      let content = text;
+
+      // Find the title - look for "in" followed by location name
+      const inIndex = firstLine.indexOf(' in ');
+      if (inIndex > -1) {
+        const locationStart = inIndex + 4; // length of " in "
+        const locationEnd = firstLine.indexOf('Once upon a time');
+        if (locationEnd > -1) {
+          title = firstLine.substring(0, locationEnd).trim();
+          content =
+            firstLine.substring(locationEnd) + '\n' + lines.slice(1).join('\n');
+        }
       }
-    }
-    
-    // If no location found, use first sentence as title
-    if (!title) {
-      const periodIndex = firstLine.indexOf('.');
-      if (periodIndex > -1) {
-        title = firstLine.substring(0, periodIndex + 1).trim();
-        content = firstLine.substring(periodIndex + 1).trim() + '\n' + lines.slice(1).join('\n');
-      } else {
-        title = firstLine;
-        content = lines.slice(1).join('\n');
+
+      // If no location found, use first sentence as title
+      if (!title) {
+        const periodIndex = firstLine.indexOf('.');
+        if (periodIndex > -1) {
+          title = firstLine.substring(0, periodIndex + 1).trim();
+          content =
+            firstLine.substring(periodIndex + 1).trim() +
+            '\n' +
+            lines.slice(1).join('\n');
+        } else {
+          title = firstLine;
+          content = lines.slice(1).join('\n');
+        }
       }
-    }
-    
-    // Format the content with proper paragraph breaks
-    content = content
-      .trim()
-      // Normalize line endings
-      .replace(/\r\n/g, '\n')
-      // Ensure proper sentence breaks
-      .replace(/\.\s*(\n)?/g, '.\n\n')
-      // Clean up excessive newlines while preserving paragraph breaks
-      .replace(/\n{3,}/g, '\n\n')
-      // Ensure proper spacing after punctuation
-      .replace(/([.!?])\s*(\w)/g, '$1 $2');
-    
-    return { title, content };
-  }, []);
+
+      // Format the content with proper paragraph breaks
+      content = content
+        .trim()
+        // Normalize line endings
+        .replace(/\r\n/g, '\n')
+        // Ensure proper sentence breaks
+        .replace(/\.\s*(\n)?/g, '.\n\n')
+        // Clean up excessive newlines while preserving paragraph breaks
+        .replace(/\n{3,}/g, '\n\n')
+        // Ensure proper spacing after punctuation
+        .replace(/([.!?])\s*(\w)/g, '$1 $2');
+
+      return { title, content };
+    },
+    []
+  );
 
   // Format story text with better title extraction and paragraph handling
-  const { title, content } = useMemo(() => formatStoryText(editedStory), [editedStory, formatStoryText]);
+  const { title, content } = useMemo(
+    () => formatStoryText(editedStory),
+    [editedStory, formatStoryText]
+  );
 
   // Process story for PageTurner by splitting paragraphs
   const storyParagraphs = useMemo(() => {
     if (!editedStory) return [];
-    
+
     // Create paragraphs array starting with the title
     const paragraphs: StoryParagraph[] = [
       {
         content: title,
         type: 'heading1',
-        index: 0
-      }
+        index: 0,
+      },
     ];
-    
+
     // Split remaining content into paragraphs
     const contentParagraphs = content
       .split(/\n\n+/)
       .filter((p: string) => p.trim().length > 0)
-      .map((p: string, i: number): StoryParagraph => ({
-        content: p.trim(),
-        type: 'paragraph',
-        index: i + 1
-      }));
-    
+      .map(
+        (p: string, i: number): StoryParagraph => ({
+          content: p.trim(),
+          type: 'paragraph',
+          index: i + 1,
+        })
+      );
+
     return [...paragraphs, ...contentParagraphs];
   }, [editedStory, title, content]);
 
   // Split story into pages
   const storyPages = useMemo(() => {
     if (!storyParagraphs.length) return [];
-    
+
     const pages: StoryParagraph[][] = [];
     let currentPage: StoryParagraph[] = [];
     let wordCount = 0;
     const wordsPerPage = WORDS_PER_PAGE[fontSize];
-    
+
     storyParagraphs.forEach((paragraph) => {
       const paragraphWordCount = paragraph.content.split(/\s+/).length;
-      
+
       // Always put title on its own page
       if (paragraph.type === 'heading1') {
         if (currentPage.length > 0) {
@@ -177,30 +200,33 @@ export default function StoryPreview({
         wordCount = 0;
         return;
       }
-      
+
       // Check if adding this paragraph would exceed the word limit
-      if (wordCount + paragraphWordCount > wordsPerPage && currentPage.length > 0) {
+      if (
+        wordCount + paragraphWordCount > wordsPerPage &&
+        currentPage.length > 0
+      ) {
         pages.push([...currentPage]);
         currentPage = [];
         wordCount = 0;
       }
-      
+
       currentPage.push(paragraph);
       wordCount += paragraphWordCount;
     });
-    
+
     // Add any remaining paragraphs
     if (currentPage.length > 0) {
       pages.push(currentPage);
     }
-    
+
     return pages;
   }, [storyParagraphs, fontSize]);
 
   // Auto-advance pages
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
+
     if (autoPlayEnabled) {
       interval = setInterval(() => {
         setCurrentPage((prev) => {
@@ -213,7 +239,7 @@ export default function StoryPreview({
         });
       }, 5000);
     }
-    
+
     return () => clearInterval(interval);
   }, [autoPlayEnabled, storyPages.length]);
 
@@ -245,7 +271,7 @@ export default function StoryPreview({
     // Clean up
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     // Show fun animation for kid engagement
     playSuccessAnimation();
   };
@@ -266,11 +292,11 @@ export default function StoryPreview({
         'Sharing is not supported in your browser. You can copy the URL manually.'
       );
     }
-    
+
     // Visual feedback when sharing
     playSuccessAnimation();
   };
-  
+
   // Fun animation effect for successful actions
   const playSuccessAnimation = () => {
     if (containerRef.current) {
@@ -285,8 +311,10 @@ export default function StoryPreview({
   // Toggle full screen for a more immersive reading experience
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      containerRef.current?.requestFullscreen().catch((err) => {
+        console.error(
+          `Error attempting to enable full-screen mode: ${err.message}`
+        );
       });
       setIsFullscreen(true);
     } else {
@@ -314,10 +342,13 @@ export default function StoryPreview({
   // Get font size class based on current setting
   const getFontSizeClass = () => {
     switch (fontSize) {
-      case 'small': return 'text-base md:text-lg';
-      case 'large': return 'text-xl md:text-2xl';
+      case 'small':
+        return 'text-base md:text-lg';
+      case 'large':
+        return 'text-xl md:text-2xl';
       case 'medium':
-      default: return 'text-lg md:text-xl';
+      default:
+        return 'text-lg md:text-xl';
     }
   };
 
@@ -342,16 +373,14 @@ export default function StoryPreview({
             <span className="sr-only">Go Back</span>
           </Button>
           {showToolTip === 'back' && (
-            <div css={storyPreviewStyles.tooltip}>
-              Go back to wizard
-            </div>
+            <div css={storyPreviewStyles.tooltip}>Go back to wizard</div>
           )}
           <div css={storyPreviewStyles.headerInfo}>
-            <h2 
-              className="font-bold text-2xl md:text-3xl" 
-              style={{ 
+            <h2
+              className="font-bold text-2xl md:text-3xl"
+              style={{
                 color: themeColors.primary,
-                textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
+                textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
               }}
             >
               {storyData.title}
@@ -361,7 +390,9 @@ export default function StoryPreview({
               <span>•</span>
               <span>{new Date().toLocaleDateString()}</span>
               <span>•</span>
-              <span style={{ color: themeColors.primary }}>{storyData.theme}</span>
+              <span style={{ color: themeColors.primary }}>
+                {storyData.theme}
+              </span>
             </div>
           </div>
         </div>
@@ -371,7 +402,10 @@ export default function StoryPreview({
             variant="outline"
             size="sm"
             onClick={() => setActiveTab('read')}
-            css={storyPreviewStyles.tabButton(activeTab === 'read', themeColors.primary)}
+            css={storyPreviewStyles.tabButton(
+              activeTab === 'read',
+              themeColors.primary
+            )}
           >
             <BookOpen className="h-3.5 w-3.5 mr-1" />
             Read
@@ -380,7 +414,10 @@ export default function StoryPreview({
             variant="outline"
             size="sm"
             onClick={() => setActiveTab('edit')}
-            css={storyPreviewStyles.tabButton(activeTab === 'edit', themeColors.primary)}
+            css={storyPreviewStyles.tabButton(
+              activeTab === 'edit',
+              themeColors.primary
+            )}
           >
             <Edit className="h-3.5 w-3.5 mr-1" />
             Edit
@@ -391,7 +428,7 @@ export default function StoryPreview({
       <div css={storyPreviewStyles.content}>
         {activeTab === 'read' ? (
           <div>
-            <motion.div 
+            <motion.div
               key={currentPage}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -406,24 +443,24 @@ export default function StoryPreview({
                   transition={{ delay: index * 0.1 }}
                 >
                   {paragraph.type === 'heading1' ? (
-                    <h1 
+                    <h1
                       className="text-3xl md:text-4xl font-bold mb-8 mt-6 tracking-tight text-center"
-                      style={{ 
+                      style={{
                         color: themeColors.primary,
-                        textShadow: '1px 1px 3px rgba(0,0,0,0.1)'
+                        textShadow: '1px 1px 3px rgba(0,0,0,0.1)',
                       }}
                     >
                       {paragraph.content}
                     </h1>
                   ) : paragraph.type === 'heading2' ? (
-                    <h2 
+                    <h2
                       className="text-2xl md:text-3xl font-semibold mb-6 mt-8 tracking-tight"
                       style={{ color: themeColors.secondary }}
                     >
                       {paragraph.content}
                     </h2>
                   ) : paragraph.type === 'heading3' ? (
-                    <h3 
+                    <h3
                       className="text-xl md:text-2xl font-semibold mb-4 mt-6 tracking-tight"
                       style={{ color: themeColors.accent }}
                     >
@@ -474,7 +511,7 @@ export default function StoryPreview({
               placeholder="Edit your story here..."
               style={{
                 background: `linear-gradient(to right, #f9f9f9, #ffffff)`,
-                boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.05)'
+                boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.05)',
               }}
             />
             <div className="absolute bottom-4 right-4 text-xs text-slate-400">
@@ -484,11 +521,11 @@ export default function StoryPreview({
         )}
       </div>
 
-      <div 
+      <div
         className="p-4 md:p-6 border-t flex items-center justify-between"
         style={{
           background: `linear-gradient(135deg, ${themeColors.primary}10, ${themeColors.secondary}20)`,
-          borderTop: `2px solid ${themeColors.primary}30`
+          borderTop: `2px solid ${themeColors.primary}30`,
         }}
       >
         <div className="flex items-center gap-3">
@@ -504,28 +541,25 @@ export default function StoryPreview({
 
           {soundEnabled && (
             <div className="hidden md:block">
-              <AmbientSoundPlayer 
-                theme={storyData.theme} 
-                setting={storyData.setting} 
-                isEnabled={soundEnabled} 
+              <AmbientSoundPlayer
+                theme={storyData.theme}
+                setting={storyData.setting}
+                isEnabled={soundEnabled}
               />
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-3">
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               variant="outline"
               size="sm"
               onClick={handleDownload}
               className="hidden md:flex items-center bg-white/90 hover:bg-white shadow-sm"
-              style={{ 
+              style={{
                 borderColor: themeColors.accent,
-                color: themeColors.accent 
+                color: themeColors.accent,
               }}
             >
               <Download className="h-3.5 w-3.5 mr-1" />
@@ -533,18 +567,15 @@ export default function StoryPreview({
             </Button>
           </motion.div>
 
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               variant="outline"
               size="sm"
               onClick={handleShare}
               className="hidden md:flex items-center bg-white/90 hover:bg-white shadow-sm"
-              style={{ 
+              style={{
                 borderColor: themeColors.secondary,
-                color: themeColors.secondary
+                color: themeColors.secondary,
               }}
             >
               <Share2 className="h-3.5 w-3.5 mr-1" />
@@ -552,19 +583,16 @@ export default function StoryPreview({
             </Button>
           </motion.div>
 
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               variant="default"
               size="sm"
               onClick={handleSave}
               disabled={isSaving}
               className="relative overflow-hidden"
-              style={{ 
+              style={{
                 backgroundColor: themeColors.primary,
-                borderColor: themeColors.primary
+                borderColor: themeColors.primary,
               }}
             >
               {isSaving ? (
@@ -584,49 +612,65 @@ export default function StoryPreview({
 
       {/* Mobile bottom controls */}
       <div className="md:hidden flex items-center justify-around p-3 border-t shadow-inner bg-white/80 backdrop-blur-sm">
-        <motion.button 
+        <motion.button
           whileTap={{ scale: 0.9 }}
           className="flex flex-col items-center text-xs"
           onClick={handleDownload}
           style={{ color: themeColors.accent }}
         >
-          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm" style={{ border: `2px solid ${themeColors.accent}20` }}>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm"
+            style={{ border: `2px solid ${themeColors.accent}20` }}
+          >
             <Download className="h-5 w-5" />
           </div>
           Download
         </motion.button>
-        
-        <motion.button 
+
+        <motion.button
           whileTap={{ scale: 0.9 }}
           className="flex flex-col items-center text-xs"
           onClick={handleShare}
           style={{ color: themeColors.secondary }}
         >
-          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm" style={{ border: `2px solid ${themeColors.secondary}20` }}>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm"
+            style={{ border: `2px solid ${themeColors.secondary}20` }}
+          >
             <Share2 className="h-5 w-5" />
           </div>
           Share
         </motion.button>
-        
-        <motion.button 
+
+        <motion.button
           whileTap={{ scale: 0.9 }}
           className="flex flex-col items-center text-xs"
           onClick={() => setSoundEnabled(!soundEnabled)}
           style={{ color: themeColors.primary }}
         >
-          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm" style={{ border: `2px solid ${themeColors.primary}20` }}>
-            {soundEnabled ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm"
+            style={{ border: `2px solid ${themeColors.primary}20` }}
+          >
+            {soundEnabled ? (
+              <VolumeX className="h-5 w-5" />
+            ) : (
+              <Volume2 className="h-5 w-5" />
+            )}
           </div>
           {soundEnabled ? 'Mute' : 'Sound'}
         </motion.button>
-        
-        <motion.button 
+
+        <motion.button
           whileTap={{ scale: 0.9 }}
           className="flex flex-col items-center text-xs"
           onClick={() => setAutoPlayEnabled(!autoPlayEnabled)}
           style={{ color: themeColors.accent }}
         >
-          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm" style={{ border: `2px solid ${themeColors.accent}20` }}>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-white shadow-sm"
+            style={{ border: `2px solid ${themeColors.accent}20` }}
+          >
             <Zap className="h-5 w-5" />
           </div>
           {autoPlayEnabled ? 'Stop' : 'Auto'} Play
@@ -636,32 +680,39 @@ export default function StoryPreview({
       {/* Add CSS for wiggle animation and story content styling */}
       <style jsx global>{`
         @keyframes wiggle {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(-2deg); }
-          75% { transform: rotate(2deg); }
+          0%,
+          100% {
+            transform: rotate(0deg);
+          }
+          25% {
+            transform: rotate(-2deg);
+          }
+          75% {
+            transform: rotate(2deg);
+          }
         }
-        
+
         .animate-wiggle {
           animation: wiggle 0.5s ease-in-out;
         }
-        
+
         @keyframes shine {
           to {
             transform: translateX(100%);
           }
         }
-        
+
         .animate-shine {
           animation: shine 1s linear infinite;
         }
-        
+
         .story-content {
           font-family: var(--font-sans);
           max-width: 65ch;
           margin: 0 auto;
           color: #4a5568;
         }
-        
+
         .story-content h1 {
           font-family: var(--font-display);
           font-size: 2.5rem;
@@ -671,7 +722,7 @@ export default function StoryPreview({
           color: ${themeColors.primary};
           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         }
-        
+
         .story-content h2 {
           font-family: var(--font-display);
           font-size: 2rem;
@@ -679,7 +730,7 @@ export default function StoryPreview({
           margin: 1.5rem 0;
           color: ${themeColors.secondary};
         }
-        
+
         .story-content h3 {
           font-family: var(--font-display);
           font-size: 1.5rem;
@@ -687,7 +738,7 @@ export default function StoryPreview({
           margin: 1.25rem 0;
           color: ${themeColors.accent};
         }
-        
+
         .story-content p {
           font-size: 1.125rem;
           line-height: 1.8;
@@ -696,13 +747,13 @@ export default function StoryPreview({
           color: #4a5568;
           letter-spacing: 0.01em;
         }
-        
+
         .story-content p:first-of-type {
           text-indent: 0;
           font-size: 1.25rem;
           line-height: 1.7;
         }
-        
+
         .story-content p:first-of-type::first-letter {
           font-size: 3.25rem;
           font-family: var(--font-display);
@@ -711,29 +762,29 @@ export default function StoryPreview({
           padding: 0.1em 0.1em 0 0;
           color: ${themeColors.primary};
         }
-        
+
         @media (max-width: 768px) {
           .story-content h1 {
             font-size: 2rem;
           }
-          
+
           .story-content h2 {
             font-size: 1.75rem;
           }
-          
+
           .story-content h3 {
             font-size: 1.5rem;
           }
-          
+
           .story-content p {
             font-size: 1rem;
             line-height: 1.7;
           }
-          
+
           .story-content p:first-of-type {
             font-size: 1.125rem;
           }
-          
+
           .story-content p:first-of-type::first-letter {
             font-size: 2.75rem;
           }
