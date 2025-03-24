@@ -1,125 +1,85 @@
-/** @jsxImportSource @emotion/react */
 import { css } from '@emotion/react';
+import { cva } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
 
-export const storyPreviewStyles = {
-  container: css`
-    position: relative;
-    background: white;
-    border-radius: 12px 24px 24px 12px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e2e8f0;
-    overflow: hidden;
-    min-height: 400px;
-    background: linear-gradient(to right, #f9f9f9, #ffffff);
-  `,
+export const storyPreviewVariants = {
+  container: cva(
+    cn(
+      'relative rounded-xl shadow-lg border overflow-hidden min-h-[400px]',
+      'bg-gradient-to-r from-background to-card'
+    )
+  ),
 
-  header: css`
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
-    background: white;
-    border-bottom: 1px solid #e2e8f0;
-  `,
+  header: cva(
+    cn('flex justify-between items-center mb-6 p-4', 'bg-card border-b')
+  ),
 
-  headerLeft: css`
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  `,
+  headerLeft: cva('flex items-center gap-4'),
 
-  headerInfo: css`
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  `,
+  headerInfo: cva('flex flex-col gap-2'),
 
-  title: css`
-    font-family: var(--font-display);
-    font-size: 2rem;
-    line-height: 1.2;
-    margin: 2rem 0;
-    text-align: center;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-  `,
+  title: cva(
+    cn(
+      'font-display text-4xl leading-tight my-8 text-center',
+      'text-foreground',
+      'drop-shadow-sm transition-colors',
+      'dark:text-foreground/90'
+    )
+  ),
 
-  metadata: css`
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    font-size: 0.875rem;
-    color: #64748b;
-  `,
+  metadata: cva(cn('flex items-center gap-4 text-sm', 'text-muted-foreground')),
 
-  content: css`
-    font-family: var(--font-sans);
-    max-width: 65ch;
-    margin: 0 auto;
-    color: #4a5568;
-    padding: 2rem;
-    min-height: 60vh;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-  `,
+  content: cva(
+    cn(
+      'font-sans max-w-[65ch] mx-auto text-foreground p-8',
+      'min-h-[60vh] relative flex flex-col',
+      'dark:text-foreground/90'
+    )
+  ),
 
-  paragraph: css`
-    font-size: 1.125rem;
-    line-height: 1.8;
-    margin: 1.25rem 0;
-    text-indent: 2rem;
-    color: #4a5568;
-    letter-spacing: 0.01em;
+  paragraph: cva(
+    cn(
+      'text-lg leading-relaxed my-5 indent-8',
+      'text-foreground/90 tracking-wide',
+      'first:indent-0 first:text-xl first:leading-relaxed',
+      'first:first-letter:text-5xl first:first-letter:font-display',
+      'first:first-letter:float-left first:first-letter:mr-1',
+      'first:first-letter:leading-none first:first-letter:pt-1',
+      'dark:text-foreground/80'
+    )
+  ),
 
-    &:first-of-type {
-      text-indent: 0;
-      font-size: 1.25rem;
-      line-height: 1.7;
+  pageNavigation: cva(
+    cn('flex items-center justify-center gap-4', 'mt-auto pt-8 border-t')
+  ),
 
-      &::first-letter {
-        font-size: 3.25rem;
-        font-family: var(--font-display);
-        float: left;
-        line-height: 1;
-        padding: 0.1em 0.1em 0 0;
-      }
-    }
-  `,
+  controls: cva('flex items-center gap-2'),
 
-  pageNavigation: css`
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    margin-top: auto;
-    padding-top: 2rem;
-    border-top: 1px solid #e2e8f0;
-  `,
+  tabButton: cva(cn('transition-colors', 'hover:bg-primary/20'), {
+    variants: {
+      isActive: {
+        true: 'bg-primary/10 border-primary/30 text-primary',
+        false: 'bg-transparent border-border text-muted-foreground',
+      },
+    },
+    defaultVariants: {
+      isActive: false,
+    },
+  }),
 
-  controls: css`
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  `,
+  tooltip: cva(
+    cn(
+      'absolute bg-popover p-2 rounded-md shadow-md z-50 text-xs',
+      'text-popover-foreground border border-border'
+    )
+  ),
+};
 
-  tabButton: (isActive: boolean, primaryColor: string) => css`
-    background: ${isActive ? `${primaryColor}10` : 'transparent'};
-    border-color: ${isActive ? `${primaryColor}30` : '#e2e8f0'};
-    color: ${isActive ? primaryColor : '#64748b'};
-    
-    &:hover {
-      background: ${`${primaryColor}20`};
-    }
-  `,
-
-  tooltip: css`
-    position: absolute;
-    background: white;
-    padding: 0.5rem;
-    border-radius: 0.375rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    z-index: 50;
-    font-size: 0.75rem;
-  `
+// Helper function to apply variants with type safety
+export const getStoryPreviewClass = (
+  variant: keyof typeof storyPreviewVariants,
+  props?: Record<string, boolean | string | undefined>
+) => {
+  const variantFn = storyPreviewVariants[variant];
+  return variantFn(props);
 };

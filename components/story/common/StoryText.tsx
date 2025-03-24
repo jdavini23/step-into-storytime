@@ -1,10 +1,10 @@
-/** @jsxImportSource @emotion/react */
 'use client';
 
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useRef } from 'react';
+import { cn } from '@/lib/utils';
 import { StoryParagraph, ThemeColors, FontSize } from './types';
 
 interface StoryTextProps {
@@ -18,7 +18,7 @@ export default function StoryText({
   paragraphs,
   themeColors,
   fontSize = 'medium',
-  className = '',
+  className,
 }: StoryTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -41,18 +41,26 @@ export default function StoryText({
     }
   };
 
+  const getThemeStyles = () => {
+    return {
+      '--theme-primary': themeColors.primary,
+      '--theme-secondary': themeColors.secondary,
+      '--theme-accent': themeColors.accent,
+    } as React.CSSProperties;
+  };
+
   return (
     <div
       ref={containerRef}
-      className={`story-text-container overflow-auto ${className}`}
-      style={{ height: '100%' }}
+      className={cn('h-full overflow-auto', className)}
+      style={getThemeStyles()}
     >
       <AnimatePresence mode="wait">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="story-content p-6"
+          className="p-6"
         >
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const paragraph = paragraphs[virtualRow.index];
@@ -61,46 +69,46 @@ export default function StoryText({
                 key={virtualRow.index}
                 data-index={virtualRow.index}
                 ref={virtualizer.measureElement}
-                className={`story-paragraph ${
-                  paragraph.type === 'heading1' ? 'mb-6' : 'mb-4'
-                }`}
+                className={cn(paragraph.type === 'heading1' ? 'mb-6' : 'mb-4')}
               >
                 <ReactMarkdown
                   components={{
                     h1: ({ node, ...props }) => (
-                      <h1 
-                        className="text-3xl md:text-4xl font-bold mb-4 leading-tight" 
-                        style={{ 
-                          color: themeColors.primary,
-                          textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                        }}
-                        {...props} 
+                      <h1
+                        className={cn(
+                          'text-3xl md:text-4xl font-bold mb-4 leading-tight',
+                          'text-[--theme-primary] drop-shadow-sm'
+                        )}
+                        {...props}
                       />
                     ),
                     h2: ({ node, ...props }) => (
-                      <h2 
-                        className="text-2xl md:text-3xl font-semibold mb-3 mt-6" 
-                        style={{ 
-                          color: themeColors.secondary,
-                        }}
-                        {...props} 
+                      <h2
+                        className={cn(
+                          'text-2xl md:text-3xl font-semibold mb-3 mt-6',
+                          'text-[--theme-secondary]'
+                        )}
+                        {...props}
                       />
                     ),
                     h3: ({ node, ...props }) => (
-                      <h3 
-                        className="text-xl md:text-2xl font-medium mb-2 mt-4" 
-                        style={{ 
-                          color: themeColors.accent,
-                        }}
-                        {...props} 
+                      <h3
+                        className={cn(
+                          'text-xl md:text-2xl font-medium mb-2 mt-4',
+                          'text-[--theme-accent]'
+                        )}
+                        {...props}
                       />
                     ),
                     p: ({ node, ...props }) => (
-                      <p 
-                        className={`mb-4 leading-relaxed ${getFontSizeClass()}`}
-                        {...props} 
+                      <p
+                        className={cn(
+                          'mb-4 leading-relaxed',
+                          getFontSizeClass()
+                        )}
+                        {...props}
                       />
-                    )
+                    ),
                   }}
                 >
                   {paragraph.content}

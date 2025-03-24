@@ -1,25 +1,36 @@
-/** @jsxImportSource @emotion/react */
-import { css } from '@emotion/react';
+'use client';
+
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { storyStyles } from './styles';
+import { cn } from '@/lib/utils';
 
 interface StoryHeaderProps {
   title: string;
   onBack?: () => void;
   showBackButton?: boolean;
   theme?: string;
+  className?: string;
 }
 
 export default function StoryHeader({
   title,
   onBack,
   showBackButton = true,
-  theme = 'default'
+  theme = 'default',
+  className,
 }: StoryHeaderProps) {
   return (
-    <header css={storyStyles.header}>
-      <div css={storyStyles.headerLeft}>
+    <header
+      className={cn(
+        'flex items-center justify-between py-4 px-6 border-b',
+        theme === 'fantasy' && 'bg-story-fantasy/5 border-story-fantasy/10',
+        theme === 'adventure' &&
+          'bg-story-adventure/5 border-story-adventure/10',
+        theme === 'mystery' && 'bg-story-mystery/5 border-story-mystery/10',
+        className
+      )}
+    >
+      <div className="flex items-center gap-4">
         {showBackButton && onBack && (
           <Button
             variant="ghost"
@@ -31,9 +42,9 @@ export default function StoryHeader({
             <span className="hidden md:inline">Back</span>
           </Button>
         )}
-        
-        <div css={storyStyles.headerInfo}>
-          <h1 css={storyStyles.title}>{title}</h1>
+
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         </div>
       </div>
     </header>

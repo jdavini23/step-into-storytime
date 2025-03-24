@@ -5,12 +5,17 @@ import Image from 'next/image';
 import { useStory } from '@/contexts/story-context';
 import Loading from '@/components/loading';
 import StoryHeader from './story-header';
+import { cn } from '@/lib/utils';
 
 interface StoryContentProps {
   storyId: string;
+  className?: string;
 }
 
-export default function StoryContent({ storyId }: StoryContentProps) {
+export default function StoryContent({
+  storyId,
+  className,
+}: StoryContentProps) {
   const { state, fetchStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +24,7 @@ export default function StoryContent({ storyId }: StoryContentProps) {
     const loadStory = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         await fetchStory(storyId);
       } catch (err) {
@@ -36,13 +41,13 @@ export default function StoryContent({ storyId }: StoryContentProps) {
   if (error) return <ErrorMessage message={error} />;
   if (!state.currentStory) return <EmptyMessage message="Story not found" />;
 
-  return <StoryDisplay />;
+  return <StoryDisplay className={className} />;
 }
 
 function ErrorMessage({ message }: { message: string }) {
   return (
     <div className="p-6 text-center">
-      <p className="text-red-600">Error: {message}</p>
+      <p className="text-destructive">{message}</p>
     </div>
   );
 }
@@ -50,12 +55,12 @@ function ErrorMessage({ message }: { message: string }) {
 function EmptyMessage({ message }: { message: string }) {
   return (
     <div className="p-6 text-center">
-      <p className="text-slate-600">{message}</p>
+      <p className="text-muted-foreground">{message}</p>
     </div>
   );
 }
 
-function StoryDisplay() {
+function StoryDisplay({ className }: { className?: string }) {
   const { currentStory } = useStory().state;
   if (!currentStory) return null;
 
@@ -68,12 +73,22 @@ function StoryDisplay() {
   const paragraphs = currentStory.content?.split('\n').filter(Boolean) || [];
 
   return (
-    <div className="bg-white rounded-xl shadow-lg">
+    <div
+      className={cn(
+        'bg-card rounded-xl shadow-lg',
+        'border border-border/10',
+        'dark:bg-card/95 dark:border-border/5',
+        'transition-colors',
+        className
+      )}
+    >
       <div className="p-6 md:p-10">
         <StoryHeader
           title={currentStory.title}
           author={authorName}
-          date={new Date(currentStory.createdAt || Date.now()).toLocaleDateString()}
+          date={new Date(
+            currentStory.createdAt || Date.now()
+          ).toLocaleDateString()}
           theme={currentStory.theme}
         />
 
@@ -88,7 +103,14 @@ function StoryDisplay() {
 
 function StoryIllustration({ title }: { title: string }) {
   return (
-    <div className="relative h-64 md:h-96 mb-8 rounded-xl overflow-hidden shadow-md">
+    <div
+      className={cn(
+        'relative h-64 md:h-96 mb-8 rounded-xl overflow-hidden',
+        'shadow-md border border-border/10',
+        'dark:border-border/5',
+        'transition-colors'
+      )}
+    >
       <Image
         src="/placeholder.svg?height=400&width=800"
         alt={`Illustration for ${title}`}
@@ -101,9 +123,24 @@ function StoryIllustration({ title }: { title: string }) {
 
 function StoryText({ paragraphs }: { paragraphs: string[] }) {
   return (
-    <article className="prose prose-lg max-w-none">
+    <article
+      className={cn(
+        'prose prose-lg max-w-none',
+        'prose-headings:text-foreground',
+        'prose-p:text-muted-foreground',
+        'dark:prose-invert',
+        'transition-colors'
+      )}
+    >
       {paragraphs.map((paragraph, index) => (
-        <p key={index} className="text-xl leading-relaxed text-slate-800 mb-6">
+        <p
+          key={index}
+          className={cn(
+            'text-xl leading-relaxed mb-6',
+            'text-muted-foreground',
+            'transition-colors'
+          )}
+        >
           {paragraph}
         </p>
       ))}

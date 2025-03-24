@@ -2,9 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Sparkles, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import ChatMessage from '@/components/story-wizard/chat-message';
 import UserInput from '@/components/story-wizard/user-input';
 import MultipleChoice from '@/components/story-wizard/multiple-choice';
@@ -12,25 +10,33 @@ import { storySteps } from '@/lib/story-wizard-steps';
 import { useStory } from '@/contexts/story-context';
 import CharacterCreator from '@/components/story-wizard/character-creator';
 import StoryPreview from '@/components/story-wizard/story-preview';
+import type { StoryData } from '@/components/story/common/types';
+import {
+  WizardContainer,
+  WizardHeader,
+  WizardProgress,
+  WizardContent,
+  MessageList,
+  SystemMessage,
+  UserMessage,
+  InputContainer,
+  WizardFooter,
+} from './wizard-components';
+import { Edit, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/styles';
+
+// Animation variants
+const fadeInOut = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: { duration: 0.2 },
+};
 
 // Define types for props and state
 interface StoryWizardProps {
   onError?: (message: string) => void;
-}
-
-interface StoryData {
-  title: string;
-  mainCharacter: {
-    name: string;
-    age: string;
-    traits: string[];
-    appearance: string;
-  };
-  setting: string;
-  theme: string;
-  plotElements: string[];
-  additionalCharacters: any[];
-  [key: string]: any;
 }
 
 interface Message {
@@ -41,12 +47,21 @@ interface Message {
   options?: Array<{ label: string; value: string }>;
 }
 
+type StoryField =
+  | keyof StoryData
+  | `mainCharacter.${keyof StoryData['mainCharacter']}`;
+
+type StoryDataKey = keyof StoryData;
+type MainCharacterKey = keyof StoryData['mainCharacter'];
+
 export default function StoryWizard({ onError }: StoryWizardProps) {
   const { generateStoryContent, createStory } = useStory();
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [storyData, setStoryData] = useState<StoryData>({
+    id: '',
     title: '',
+    content: '',
     mainCharacter: {
       name: '',
       age: '',
@@ -56,12 +71,247 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
     setting: '',
     theme: '',
     plotElements: [],
-    additionalCharacters: [],
+    metadata: {
+      targetAge: 8,
+      difficulty: 'medium',
+      theme: '',
+      setting: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      wordCount: 0,
+      readingTime: 0,
+    },
+    accessibility: {
+      contrast: 'normal',
+      motionReduced: false,
+      fontSize: 'medium',
+      lineHeight: 1.5,
+    },
   });
+
   const [isTyping, setIsTyping] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [generatedStory, setGeneratedStory] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Helper functions
+  const getPlaceholder = (field: StoryField): string => {
+    switch (field) {
+      case 'mainCharacter.name':
+        return "Type your character's name...";
+      case 'mainCharacter.age':
+        return "Type your character's age...";
+      case 'title':
+        return 'Type your story title...';
+      default:
+        return `Type your ${field.split('.').pop()}...`;
+    }
+  };
+
+  const handleBackStep = () => {
+    const prevStep = currentStep - 1;
+    if (prevStep >= -1) {
+      setCurrentStep(prevStep);
+      setMessages(messages.slice(0, -2));
+    }
+  };
+
+  const handleUserInput = (value: string | string[], field: StoryField) => {
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.') as [
+        StoryDataKey,
+        MainCharacterKey
+      ];
+      setStoryData((prev) => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent as keyof StoryData],
+          [child]: Array.isArray(value) ? value : value.trim(),
+        },
+      }));
+    } else {
+      setStoryData((prev) => ({
+        ...prev,
+        [field]: Array.isArray(value) ? value : value.trim(),
+      }));
+    }
+
+    // Add user message
+    const userMessage: Message = {
+      type: 'user',
+      content: Array.isArray(value) ? value.join(', ') : value,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    // Show typing indicator
+    setIsTyping(true);
+
+    // Get next step from storySteps array
+    const nextStep = currentStep + 1;
+
+    // Ensure we're showing the character name step after title
+    if (field === 'title') {
+      const characterNameStep = storySteps[0]; // First step is character name
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: 'system',
+            content: characterNameStep.message,
+            inputType: characterNameStep.inputType,
+            field: characterNameStep.field,
+            options: characterNameStep.options,
+          },
+        ]);
+        setIsTyping(false);
+        setCurrentStep(0);
+      }, 1000);
+    } else if (nextStep < storySteps.length) {
+      const step = storySteps[nextStep];
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: 'system',
+            content: step.message,
+            inputType: step.inputType,
+            field: step.field,
+            options: step.options,
+          },
+        ]);
+        setIsTyping(false);
+        setCurrentStep(nextStep);
+      }, 1000);
+    } else {
+      // Final step - show review/generate options
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: 'system',
+            content:
+              "Thanks for all that information! I'm ready to create your story now. Would you like to review your choices or generate the story?",
+            inputType: 'choice',
+            field: 'action',
+            options: [
+              { label: 'Review my choices', value: 'review' },
+              { label: 'Generate my story!', value: 'generate' },
+            ],
+          },
+        ]);
+        setIsTyping(false);
+        setCurrentStep(nextStep);
+      }, 1000);
+    }
+  };
+
+  const handleChoiceSelection = (
+    value: string | string[],
+    field: StoryField
+  ) => {
+    const finalValue = Array.isArray(value) ? value[0] : value;
+    if (field === 'action') {
+      handleFinalAction(finalValue);
+    } else if (field === 'viewStory') {
+      handleViewStory(finalValue);
+    } else if (field === 'retry') {
+      handleFinalAction(finalValue);
+    } else {
+      handleUserInput(finalValue, field);
+    }
+  };
+
+  const handleTitleEdit = () => {
+    const newTitle = prompt('Edit title:', storyData.title);
+    if (newTitle) handleEditField('title', newTitle);
+  };
+
+  const handleSettingEdit = () => {
+    const newSetting = prompt('Edit setting:', storyData.setting);
+    if (newSetting) handleEditField('setting', newSetting);
+  };
+
+  const handleThemeEdit = () => {
+    const newTheme = prompt('Edit theme:', storyData.theme);
+    if (newTheme) handleEditField('theme', newTheme);
+  };
+
+  const renderReviewField = (
+    label: string,
+    value: string,
+    onEdit: () => void
+  ) => {
+    return (
+      <div>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <div className="flex justify-between items-center">
+          <p className="font-medium text-foreground">{value}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn('h-8', buttonVariants({ variant: 'ghost' }))}
+            onClick={onEdit}
+          >
+            <Edit className="h-3.5 w-3.5 mr-1" />
+            Edit
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCharacterReview = () => {
+    return (
+      <div>
+        <p className="text-sm text-muted-foreground">Main Character</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="font-medium text-foreground">
+              {storyData.mainCharacter?.name || 'Unnamed Character'}{' '}
+              {storyData.mainCharacter?.age
+                ? `(${storyData.mainCharacter.age})`
+                : ''}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Traits: {storyData.mainCharacter?.traits?.join(', ') || 'None'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('h-8', buttonVariants({ variant: 'ghost' }))}
+              onClick={() => {
+                const newName = prompt(
+                  'Edit character name:',
+                  storyData.mainCharacter?.name || ''
+                );
+                if (newName) handleEditField('mainCharacter.name', newName);
+              }}
+            >
+              <Edit className="h-3.5 w-3.5 mr-1" />
+              Edit Name
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('h-8', buttonVariants({ variant: 'ghost' }))}
+              onClick={() => {
+                const newAge = prompt(
+                  'Edit character age:',
+                  storyData.mainCharacter?.age || ''
+                );
+                if (newAge) handleEditField('mainCharacter.age', newAge);
+              }}
+            >
+              <Edit className="h-3.5 w-3.5 mr-1" />
+              Edit Age
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Add initial message when component mounts
   useEffect(() => {
@@ -114,102 +364,6 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
     }
 
     return errors;
-  };
-
-  const handleUserInput = (value: string | string[] | any, field: string) => {
-    try {
-      // Update story data
-      if (field.includes('.')) {
-        const [parent, child] = field.split('.');
-        setStoryData((prev) => ({
-          ...prev,
-          [parent]: {
-            ...prev[parent],
-            [child]: Array.isArray(value) ? value : value.trim(),
-          },
-        }));
-      } else {
-        setStoryData((prev) => ({
-          ...prev,
-          [field]: Array.isArray(value) ? value : value.trim(),
-        }));
-      }
-
-      // Add user message
-      const userMessage: Message = {
-        type: 'user',
-        content: Array.isArray(value) ? value.join(', ') : value,
-      };
-      setMessages((prev) => [...prev, userMessage]);
-
-      // Show typing indicator
-      setIsTyping(true);
-
-      // Get next step from storySteps array
-      const nextStep = currentStep + 1;
-
-      // Ensure we're showing the character name step after title
-      if (field === 'title') {
-        const characterNameStep = storySteps[0]; // First step is character name
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              type: 'system',
-              content: characterNameStep.message,
-              inputType: characterNameStep.inputType,
-              field: characterNameStep.field,
-              options: characterNameStep.options,
-            },
-          ]);
-          setIsTyping(false);
-          setCurrentStep(0);
-        }, 1000);
-      } else if (nextStep < storySteps.length) {
-        const step = storySteps[nextStep];
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              type: 'system',
-              content: step.message,
-              inputType: step.inputType,
-              field: step.field,
-              options: step.options,
-            },
-          ]);
-          setIsTyping(false);
-          setCurrentStep(nextStep);
-        }, 1000);
-      } else {
-        // Final step - show review/generate options
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              type: 'system',
-              content:
-                "Thanks for all that information! I'm ready to create your story now. Would you like to review your choices or generate the story?",
-              inputType: 'choice',
-              field: 'action',
-              options: [
-                { label: 'Review my choices', value: 'review' },
-                { label: 'Generate my story!', value: 'generate' },
-              ],
-            },
-          ]);
-          setIsTyping(false);
-          setCurrentStep(nextStep);
-        }, 1000);
-      }
-    } catch (error) {
-      console.error('Error handling user input:', error);
-      if (onError) {
-        onError(
-          'An error occurred while processing your input. Please try again.'
-        );
-      }
-    }
   };
 
   const handleFinalAction = async (action: string | string[]) => {
@@ -272,7 +426,10 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
 
         try {
           // Use the API to generate the story
-          const storyContent = await generateStoryContent(storyData);
+          const storyContent = await generateStoryContent({
+            ...storyData,
+            plotElements: storyData.plotElements || [],
+          });
           setGeneratedStory(storyContent);
 
           setMessages((prev) => [
@@ -345,19 +502,21 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
     }
   };
 
-  const handleEditField = (field: string, value: any) => {
-    // Update story data
+  const handleEditField = (field: StoryField, value: string) => {
     if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setStoryData((prev: any) => ({
+      const [parent, child] = field.split('.') as [
+        StoryDataKey,
+        MainCharacterKey
+      ];
+      setStoryData((prev) => ({
         ...prev,
         [parent]: {
-          ...prev[parent],
+          ...prev[parent as keyof StoryData],
           [child]: value,
         },
       }));
     } else {
-      setStoryData((prev: any) => ({
+      setStoryData((prev) => ({
         ...prev,
         [field]: value,
       }));
@@ -402,176 +561,68 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
     }
   };
 
-  const renderInputComponent = (message: any) => {
+  const renderInputComponent = (message: Message) => {
     switch (message.inputType) {
       case 'text':
         return (
           <UserInput
-            onSubmit={(value) => handleUserInput(value, message.field)}
-            placeholder={
-              message.field === 'mainCharacter.name'
-                ? "Type your character's name..."
-                : message.field === 'mainCharacter.age'
-                ? "Type your character's age..."
-                : message.field === 'title'
-                ? 'Type your story title...'
-                : `Type your ${message.field.split('.').pop()}...`
+            onSubmit={(value) =>
+              handleUserInput(value, message.field as StoryField)
             }
+            placeholder={getPlaceholder(message.field as StoryField)}
             key={message.field}
           />
         );
       case 'choice':
         return (
           <MultipleChoice
-            options={message.options}
-            onSelect={(value) => {
-              if (message.field === 'action') {
-                handleFinalAction(value);
-              } else if (message.field === 'viewStory') {
-                handleViewStory(value);
-              } else if (message.field === 'retry') {
-                handleFinalAction(value);
-              } else {
-                handleUserInput(value, message.field);
-              }
-            }}
+            options={message.options || []}
+            onSelect={(value) =>
+              handleChoiceSelection(value, message.field as StoryField)
+            }
           />
         );
       case 'multiselect':
         return (
           <MultipleChoice
-            options={message.options}
-            onSelect={(value) => handleUserInput(value, message.field)}
+            options={message.options || []}
+            onSelect={(value) =>
+              handleUserInput(value, message.field as StoryField)
+            }
             multiSelect
           />
         );
       case 'character':
         return (
           <CharacterCreator
-            onSubmit={(character) => handleUserInput(character, message.field)}
+            onSubmit={(character) =>
+              handleUserInput(character, message.field as StoryField)
+            }
           />
         );
       case 'review':
         return (
-          <div className="bg-white rounded-xl shadow-md p-6 my-4">
-            <h3 className="text-lg font-semibold mb-4">Story Elements</h3>
+          <div className="rounded-xl shadow-md p-6 my-4 bg-card">
+            <h3 className="text-lg font-semibold mb-4 text-foreground">
+              Story Elements
+            </h3>
             <div className="space-y-4">
-              <div>
-                <p className="text-sm text-slate-500">Title</p>
-                <div className="flex justify-between items-center">
-                  <p className="font-medium">{storyData.title}</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-violet-600"
-                    onClick={() => {
-                      const newTitle = prompt('Edit title:', storyData.title);
-                      if (newTitle) handleEditField('title', newTitle);
-                    }}
-                  >
-                    <Edit className="h-3.5 w-3.5 mr-1" />
-                    Edit
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-slate-500">Main Character</p>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">
-                      {storyData.mainCharacter?.name || 'Unnamed Character'}{' '}
-                      {storyData.mainCharacter?.age
-                        ? `(${storyData.mainCharacter.age})`
-                        : ''}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      Traits:{' '}
-                      {storyData.mainCharacter?.traits?.join(', ') || 'None'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-violet-600"
-                      onClick={() => {
-                        const newName = prompt(
-                          'Edit character name:',
-                          storyData.mainCharacter?.name || ''
-                        );
-                        if (newName)
-                          handleEditField('mainCharacter.name', newName);
-                      }}
-                    >
-                      <Edit className="h-3.5 w-3.5 mr-1" />
-                      Edit Name
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-violet-600"
-                      onClick={() => {
-                        const newAge = prompt(
-                          'Edit character age:',
-                          storyData.mainCharacter?.age || ''
-                        );
-                        if (newAge)
-                          handleEditField('mainCharacter.age', newAge);
-                      }}
-                    >
-                      <Edit className="h-3.5 w-3.5 mr-1" />
-                      Edit Age
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-slate-500">Setting</p>
-                <div className="flex justify-between items-center">
-                  <p className="font-medium">{storyData.setting}</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-violet-600"
-                    onClick={() => {
-                      const newSetting = prompt(
-                        'Edit setting:',
-                        storyData.setting
-                      );
-                      if (newSetting) handleEditField('setting', newSetting);
-                    }}
-                  >
-                    <Edit className="h-3.5 w-3.5 mr-1" />
-                    Edit
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-slate-500">Theme</p>
-                <div className="flex justify-between items-center">
-                  <p className="font-medium">{storyData.theme}</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-violet-600"
-                    onClick={() => {
-                      const newTheme = prompt('Edit theme:', storyData.theme);
-                      if (newTheme) handleEditField('theme', newTheme);
-                    }}
-                  >
-                    <Edit className="h-3.5 w-3.5 mr-1" />
-                    Edit
-                  </Button>
-                </div>
-              </div>
+              {renderReviewField('Title', storyData.title, handleTitleEdit)}
+              {renderCharacterReview()}
+              {renderReviewField(
+                'Setting',
+                storyData.setting,
+                handleSettingEdit
+              )}
+              {renderReviewField('Theme', storyData.theme, handleThemeEdit)}
             </div>
 
             <div className="mt-6 flex justify-center">
               <Button
-                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                className={cn(
+                  buttonVariants({ variant: 'default' }),
+                  'bg-primary hover:bg-primary/90'
+                )}
                 onClick={() => handleFinalAction('generate')}
               >
                 <Sparkles className="h-4 w-4 mr-2" />
@@ -584,11 +635,11 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
         return (
           <div className="flex flex-col items-center py-4">
             <div className="w-16 h-16 relative">
-              <div className="absolute inset-0 rounded-full border-4 border-violet-200 opacity-25"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-t-violet-600 animate-spin"></div>
-              <Sparkles className="absolute inset-0 m-auto h-6 w-6 text-violet-600" />
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin"></div>
+              <Sparkles className="absolute inset-0 m-auto h-6 w-6 text-primary" />
             </div>
-            <p className="mt-4 text-slate-600">
+            <p className="mt-4 text-muted-foreground">
               Creating your magical story...
             </p>
           </div>
@@ -598,122 +649,76 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
     }
   };
 
-  // Calculate progress percentage
-  const progress = Math.max(
-    0,
-    Math.min(100, Math.round((currentStep / storySteps.length) * 100))
-  );
-
   return (
-    <>
-      <AnimatePresence mode="wait" initial={false}>
-        {showPreview ? (
-          <motion.div
-            key="preview"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <StoryPreview
-              story={generatedStory}
-              storyData={{
-                id: storyData.id || '',
-                title: storyData.title,
-                content: generatedStory,
-                metadata: {
-                  wordCount: generatedStory.split(/\s+/).length,
-                  readingTime: Math.ceil(
-                    generatedStory.split(/\s+/).length / 200
-                  ), // Assuming 200 words per minute
-                  targetAge: 8, // Default target age
-                  difficulty: 'medium',
-                  theme: storyData.theme,
-                  setting: storyData.setting,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                accessibility: {
-                  contrast: 'normal',
-                  motionReduced: false,
-                  fontSize: 'medium',
-                  lineHeight: 1.5,
-                },
-              }}
-              onBack={() => setShowPreview(false)}
-              onSave={handleSaveStory}
-            />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="wizard"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="bg-white rounded-2xl shadow-xl overflow-hidden"
-          >
-            <div className="border-b border-slate-100 p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mr-3">
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
-                <h2 className="font-semibold text-slate-900">Story Wizard</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">
-                  {progress}% complete
-                </span>
-                <div className="w-32">
-                  <Progress value={progress} className="h-2" />
-                </div>
-              </div>
-            </div>
+    <WizardContainer>
+      <WizardHeader>
+        <h2 className="text-xl font-semibold text-foreground">
+          Create Your Story
+        </h2>
+        <WizardProgress
+          progress={Math.min(
+            ((currentStep + 1) / (storySteps.length + 1)) * 100,
+            100
+          )}
+        />
+      </WizardHeader>
 
-            <div className="h-[500px] overflow-y-auto p-4 bg-slate-50">
-              <div className="space-y-4">
-                {messages.map((message, index) => (
-                  <ChatMessage
-                    key={index}
-                    message={message.content}
-                    type={message.type}
-                  />
-                ))}
-
-                {isTyping && (
-                  <div className="flex items-center space-x-2 text-slate-500 text-sm">
-                    <div className="h-8 w-8 rounded-full bg-violet-100 flex items-center justify-center">
-                      <Sparkles className="h-4 w-4 text-violet-600" />
-                    </div>
-                    <div className="flex space-x-1">
-                      <div
-                        className="h-2 w-2 bg-slate-300 rounded-full animate-bounce"
-                        style={{ animationDelay: '0ms' }}
-                      ></div>
-                      <div
-                        className="h-2 w-2 bg-slate-300 rounded-full animate-bounce"
-                        style={{ animationDelay: '150ms' }}
-                      ></div>
-                      <div
-                        className="h-2 w-2 bg-slate-300 rounded-full animate-bounce"
-                        style={{ animationDelay: '300ms' }}
-                      ></div>
-                    </div>
+      <WizardContent>
+        <AnimatePresence mode="wait">
+          {showPreview ? (
+            <motion.div {...fadeInOut}>
+              <StoryPreview
+                story={generatedStory}
+                storyData={storyData}
+                onBack={() => setShowPreview(false)}
+                onSave={handleSaveStory}
+              />
+            </motion.div>
+          ) : (
+            <MessageList>
+              {messages.map((message, index) =>
+                message.type === 'system' ? (
+                  <SystemMessage key={index}>
+                    {message.content}
+                    {renderInputComponent(message)}
+                  </SystemMessage>
+                ) : (
+                  <UserMessage key={index}>{message.content}</UserMessage>
+                )
+              )}
+              {isTyping && (
+                <SystemMessage>
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce [animation-delay:0.4s]" />
                   </div>
-                )}
+                </SystemMessage>
+              )}
+              <div ref={messagesEndRef} />
+            </MessageList>
+          )}
+        </AnimatePresence>
+      </WizardContent>
 
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 p-4 bg-white">
-              {messages.length > 0 &&
-                !isTyping &&
-                renderInputComponent(messages[messages.length - 1])}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+      {!showPreview && currentStep >= 0 && (
+        <WizardFooter>
+          <Button
+            variant="outline"
+            onClick={handleBackStep}
+            disabled={currentStep <= 0 || isTyping}
+          >
+            Back
+          </Button>
+          <Button
+            variant="default"
+            onClick={() => handleFinalAction('generate')}
+            disabled={isTyping || !validateStoryData().length}
+          >
+            Generate Story
+          </Button>
+        </WizardFooter>
+      )}
+    </WizardContainer>
   );
 }

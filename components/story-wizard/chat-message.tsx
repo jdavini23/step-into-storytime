@@ -1,43 +1,53 @@
-"use client"
+'use client';
 
-import { motion } from "framer-motion"
-import { Sparkles, User } from "lucide-react"
+import { motion } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ChatMessageProps {
-  message: string
-  type: "system" | "user"
+  message: string;
+  type: 'system' | 'user';
+  className?: string;
 }
 
-export default function ChatMessage({ message, type }: ChatMessageProps) {
+export default function ChatMessage({
+  message,
+  type,
+  className,
+}: ChatMessageProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={`flex ${type === "user" ? "justify-end" : "justify-start"}`}
+      exit={{ opacity: 0, y: -10 }}
+      className={cn(
+        'flex items-start gap-3',
+        type === 'user' && 'justify-end',
+        className
+      )}
     >
-      <div className={`flex max-w-[80%] ${type === "user" ? "flex-row-reverse" : "flex-row"}`}>
-        <div
-          className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-            type === "user" ? "bg-indigo-100 ml-2" : "bg-violet-100 mr-2"
-          }`}
-        >
-          {type === "user" ? (
-            <User className="h-4 w-4 text-indigo-600" />
-          ) : (
-            <Sparkles className="h-4 w-4 text-violet-600" />
-          )}
+      {type === 'system' && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-primary" />
         </div>
-
+      )}
+      <div
+        className={cn(
+          'flex-1 space-y-2 max-w-[80%]',
+          type === 'user' && 'text-right'
+        )}
+      >
         <div
-          className={`rounded-2xl px-4 py-2 ${
-            type === "user" ? "bg-indigo-600 text-white" : "bg-white border border-slate-200 text-slate-800"
-          }`}
+          className={cn(
+            'p-4 rounded-lg',
+            type === 'system'
+              ? 'bg-muted text-muted-foreground'
+              : 'bg-primary text-primary-foreground'
+          )}
         >
-          <p className="text-sm md:text-base">{message}</p>
+          {message}
         </div>
       </div>
     </motion.div>
-  )
+  );
 }
-

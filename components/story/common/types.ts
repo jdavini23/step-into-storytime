@@ -1,5 +1,5 @@
-export type ParagraphType = "paragraph" | "heading1" | "heading2" | "heading3";
-export type FontSize = "small" | "medium" | "large";
+export type ParagraphType = 'paragraph' | 'heading1' | 'heading2' | 'heading3';
+export type FontSize = 'small' | 'medium' | 'large';
 
 export interface ThemeColors {
   primary: string;
@@ -15,7 +15,7 @@ export interface StoryMetadata {
   wordCount: number;
   readingTime: number;
   targetAge: number;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: 'easy' | 'medium' | 'hard';
   theme: string;
   setting: string;
   createdAt: string;
@@ -23,13 +23,17 @@ export interface StoryMetadata {
 }
 
 export interface AccessibilitySettings {
-  contrast: "normal" | "high";
+  contrast: 'normal' | 'high';
   motionReduced: boolean;
   fontSize: FontSize;
   lineHeight: number;
 }
 
 export interface StoryData {
+  plotElements: never[];
+  mainCharacter: any;
+  setting: any;
+  theme: any;
   id: string;
   title: string;
   content: string;

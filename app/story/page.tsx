@@ -1,10 +1,16 @@
-import Navbar from "@/components/navbar"
-import StoryContent from "@/components/story/story-content"
-import StoryControls from "@/components/story/story-controls"
-import StoryHeader from "@/components/story/story-header"
-import Footer from "@/components/sections/footer"
+import Navbar from '@/components/navbar';
+import StoryContent from '@/components/story/story-content';
+import StoryControls from '@/components/story/story-controls';
+import StoryHeader from '@/components/story/story-header';
+import Footer from '@/components/sections/footer';
 
-export default function StoryPage() {
+interface StoryPageProps {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+export default function StoryPage({ searchParams }: StoryPageProps) {
+  const storyId = typeof searchParams.id === 'string' ? searchParams.id : '';
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50">
       <Navbar />
@@ -19,7 +25,7 @@ export default function StoryPage() {
           />
 
           <div className="mt-8 bg-white rounded-2xl shadow-xl overflow-hidden">
-            <StoryContent storyId={""} />
+            <StoryContent storyId={storyId} />
             <StoryControls />
           </div>
         </div>
@@ -27,6 +33,5 @@ export default function StoryPage() {
 
       <Footer />
     </div>
-  )
+  );
 }
-

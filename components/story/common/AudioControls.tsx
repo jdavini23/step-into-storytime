@@ -3,13 +3,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Volume2,
-  VolumeX,
-  PauseCircle,
-  PlayCircle,
-} from 'lucide-react';
-import { storyStyles } from './styles';
+import { Volume2, VolumeX, PauseCircle, PlayCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { ThemeColors } from './types';
 
 interface AudioControlsProps {
@@ -27,7 +22,7 @@ export default function AudioControls({
   isPlaying = false,
   volume = 70,
   themeColors,
-  className = '',
+  className,
 }: AudioControlsProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(volume);
@@ -51,17 +46,32 @@ export default function AudioControls({
     onVolumeChange?.(newVolume);
   };
 
+  const getThemeStyles = () => {
+    if (!themeColors) return {};
+    return {
+      '--theme-primary': themeColors.primary,
+      '--theme-hover': `${themeColors.primary}10`,
+    } as React.CSSProperties;
+  };
+
   return (
-    <div className={`flex items-center gap-3 ${className}`} css={storyStyles.controls}>
+    <div
+      className={cn(
+        'flex items-center gap-3 p-2 rounded-lg',
+        'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
+        className
+      )}
+      style={getThemeStyles()}
+    >
       <Button
         variant="ghost"
         size="icon"
-        className="h-10 w-10 rounded-full hover:bg-slate-100"
+        className={cn(
+          'h-10 w-10 rounded-full',
+          'hover:bg-muted transition-colors duration-200',
+          themeColors && 'text-[--theme-primary] hover:bg-[--theme-hover]'
+        )}
         onClick={onPlayPause}
-        style={themeColors ? {
-          color: themeColors.primary,
-          '--hover-color': `${themeColors.primary}10`,
-        } as React.CSSProperties : undefined}
       >
         {isPlaying ? (
           <PauseCircle className="h-6 w-6" />
@@ -76,7 +86,10 @@ export default function AudioControls({
           variant="ghost"
           size="icon"
           onClick={handleVolumeToggle}
-          className="hover:bg-slate-100"
+          className={cn(
+            'hover:bg-muted transition-colors duration-200',
+            themeColors && 'text-[--theme-primary] hover:bg-[--theme-hover]'
+          )}
         >
           {isMuted || volume === 0 ? (
             <VolumeX className="h-5 w-5" />
@@ -92,10 +105,11 @@ export default function AudioControls({
           max="100"
           value={isMuted ? 0 : volume}
           onChange={handleVolumeChange}
-          className="w-20 md:w-32 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-          style={themeColors ? {
-            accentColor: themeColors.primary,
-          } as React.CSSProperties : undefined}
+          className={cn(
+            'w-20 md:w-32 h-2 rounded-lg appearance-none cursor-pointer',
+            'bg-muted',
+            themeColors && '[&::-webkit-slider-thumb]:bg-[--theme-primary]'
+          )}
         />
       </div>
     </div>

@@ -1,7 +1,7 @@
-/** @jsxImportSource @emotion/react */
 'use client';
 
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import { ThemeColors } from './types';
 
 interface ActionControlsProps {
@@ -10,6 +10,7 @@ interface ActionControlsProps {
   onSave?: () => Promise<void>;
   showSave?: boolean;
   themeColors: ThemeColors;
+  className?: string;
 }
 
 export default function ActionControls({
@@ -18,40 +19,47 @@ export default function ActionControls({
   onSave,
   showSave = true,
   themeColors,
+  className,
 }: ActionControlsProps) {
+  const getThemeStyles = () => {
+    return {
+      '--theme-primary': themeColors.primary,
+      '--theme-secondary': themeColors.secondary,
+      '--theme-accent': themeColors.accent,
+      '--theme-text': themeColors.text,
+    } as React.CSSProperties;
+  };
+
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className={cn('flex items-center gap-2', className)}
+      style={getThemeStyles()}
+    >
       {onDownload && (
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onDownload}
-          className="px-3 py-2 rounded-lg text-sm font-medium"
-          css={{
-            backgroundColor: themeColors.primary,
-            color: themeColors.text,
-            '&:hover': {
-              backgroundColor: themeColors.primaryHover,
-            },
-          }}
+          className={cn(
+            'px-3 py-2 rounded-lg text-sm font-medium',
+            'bg-[--theme-primary] text-[--theme-text]',
+            'hover:bg-[--theme-primary]/90 transition-colors duration-200'
+          )}
         >
           Download
         </motion.button>
       )}
-      
+
       {onShare && (
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onShare}
-          className="px-3 py-2 rounded-lg text-sm font-medium"
-          css={{
-            backgroundColor: themeColors.secondary,
-            color: themeColors.text,
-            '&:hover': {
-              backgroundColor: themeColors.secondaryHover,
-            },
-          }}
+          className={cn(
+            'px-3 py-2 rounded-lg text-sm font-medium',
+            'bg-[--theme-secondary] text-[--theme-text]',
+            'hover:bg-[--theme-secondary]/90 transition-colors duration-200'
+          )}
         >
           Share
         </motion.button>
@@ -62,14 +70,11 @@ export default function ActionControls({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onSave}
-          className="px-3 py-2 rounded-lg text-sm font-medium"
-          css={{
-            backgroundColor: themeColors.accent,
-            color: themeColors.text,
-            '&:hover': {
-              backgroundColor: themeColors.accentHover,
-            },
-          }}
+          className={cn(
+            'px-3 py-2 rounded-lg text-sm font-medium',
+            'bg-[--theme-accent] text-[--theme-text]',
+            'hover:bg-[--theme-accent]/90 transition-colors duration-200'
+          )}
         >
           Save
         </motion.button>

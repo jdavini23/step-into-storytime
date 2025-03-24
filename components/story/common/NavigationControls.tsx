@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { storyStyles } from './styles';
+import { cn } from '@/lib/utils';
 import { ThemeColors } from './types';
 
 interface NavigationControlsProps {
@@ -21,26 +21,40 @@ export default function NavigationControls({
   currentPage,
   totalPages,
   themeColors,
-  className = '',
+  className,
 }: NavigationControlsProps) {
+  const getThemeStyles = () => {
+    if (!themeColors) return {};
+    return {
+      '--theme-secondary': themeColors.secondary,
+      '--theme-hover': `${themeColors.secondary}10`,
+    } as React.CSSProperties;
+  };
+
   return (
-    <div className={`flex items-center gap-4 ${className}`} css={storyStyles.controls}>
+    <div
+      className={cn(
+        'flex items-center gap-4 p-2 rounded-lg',
+        'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
+        className
+      )}
+      style={getThemeStyles()}
+    >
       <Button
         variant="ghost"
         size="icon"
         onClick={onPrevious}
         disabled={currentPage <= 0}
-        className="hover:bg-slate-100"
-        style={themeColors ? {
-          color: themeColors.secondary,
-          '--hover-color': `${themeColors.secondary}10`,
-        } as React.CSSProperties : undefined}
+        className={cn(
+          'hover:bg-muted transition-colors duration-200',
+          themeColors && 'text-[--theme-secondary] hover:bg-[--theme-hover]'
+        )}
       >
         <ChevronLeft className="h-6 w-6" />
         <span className="sr-only">Previous page</span>
       </Button>
 
-      <span className="text-sm text-slate-600">
+      <span className="text-sm text-muted-foreground">
         Page {currentPage + 1} of {totalPages}
       </span>
 
@@ -49,11 +63,10 @@ export default function NavigationControls({
         size="icon"
         onClick={onNext}
         disabled={currentPage >= totalPages - 1}
-        className="hover:bg-slate-100"
-        style={themeColors ? {
-          color: themeColors.secondary,
-          '--hover-color': `${themeColors.secondary}10`,
-        } as React.CSSProperties : undefined}
+        className={cn(
+          'hover:bg-muted transition-colors duration-200',
+          themeColors && 'text-[--theme-secondary] hover:bg-[--theme-hover]'
+        )}
       >
         <ChevronRight className="h-6 w-6" />
         <span className="sr-only">Next page</span>

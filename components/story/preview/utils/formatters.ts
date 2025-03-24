@@ -1,6 +1,19 @@
 import { StoryParagraph } from '../../common/types';
 
-export function formatStoryText(text: string) {
+interface FormattedStoryResult {
+  paragraphs: StoryParagraph[];
+  totalPages: number;
+  title?: string;
+}
+
+const WORDS_PER_PAGE = 200; // Average words per page
+
+/**
+ * Formats raw story text into structured paragraphs and calculates pagination
+ * @param text - Raw story text, potentially containing markdown
+ * @returns Formatted story data including paragraphs and page count
+ */
+export function formatStoryText(text: string): FormattedStoryResult {
   if (!text) return { paragraphs: [], totalPages: 0 };
 
   const lines = text.split('\n');
@@ -8,7 +21,7 @@ export function formatStoryText(text: string) {
   let title = '';
   let content = '';
 
-  // If first line is a heading, use it as title
+  // Extract title from markdown heading if present
   if (firstLine.startsWith('# ')) {
     title = firstLine.substring(2).trim();
     content = lines.slice(1).join('\n').trim();
@@ -22,10 +35,10 @@ export function formatStoryText(text: string) {
     content = text;
   }
 
-  // Process content to ensure proper markdown formatting
+  // Normalize markdown headings
   content = content
     .split('\n')
-    .map(line => {
+    .map((line) => {
       if (line.startsWith('#')) {
         const match = line.match(/^(#+)(\S)/);
         if (match) {
@@ -36,34 +49,38 @@ export function formatStoryText(text: string) {
     })
     .join('\n');
 
-  // Convert to paragraphs
+  // Convert content to structured paragraphs
   const paragraphs: StoryParagraph[] = content
     .split('\n')
-    .filter(line => line.trim() !== '')
+    .filter((line) => line.trim() !== '')
     .map((content, index) => {
-      let type = 'paragraph';
-      if (content.startsWith('# ')) {
-        type = 'heading1';
-      } else if (content.startsWith('## ')) {
-        type = 'heading2';
-      } else if (content.startsWith('### ')) {
-        type = 'heading3';
-      }
-
+      const type = determineContentType(content);
       return {
-        content,
+        content: content.replace(/^#+\s/, ''), // Remove heading markers
         type,
         index,
-      } as StoryParagraph;
+      };
     });
 
-  // Calculate total pages based on content length
-  const WORDS_PER_PAGE = 200; // Average words per page
+  // Calculate pagination
   const totalWords = content.split(/\s+/).length;
-  const totalPages = Math.ceil(totalWords / WORDS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalWords / WORDS_PER_PAGE));
 
   return {
     paragraphs,
-    totalPages: Math.max(1, totalPages), // Ensure at least 1 page
+    totalPages,
+    title: title || undefined,
   };
+}
+
+/**
+ * Determines the type of content based on markdown syntax
+ * @param content - Line of content to analyze
+ * @returns Content type identifier
+ */
+function determineContentType(content: string): StoryParagraph['type'] {
+  if (content.startsWith('# ')) return 'heading1';
+  if (content.startsWith('## ')) return 'heading2';
+  if (content.startsWith('### ')) return 'heading3';
+  return 'paragraph';
 }
