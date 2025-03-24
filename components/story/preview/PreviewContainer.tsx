@@ -3,13 +3,13 @@
 
 import { useReducer, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { StoryData, ThemeColors, FontSize } from '@/components/story/common/types';
-import { storyStyles } from '@/components/story/common/styles';
-import StoryHeader from '@/components/story/common/StoryHeader';
-import StoryText from '@/components/story/common/StoryText';
-import AudioControls from '@/components/story/common/AudioControls';
-import NavigationControls from '@/components/story/common/NavigationControls';
-import ActionControls from '@/components/story/common/ActionControls';
+import { StoryData, ThemeColors, FontSize } from '../common/types';
+import { storyStyles } from '../common/styles';
+import StoryHeader from '../common/StoryHeader';
+import StoryText from '../common/StoryText';
+import AudioControls from '../common/AudioControls';
+import NavigationControls from '../common/NavigationControls';
+import ActionControls from '../common/ActionControls';
 import { formatStoryText } from './utils/formatters';
 
 // State management
