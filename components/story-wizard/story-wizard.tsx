@@ -601,10 +601,7 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
   // Calculate progress percentage
   const progress = Math.max(
     0,
-    Math.min(
-      100,
-      Math.round((currentStep / (storySteps.length)) * 100)
-    )
+    Math.min(100, Math.round((currentStep / storySteps.length) * 100))
   );
 
   return (
@@ -620,7 +617,29 @@ export default function StoryWizard({ onError }: StoryWizardProps) {
           >
             <StoryPreview
               story={generatedStory}
-              storyData={storyData}
+              storyData={{
+                id: storyData.id || '',
+                title: storyData.title,
+                content: generatedStory,
+                metadata: {
+                  wordCount: generatedStory.split(/\s+/).length,
+                  readingTime: Math.ceil(
+                    generatedStory.split(/\s+/).length / 200
+                  ), // Assuming 200 words per minute
+                  targetAge: 8, // Default target age
+                  difficulty: 'medium',
+                  theme: storyData.theme,
+                  setting: storyData.setting,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+                accessibility: {
+                  contrast: 'normal',
+                  motionReduced: false,
+                  fontSize: 'medium',
+                  lineHeight: 1.5,
+                },
+              }}
               onBack={() => setShowPreview(false)}
               onSave={handleSaveStory}
             />

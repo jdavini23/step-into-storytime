@@ -1,17 +1,10 @@
-let userConfig = undefined
-try {
-  userConfig = await import('./v0-user-next.config')
-} catch (e) {
-  // ignore error
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   compiler: {
     emotion: {
-      sourceMap: true,
+      sourceMap: process.env.NODE_ENV === 'development',
       autoLabel: 'dev-only',
       labelFormat: '[local]',
     },
@@ -30,28 +23,13 @@ const nextConfig = {
   sassOptions: {
     includePaths: ['./styles'],
   },
-  webpack: (config) => {
-    // config.module.rules.push({
-    //   test: /\.svg$/,
-    //   use: ['@svgr/webpack'],
-    // });
-    return config;
-  },
-}
+  // Optimize for production
+  poweredByHeader: false,
+  compress: true,
+  generateEtags: true,
+  // Handle any redirects or rewrites here if needed
+  // rewrites: async () => [],
+  // redirects: async () => [],
+};
 
-mergeConfig(nextConfig, userConfig)
-
-function mergeConfig(nextConfig, userConfig) {
-  if (!userConfig) {
-    return
-  }
-
-  const userNextConfig = userConfig.default || userConfig
-  if (typeof userNextConfig === 'function') {
-    Object.assign(nextConfig, userNextConfig(nextConfig))
-  } else if (typeof userNextConfig === 'object') {
-    Object.assign(nextConfig, userNextConfig)
-  }
-}
-
-export default nextConfig
+export default nextConfig;

@@ -6,7 +6,8 @@ export const storyStyles = {
     position: relative;
     background: white;
     border-radius: 12px 24px 24px 12px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+      0 8px 10px -6px rgba(0, 0, 0, 0.1);
     border: 1px solid #e2e8f0;
     overflow: hidden;
     min-height: 400px;
@@ -59,5 +60,5 @@ export const storyStyles = {
     padding: 1rem;
     background: #f8fafc;
     border-top: 1px solid #e2e8f0;
-  `
+  `,
 };
