@@ -8,25 +8,10 @@ import {
   useEffect,
   useCallback,
 } from 'react';
+import type { Story as CommonStory, StoryMetadata } from '@/components/story/common/types';
 
 // Define types
-type Story = {
-  id?: string;
-  title: string;
-  mainCharacter: {
-    name: string;
-    age: string;
-    traits: string[];
-    appearance: string;
-  };
-  setting: string;
-  theme: string;
-  plotElements: string[];
-  content?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  author?: string;
-};
+export type Story = CommonStory;
 
 type StoryState = {
   stories: Story[];

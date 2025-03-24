@@ -1,10 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { useStory } from '@/contexts/story-context';
 import Loading from '@/components/loading';
-import StoryHeader from './story-header';
+import StoryHeader from './common/StoryHeader';
+import AudioControls from './common/AudioControls';
+import NavigationControls from './common/NavigationControls';
+import ActionControls from './common/ActionControls';
+import { themeColors } from '../story-wizard/theme-colors';
+import type { ThemeType } from '../story-wizard/theme-colors';
 
 interface StoryContentProps {
   storyId: string;
@@ -14,16 +18,19 @@ export default function StoryContent({ storyId }: StoryContentProps) {
   const { state, fetchStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(70);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const loadStory = async () => {
+      setIsLoading(true);
+      setError(null);
+      
       try {
-        setIsLoading(true);
         await fetchStory(storyId);
-      } catch (error) {
-        setError(
-          error instanceof Error ? error.message : 'Failed to load story'
-        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load story');
       } finally {
         setIsLoading(false);
       }
@@ -32,73 +39,72 @@ export default function StoryContent({ storyId }: StoryContentProps) {
     loadStory();
   }, [storyId, fetchStory]);
 
-  if (isLoading) {
-    return <Loading />;
-  }
+  if (isLoading) return <Loading />;
+  if (error) return <ErrorMessage message={error} />;
+  if (!state.currentStory) return <EmptyMessage message="Story not found" />;
 
-  if (error) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-red-600">Error: {error}</p>
-      </div>
-    );
-  }
-
-  if (!state.currentStory) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-slate-600">Story not found</p>
-      </div>
-    );
-  }
-
-  // Get author name from main character's name if author is not set
-  const authorName =
-    state.currentStory.author ||
-    (state.currentStory.mainCharacter?.name
-      ? `Created by ${state.currentStory.mainCharacter.name}'s family`
-      : 'Anonymous');
-
-  // Format the story content by splitting into paragraphs
-  const paragraphs =
-    state.currentStory.content?.split('\n').filter(Boolean) || [];
+  // Since we've checked for null above, we can safely use currentStory here
+  const { currentStory } = state;
+  const currentThemeColors = themeColors[currentStory.metadata.theme as ThemeType] || themeColors.default;
 
   return (
-    <div className="bg-white rounded-xl shadow-lg">
-      <div className="p-6 md:p-10">
-        <StoryHeader
-          title={state.currentStory.title}
-          author={authorName}
-          date={new Date(
-            state.currentStory.createdAt || Date.now()
-          ).toLocaleDateString()}
-          theme={state.currentStory.theme}
-        />
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <StoryHeader
+        title={currentStory.title}
+        author={currentStory.author}
+        date={currentStory.createdAt}
+        theme={currentStory.metadata.theme}
+        themeColors={currentThemeColors}
+      />
 
-        <div className="mt-8">
-          {/* Story illustration */}
-          <div className="relative h-64 md:h-96 mb-8 rounded-xl overflow-hidden shadow-md">
-            <Image
-              src="/placeholder.svg?height=400&width=800"
-              alt={`Illustration for ${state.currentStory.title}`}
-              fill
-              className="object-cover"
-            />
-          </div>
-
-          {/* Story text */}
-          <article className="prose prose-lg max-w-none">
-            {paragraphs.map((paragraph, index) => (
-              <p
-                key={index}
-                className="text-xl leading-relaxed text-slate-800 mb-6"
-              >
-                {paragraph}
-              </p>
-            ))}
-          </article>
+      <main className="my-8">
+        <div className="prose prose-lg max-w-none">
+          {currentStory.content}
         </div>
-      </div>
+      </main>
+
+      <footer className="border-t border-slate-200 bg-slate-50 p-4 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <AudioControls
+            isPlaying={isPlaying}
+            volume={volume}
+            onPlayPause={() => setIsPlaying(!isPlaying)}
+            onVolumeChange={setVolume}
+            themeColors={currentThemeColors}
+          />
+
+          <NavigationControls
+            currentPage={currentPage}
+            totalPages={currentStory.pages.length}
+            onPrevious={() => setCurrentPage(p => Math.max(1, p - 1))}
+            onNext={() => setCurrentPage(p => Math.min(currentStory.pages.length, p + 1))}
+            themeColors={currentThemeColors}
+          />
+
+          <ActionControls
+            themeColors={currentThemeColors}
+            onDownload={() => {/* TODO: Implement download */}}
+            onShare={() => {/* TODO: Implement share */}}
+            onSave={() => {/* TODO: Implement save */}}
+          />
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return (
+    <div className="p-6 text-center">
+      <p className="text-red-600">Error: {message}</p>
+    </div>
+  );
+}
+
+function EmptyMessage({ message }: { message: string }) {
+  return (
+    <div className="p-6 text-center">
+      <p className="text-slate-600">{message}</p>
     </div>
   );
 }
