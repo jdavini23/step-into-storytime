@@ -19,7 +19,7 @@ export default function StoryPage() {
           />
 
           <div className="mt-8 bg-white rounded-2xl shadow-xl overflow-hidden">
-            <StoryContent />
+            <StoryContent storyId={""} />
             <StoryControls />
           </div>
         </div>
