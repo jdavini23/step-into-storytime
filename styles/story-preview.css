@@ -1,0 +1,198 @@
+/* Story Preview Styles */
+
+/* CSS Variables */
+:root {
+  --primary-color: #8B5CF6;
+  --secondary-color: #4ECDC4;
+  --accent-color: #45B7D1;
+  --font-size-small: 1rem;
+  --font-size-medium: 1.125rem;
+  --font-size-large: 1.25rem;
+}
+
+/* Container styles */
+.story-preview-container {
+  position: relative;
+  background: white;
+  border-radius: 12px 24px 24px 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  min-height: 400px;
+  background: linear-gradient(to right, #f9f9f9, #ffffff);
+}
+
+/* Animation keyframes */
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-2deg);
+  }
+  75% {
+    transform: rotate(2deg);
+  }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+@keyframes shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shine {
+  animation: shine 1s linear infinite;
+}
+
+/* Story content styles */
+.story-content {
+  font-family: 'Roboto', sans-serif;
+  max-width: 65ch;
+  margin: 0 auto;
+  color: #4a5568;
+  padding: 2rem;
+  min-height: 60vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.story-paragraph {
+  margin-bottom: 1.5rem;
+}
+
+/* Heading styles */
+.story-heading-1 {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 2.5rem;
+  line-height: 1.2;
+  margin: 2rem 0;
+  text-align: center;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  font-weight: bold;
+}
+
+.story-heading-2 {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 2rem;
+  line-height: 1.3;
+  margin: 1.5rem 0;
+  font-weight: 600;
+}
+
+.story-heading-3 {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.5rem;
+  line-height: 1.4;
+  margin: 1.25rem 0;
+  font-weight: 500;
+}
+
+/* Paragraph styles */
+.story-content p, .story-paragraph {
+  font-size: 1.125rem;
+  line-height: 1.8;
+  margin: 1.25rem 0;
+  color: #2d3748;
+  letter-spacing: 0.01em;
+}
+
+.story-content p:first-of-type, .story-paragraph:first-of-type {
+  text-indent: 0;
+  font-size: 1.25rem;
+  line-height: 1.7;
+}
+
+.story-content p:first-of-type::first-letter, .story-paragraph:first-of-type::first-letter {
+  font-size: 3.25rem;
+  font-family: var(--font-display, Georgia, serif);
+  float: left;
+  line-height: 1;
+  padding: 0.1em 0.1em 0 0;
+  color: var(--primary-color, #8B5CF6);
+}
+
+/* Controls and navigation */
+.story-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: auto;
+  padding-top: 2rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Font size variations */
+.font-size-small .story-paragraph, .font-size-small .story-heading-1, .font-size-small .story-heading-2, .font-size-small .story-heading-3 {
+  font-size: var(--font-size-small);
+  line-height: 1.7;
+}
+
+.font-size-medium .story-paragraph, .font-size-medium .story-heading-1, .font-size-medium .story-heading-2, .font-size-medium .story-heading-3 {
+  font-size: var(--font-size-medium);
+  line-height: 1.8;
+}
+
+.font-size-large .story-paragraph, .font-size-large .story-heading-1, .font-size-large .story-heading-2, .font-size-large .story-heading-3 {
+  font-size: var(--font-size-large);
+  line-height: 1.9;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .story-content {
+    padding: 1.5rem;
+  }
+  
+  .story-content h1 {
+    font-size: 2rem;
+  }
+
+  .story-content h2 {
+    font-size: 1.75rem;
+  }
+
+  .story-content h3 {
+    font-size: 1.5rem;
+  }
+
+  .story-content p {
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+
+  .story-content p:first-of-type {
+    font-size: 1.125rem;
+  }
+
+  .story-content p:first-of-type::first-letter {
+    font-size: 2.75rem;
+  }
+  
+  .font-size-small p {
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .font-size-medium p {
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+
+  .font-size-large p {
+    font-size: 1.125rem;
+    line-height: 1.8;
+  }
+}

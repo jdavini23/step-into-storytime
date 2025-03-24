@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { storyPreviewStyles } from './StoryPreviewStyles';
 import { themeColors } from './theme-colors';
 import type { ThemeType } from './theme-colors';
+import '@/styles/story-preview.css';
 
 import {
   ArrowLeft,
@@ -145,23 +146,19 @@ export default function StoryPreview({
       let content = '';
 
       // If first line is a heading, use it as title
-      if (firstLine.startsWith('# ')) {
-        title = firstLine.substring(2).trim();
-        content = lines.slice(1).join('\n').trim();
-      } else if (firstLine.startsWith('#')) {
-        // Handle case where there's no space after the # character
-        title = firstLine.substring(1).trim();
-        content = lines.slice(1).join('\n').trim();
-        
-        // If there's no content after the title line, treat the title line as content too
-        if (!content) {
-          content = title;
+      if (firstLine.startsWith('#')) {
+        const titleMatch = firstLine.match(/^(#+)\s*(.*)$/);
+        if (titleMatch) {
+          title = titleMatch[2].trim();
+          content = lines.slice(1).join('\n').trim();
         }
       } else {
         // If no title is found, use the entire text as content
         content = text;
       }
-      
+
+      console.log('Extracted title:', title);
+      console.log('Extracted content:', content);
       // Process content to ensure proper markdown formatting
       // Make sure headings have proper markdown syntax
       content = content
@@ -196,25 +193,31 @@ export default function StoryPreview({
   const paragraphs = useMemo(() => {
     const formattedText = formatStoryText(story);
     
-    const result = formattedText.content
+    interface ParagraphResult {
+      content: string;
+      type: ParagraphType;
+      index: number;
+    }
+
+    const result: ParagraphResult[] = formattedText.content
       .split('\n')
-      .filter(line => line.trim() !== '') // Remove empty lines
-      .map((content, index) => {
-        // Determine the type of content based on markdown syntax
-        let type = 'paragraph';
-        if (content.startsWith('# ')) {
-          type = 'heading1';
-        } else if (content.startsWith('## ')) {
-          type = 'heading2';
-        } else if (content.startsWith('### ')) {
-          type = 'heading3';
-        }
-        
-        return {
-          content,
-          type,
-          index,
-        };
+      .filter((line: string) => line.trim() !== '') // Remove empty lines
+      .map((content: string, index: number): ParagraphResult => {
+      // Determine the type of content based on markdown syntax
+      let type: ParagraphType = 'paragraph';
+      if (content.startsWith('# ')) {
+        type = 'heading1';
+      } else if (content.startsWith('## ')) {
+        type = 'heading2';
+      } else if (content.startsWith('### ')) {
+        type = 'heading3';
+      }
+      
+      return {
+        content,
+        type,
+        index,
+      };
       });
     
     return result;
@@ -249,13 +252,12 @@ export default function StoryPreview({
     return colors || defaultTheme;
   }, [state.theme]);
 
-  const containerStyles = css`
-    ${storyPreviewStyles.container}
-    --primary-color: ${currentThemeColors.primary};
-    --secondary-color: ${currentThemeColors.secondary};
-    --accent-color: ${currentThemeColors.accent};
-    font-size: var(--font-size-${state.fontSize});
-  `;
+  // Define CSS variables for theme colors
+  const themeVariables = {
+    '--primary-color': currentThemeColors.primary,
+    '--secondary-color': currentThemeColors.secondary,
+    '--accent-color': currentThemeColors.accent,
+  } as React.CSSProperties;
 
   // Process story for PageTurner by splitting paragraphs
   const storyParagraphs = useMemo(() => {
@@ -470,8 +472,8 @@ export default function StoryPreview({
   return (
     <div
       ref={containerRef}
-      css={containerStyles}
-      className="story-preview-container"
+      className={`story-preview-container font-size-${state.fontSize}`}
+      style={themeVariables}
       {...a11yProps}
     >
       <AnimatePresence mode="wait">
@@ -495,37 +497,27 @@ export default function StoryPreview({
                 <ReactMarkdown
                   components={{
                     h1: ({ node, ...props }) => (
-                      <h1 
-                        className="text-3xl md:text-4xl font-bold mb-4 leading-tight" 
-                        style={{ 
-                          color: currentThemeColors.primary,
-                          textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                        }}
-                        {...props} 
+                      <h1
+                        className="story-heading-1"
+                        {...props}
                       />
                     ),
                     h2: ({ node, ...props }) => (
-                      <h2 
-                        className="text-2xl md:text-3xl font-semibold mb-3 mt-6" 
-                        style={{ 
-                          color: currentThemeColors.secondary,
-                        }}
-                        {...props} 
+                      <h2
+                        className="story-heading-2"
+                        {...props}
                       />
                     ),
                     h3: ({ node, ...props }) => (
-                      <h3 
-                        className="text-xl md:text-2xl font-medium mb-2 mt-4" 
-                        style={{ 
-                          color: currentThemeColors.accent,
-                        }}
-                        {...props} 
+                      <h3
+                        className="story-heading-3"
+                        {...props}
                       />
                     ),
                     p: ({ node, ...props }) => (
-                      <p 
-                        className={`mb-4 leading-relaxed ${getFontSizeClass()}`}
-                        {...props} 
+                      <p
+                        className="story-paragraph"
+                        {...props}
                       />
                     )
                   }}
@@ -681,119 +673,7 @@ export default function StoryPreview({
         </motion.button>
       </div>
 
-      {/* Add CSS for wiggle animation and story content styling */}
-      <style jsx global>{`
-        @keyframes wiggle {
-          0%,
-          100% {
-            transform: rotate(0deg);
-          }
-          25% {
-            transform: rotate(-2deg);
-          }
-          75% {
-            transform: rotate(2deg);
-          }
-        }
-
-        .animate-wiggle {
-          animation: wiggle 0.5s ease-in-out;
-        }
-
-        @keyframes shine {
-          to {
-            transform: translateX(100%);
-          }
-        }
-
-        .animate-shine {
-          animation: shine 1s linear infinite;
-        }
-
-        .story-content {
-          font-family: var(--font-sans);
-          max-width: 65ch;
-          margin: 0 auto;
-          color: #4a5568;
-        }
-
-        .story-content h1 {
-          font-family: var(--font-display);
-          font-size: 2.5rem;
-          line-height: 1.2;
-          margin: 2rem 0;
-          text-align: center;
-          color: ${currentThemeColors.primary};
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .story-content h2 {
-          font-family: var(--font-display);
-          font-size: 2rem;
-          line-height: 1.3;
-          margin: 1.5rem 0;
-          color: ${currentThemeColors.secondary};
-        }
-
-        .story-content h3 {
-          font-family: var(--font-display);
-          font-size: 1.5rem;
-          line-height: 1.4;
-          margin: 1.25rem 0;
-          color: ${currentThemeColors.accent};
-        }
-
-        .story-content p {
-          font-size: 1.125rem;
-          line-height: 1.8;
-          margin: 1.25rem 0;
-          text-indent: 2rem;
-          color: #4a5568;
-          letter-spacing: 0.01em;
-        }
-
-        .story-content p:first-of-type {
-          text-indent: 0;
-          font-size: 1.25rem;
-          line-height: 1.7;
-        }
-
-        .story-content p:first-of-type::first-letter {
-          font-size: 3.25rem;
-          font-family: var(--font-display);
-          float: left;
-          line-height: 1;
-          padding: 0.1em 0.1em 0 0;
-          color: ${currentThemeColors.primary};
-        }
-
-        @media (max-width: 768px) {
-          .story-content h1 {
-            font-size: 2rem;
-          }
-
-          .story-content h2 {
-            font-size: 1.75rem;
-          }
-
-          .story-content h3 {
-            font-size: 1.5rem;
-          }
-
-          .story-content p {
-            font-size: 1rem;
-            line-height: 1.7;
-          }
-
-          .story-content p:first-of-type {
-            font-size: 1.125rem;
-          }
-
-          .story-content p:first-of-type::first-letter {
-            font-size: 2.75rem;
-          }
-        }
-      `}</style>
+      {/* CSS is now imported from /styles/story-preview.css */}
     </div>
   );
 }

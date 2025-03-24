@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "setup": "node setup-dev.js",
+    "postinstall": "node setup-dev.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

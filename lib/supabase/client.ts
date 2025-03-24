@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
+import { createMockSupabaseClient } from './mock-client';
 
 // Type for Supabase instance with all tables
 export type TypedSupabaseClient = SupabaseClient<Database>;
@@ -35,35 +36,42 @@ if (!supabaseUrl || !supabaseAnonKey) {
     }
   );
   
-  // In development, throw an error to make it obvious
+  // In development, use mock data instead of throwing an error
   if (process.env.NODE_ENV === 'development') {
-    throw new Error('Missing required Supabase environment variables');
+    console.warn('[WARN] Using mock Supabase client for development. Add .env.local file with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to use a real Supabase instance.');
   }
   
-  // In production, create a dummy client that will fail gracefully
-  // This prevents the app from crashing completely
-  const dummyClient = {
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: new Error('No Supabase credentials') }),
-      getUser: () => Promise.resolve({ data: { user: null }, error: new Error('No Supabase credentials') }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      signInWithPassword: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
-      signInWithOAuth: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
-      signOut: () => Promise.resolve({ error: null }),
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
+  // Use a mock client in development, or a dummy client in production
+  if (process.env.NODE_ENV === 'development') {
+    // In development, use a mock client with sample data
+    console.warn('[WARN] Using mock Supabase client with sample data for development');
+    supabase = createMockSupabaseClient();
+  } else {
+    // In production, create a dummy client that will fail gracefully
+    // This prevents the app from crashing completely
+    const dummyClient = {
+      auth: {
+        getSession: () => Promise.resolve({ data: { session: null }, error: new Error('No Supabase credentials') }),
+        getUser: () => Promise.resolve({ data: { user: null }, error: new Error('No Supabase credentials') }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+        signInWithPassword: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
+        signInWithOAuth: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
+        signOut: () => Promise.resolve({ error: null }),
+      },
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
+          }),
         }),
+        insert: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
+        update: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
       }),
-      insert: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
-      update: () => Promise.resolve({ data: null, error: new Error('No Supabase credentials') }),
-    }),
-  } as unknown as SupabaseClient<Database>;
-  
-  console.warn('[WARN] Using fallback Supabase client that will fail gracefully');
-  supabase = dummyClient;
+    } as unknown as SupabaseClient<Database>;
+
+    console.warn('[WARN] Using fallback Supabase client that will fail gracefully');
+    supabase = dummyClient;
+  }
 } else {
   // Validate URL format
   try {

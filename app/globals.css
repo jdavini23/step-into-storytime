@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import component-specific styles */
+@import '../styles/story-preview.css';
+
 /* Add font-family from styles/globals.css */
 body {
   font-family: Arial, Helvetica, sans-serif;
@@ -113,6 +116,8 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 
 /* Custom styles for story page */
 @layer components {
