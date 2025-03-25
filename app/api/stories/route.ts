@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { StoryData } from '@/components/story/common/types';
 import type { Story } from '@/contexts/story-context';
 import { createClient } from '@/utils/supabase/server';
+import { generateStory } from '@/utils/ai/story-generator';
+import type { Database } from '@/types/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // In-memory storage for demo purposes
 // TODO: Replace with database storage
@@ -10,16 +13,19 @@ let stories: Story[] = [];
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await (await supabase).auth.getUser();
 
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
         { status: 401 }
       );
     }
 
-    const { data: stories, error } = await supabase
+    const { data: stories, error } = await (await supabase)
       .from('stories')
       .select('*')
       .eq('user_id', user.id)
@@ -27,15 +33,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching stories:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch stories' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ stories });
+    return NextResponse.json(stories);
   } catch (error) {
-    console.error('Unexpected error in GET /api/stories:', error);
+    console.error('Error in stories route:', error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }
@@ -45,10 +48,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
         { status: 401 }
@@ -56,43 +62,67 @@ export async function POST(request: NextRequest) {
     }
 
     const json = await request.json();
-    
+
     // Validate required fields
-    if (!json.title || !json.mainCharacter) {
+    if (!json.character || !json.theme || !json.setting) {
       return NextResponse.json(
-        { error: 'Title and main character are required' },
+        { error: 'Character, theme, and setting are required' },
         { status: 400 }
       );
     }
 
-    // Prepare story data
-    const storyData = {
-      title: json.title,
-      main_character: json.mainCharacter,
-      setting: json.setting,
-      theme: json.theme,
-      plot_elements: json.plotElements || [],
-      content: json.content,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    try {
+      // Generate the story using AI
+      const generatedStory = await generateStory({
+        character: json.character,
+        theme: json.theme,
+        setting: json.setting,
+        targetAge: parseInt(json.character.age) || 6,
+        readingLevel: json.readingLevel || 'beginner',
+        language: json.language || 'en',
+        style: json.style,
+        educationalFocus: json.educationalFocus,
+      });
 
-    const { data: story, error } = await supabase
-      .from('stories')
-      .insert([storyData])
-      .select()
-      .single();
+      // Prepare story data for database
+      const storyData = {
+        title: generatedStory.title,
+        description: generatedStory.description,
+        main_character: generatedStory.mainCharacter,
+        setting: generatedStory.setting,
+        theme: generatedStory.theme,
+        content: generatedStory.content,
+        target_age: generatedStory.targetAge,
+        reading_level: generatedStory.readingLevel,
+        metadata: generatedStory.metadata,
+        plot_elements: [],
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-    if (error) {
-      console.error('Error creating story:', error);
+      const { data: story, error } = await supabase
+        .from('stories')
+        .insert([storyData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating story:', error);
+        return NextResponse.json(
+          { error: error.message || 'Failed to create story' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ story });
+    } catch (error) {
+      console.error('Error generating story:', error);
       return NextResponse.json(
-        { error: error.message || 'Failed to create story' },
+        { error: 'Failed to generate story' },
         { status: 500 }
       );
     }
-
-    return NextResponse.json({ story });
   } catch (error) {
     console.error('Unexpected error in POST /api/stories:', error);
     return NextResponse.json(
@@ -107,8 +137,10 @@ export async function PUT(
   { params }: { params: { storyId: string } }
 ) {
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json(
@@ -164,8 +196,10 @@ export async function DELETE(
   { params }: { params: { storyId: string } }
 ) {
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json(
@@ -190,10 +224,7 @@ export async function DELETE(
       );
     }
 
-    const { error } = await supabase
-      .from('stories')
-      .delete()
-      .eq('id', storyId);
+    const { error } = await supabase.from('stories').delete().eq('id', storyId);
 
     if (error) {
       console.error('Error deleting story:', error);

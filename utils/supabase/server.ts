@@ -1,31 +1,41 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import type { CookieOptions } from '@supabase/ssr';
+import type { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
+import type { Database } from '@/types/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-export function createClient() {
-  const cookieStore = cookies()
+export async function createClient() {
+  const cookieStore = await cookies();
 
-  return createServerClient(
+  const client = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
+        async get(name: string) {
+          const cookie = await cookieStore.get(name);
+          return cookie?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set({
+              name,
+              value,
+              ...options,
+            });
           } catch (error) {
-            // Handle cookies in middleware
-            console.warn('Cookie set in middleware:', { name, error })
+            // Handle error if needed
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.delete(name)
+            cookieStore.delete({
+              name,
+              ...options,
+            });
           } catch (error) {
-            // Handle cookies in middleware
-            console.warn('Cookie removal in middleware:', { name, error })
+            // Handle error if needed
           }
         },
       },
@@ -40,5 +50,7 @@ export function createClient() {
         },
       },
     }
-  )
+  );
+
+  return client;
 }

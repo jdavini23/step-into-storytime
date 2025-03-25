@@ -26,9 +26,6 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   generateEtags: true,
-  // Handle any redirects or rewrites here if needed
-  // rewrites: async () => [],
-  // redirects: async () => [],
 };
 
 export default nextConfig;

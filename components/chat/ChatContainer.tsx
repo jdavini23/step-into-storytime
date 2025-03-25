@@ -8,15 +8,53 @@ import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
-import { Message, ConversationState, ChatContainerProps } from './types';
-import { 
-  ConversationStep, 
-  determineNextStep, 
-  generateResponse, 
-  processUserInput 
+import type {
+  Message,
+  ConversationState,
+  ChatContainerProps,
+  StoryDataState,
+} from './types';
+import {
+  ConversationStep,
+  determineNextStep,
+  generateResponse,
+  processUserInput,
 } from '@/lib/conversation-manager';
 import { SETTINGS, THEMES, LENGTH_OPTIONS } from '../../lib/story-options';
 import { useAuth } from '@/contexts/auth-context';
+
+const handleError = (
+  error: any,
+  setState: React.Dispatch<React.SetStateAction<ConversationState>>,
+  onError: (error: string) => void
+) => {
+  let errorMessage = 'Failed to generate story. Please try again.';
+
+  if (error.details) {
+    errorMessage = `${error.error}: ${error.details}`;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  }
+
+  // Add error message to chat using the correct Message type
+  setState((prev) => ({
+    ...prev,
+    messages: [
+      ...prev.messages,
+      {
+        id: Date.now().toString(),
+        type: 'ai',
+        content: `❌ ${errorMessage}`,
+        timestamp: Date.now(),
+        error: true,
+        severity: 'error',
+      },
+    ],
+  }));
+
+  // Also call the error handler prop
+  onError(errorMessage);
+};
 
 export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
   const { state: authState } = useAuth();
@@ -33,7 +71,10 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      messagesEndRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end',
+      });
     }
   };
 
@@ -41,7 +82,9 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
     // Only scroll if we're near the bottom already or if we're typing
     const container = messagesEndRef.current?.parentElement;
     if (container) {
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      const isNearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        100;
       if (isNearBottom || state.isTyping) {
         scrollToBottom();
       }
@@ -51,7 +94,7 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
   // Initial greeting
   useEffect(() => {
     const initialMessage = generateResponse('name', state);
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       messages: [initialMessage],
     }));
@@ -68,7 +111,7 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       timestamp: Date.now(),
     };
 
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       messages: [...prev.messages, userMessage],
       isTyping: true,
@@ -96,7 +139,7 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
     // Generate AI response for the next step
     setTimeout(() => {
       const aiResponse = generateResponse(nextStep, newState);
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         ...updates,
         messages: [...prev.messages, aiResponse],
@@ -107,7 +150,11 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
 
   const generateStory = async (currentState: ConversationState) => {
     if (!authState.isAuthenticated) {
-      onError('Please sign in to generate stories');
+      handleError(
+        new Error('Please sign in to generate stories'),
+        setState,
+        onError
+      );
       return;
     }
 
@@ -124,7 +171,8 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
           age: storyData.character?.age || '',
           traits: storyData.character?.traits || [],
         },
-        setting: SETTINGS.find((s) => s.id === storyData.setting)?.description || '',
+        setting:
+          SETTINGS.find((s) => s.id === storyData.setting)?.description || '',
         theme: THEMES.find((t) => t.id === storyData.theme)?.description || '',
         plotElements: [],
       };
@@ -136,8 +184,8 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to generate story');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate story');
       }
 
       const data = await response.json();
@@ -147,48 +195,40 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       const storyResponse = await fetch('/api/stories', {
         method: 'POST',
         credentials: 'include',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           title: payload.title,
           description: `A story about ${storyData.character?.name} in ${
-            SETTINGS.find((s) => s.id === storyData.setting)?.title || 'a magical place'
+            SETTINGS.find((s) => s.id === storyData.setting)?.title ||
+            'a magical place'
           }`,
           content: initialContent,
-          character_name: storyData.character?.name || '',
-          character_age: storyData.character?.age || '',
-          character_traits: storyData.character?.traits || [],
-          theme_id: storyData.theme || '',
-          setting_id: storyData.setting || '',
-          reading_level: 'beginner',
-          target_age: parseInt(storyData.character?.age || '6'),
-          word_count: initialContent.split(/\s+/).length,
-          reading_time: Math.ceil(initialContent.split(/\s+/).length / 200),
-          status: 'published',
-          accessibility_settings: {
-            contrast: 'normal',
-            motion_reduced: false,
-            font_size: 'medium',
-            line_height: 1.5,
-          }
+          character: {
+            name: storyData.character?.name || '',
+            age: storyData.character?.age || '',
+            traits: storyData.character?.traits || [],
+          },
+          theme: storyData.theme || '',
+          setting: storyData.setting || '',
+          readingLevel: 'beginner',
+          language: 'en',
+          style: 'adventure',
+          targetAge: parseInt(storyData.character?.age || '6'),
         }),
       });
 
       if (!storyResponse.ok) {
-        const error = await storyResponse.json();
-        throw new Error(error.error || 'Failed to save story');
+        const errorData = await storyResponse.json();
+        throw new Error(errorData.error || 'Failed to save story');
       }
 
       const story = await storyResponse.json();
       onComplete(story);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Story generation error:', error);
-      onError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to generate story. Please try again.'
-      );
+      handleError(error, setState, onError);
     } finally {
       setIsGenerating(false);
     }
@@ -197,11 +237,11 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
   const getQuickReplies = () => {
     switch (currentStep) {
       case 'setting':
-        return SETTINGS.map(s => s.title);
+        return SETTINGS.map((s) => s.title);
       case 'theme':
-        return THEMES.map(t => t.title);
+        return THEMES.map((t) => t.title);
       case 'length':
-        return LENGTH_OPTIONS.map(l => l.title);
+        return LENGTH_OPTIONS.map((l) => l.title);
       case 'confirm':
         return ['Yes, generate story!', 'No, let me change something'];
       default:
@@ -220,7 +260,15 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
             >
-              <MessageBubble message={message} onEdit={() => setState(prev => ({ ...prev, editingMessageId: message.id }))} />
+              <MessageBubble
+                message={message}
+                onEdit={() =>
+                  setState((prev) => ({
+                    ...prev,
+                    editingMessageId: message.id,
+                  }))
+                }
+              />
             </motion.div>
           ))}
           {state.isTyping && <TypingIndicator />}
@@ -228,10 +276,7 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      <form
-        onSubmit={handleSend}
-        className="flex gap-2 mt-auto"
-      >
+      <form onSubmit={handleSend} className="flex gap-2 mt-auto">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -8,6 +8,8 @@ export interface Message {
   };
   timestamp: number;
   isEditing?: boolean;
+  error?: boolean;
+  severity?: 'info' | 'warning' | 'error';
 }
 
 export interface StoryDataState {
