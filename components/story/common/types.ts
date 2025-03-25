@@ -12,34 +12,50 @@ export interface ThemeColors {
 }
 
 export interface StoryMetadata {
-  wordCount: number;
-  readingTime: number;
   targetAge: number;
   difficulty: 'easy' | 'medium' | 'hard';
   theme: string;
   setting: string;
   createdAt: string;
   updatedAt: string;
+  wordCount: number;
+  readingTime: number;
 }
 
 export interface AccessibilitySettings {
   contrast: 'normal' | 'high';
   motionReduced: boolean;
-  fontSize: FontSize;
+  fontSize: 'small' | 'medium' | 'large';
   lineHeight: number;
 }
 
 export interface StoryData {
-  plotElements: never[];
-  mainCharacter: any;
-  setting: any;
-  theme: any;
   id: string;
+  userId: string;
   title: string;
-  content: string;
+  description: string;
+  content: {
+    en: string[];
+    es: string[];
+  };
+  mainCharacter: {
+    name: string;
+    age: string;
+    traits: string[];
+    appearance: string;
+  };
+  setting: string;
+  theme: string;
+  plotElements: string[];
+  targetAge: number;
+  readingLevel: 'beginner' | 'intermediate' | 'advanced';
+  createdAt: string;
+  updatedAt: string;
   metadata: StoryMetadata;
   accessibility: AccessibilitySettings;
 }
+
+export type Story = StoryData;
 
 export interface StoryParagraph {
   content: string;

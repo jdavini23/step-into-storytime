@@ -5,12 +5,12 @@ import StoryHeader from '@/components/story/story-header';
 import Footer from '@/components/sections/footer';
 
 interface StoryPageProps {
-  searchParams: { [key: string]: string | string[] | undefined };
+  params: {
+    storyId: string;
+  };
 }
 
-export default function StoryPage({ searchParams }: StoryPageProps) {
-  const storyId = typeof searchParams.id === 'string' ? searchParams.id : '';
-
+export default function StoryPage({ params }: StoryPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50">
       <Navbar />
@@ -25,7 +25,7 @@ export default function StoryPage({ searchParams }: StoryPageProps) {
           />
 
           <div className="mt-8 bg-white rounded-2xl shadow-xl overflow-hidden">
-            <StoryContent storyId={storyId} />
+            <StoryContent storyId={params.storyId} />
             <StoryControls />
           </div>
         </div>

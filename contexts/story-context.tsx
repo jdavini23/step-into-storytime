@@ -8,9 +8,26 @@ import {
   useEffect,
   useCallback,
 } from 'react';
+import type { StoryData } from '@/components/story/common/types';
+import { generateStoryIllustrations } from '@/lib/image-generation';
 
 // Define types
-type Story = {
+export type StoryBranch = {
+  id: string;
+  content: string;
+  choices: {
+    text: string;
+    nextBranchId: string;
+  }[];
+  illustration?: {
+    url: string;
+    prompt: string;
+    scene: string;
+  };
+};
+
+export type Story = {
+  storyData: StoryData;
   id?: string;
   title: string;
   mainCharacter: {
@@ -23,6 +40,15 @@ type Story = {
   theme: string;
   plotElements: string[];
   content?: string;
+  illustrations?: {
+    url: string;
+    prompt: string;
+    scene: string;
+  }[];
+  branches?: {
+    [key: string]: StoryBranch;
+  };
+  currentBranchId?: string;
   createdAt?: string;
   updatedAt?: string;
   author?: string;
@@ -157,7 +183,7 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
   }, [state.stories]);
 
   // API functions
-  const fetchStories = async () => {
+  const fetchStories = useCallback(async () => {
     // Don't set loading state if already loading to prevent additional renders
     if (!state.isLoading) {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -174,35 +200,55 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
         );
       }
 
-      const data = await response.json();
-      dispatch({ type: 'SET_STORIES', payload: data });
-      return data;
+      const stories = await response.json();
+      dispatch({ type: 'SET_STORIES', payload: stories });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
       console.error('Error fetching stories:', error);
-      // Return empty array to prevent undefined errors
-      return [];
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({
+        type: 'SET_ERROR',
+        payload:
+          error instanceof Error ? error.message : 'Failed to fetch stories',
+      });
     }
-  };
+  }, [state.isLoading]);
 
-  const fetchStory = async (id: string) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    try {
-      const response = await fetch(`/api/stories/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch story');
-      const data = await response.json();
-      dispatch({ type: 'SET_CURRENT_STORY', payload: data });
-      return data;
-    } catch (error) {
-      dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
-      console.error('Error fetching story:', error);
-      throw error;
-    }
-  };
+  const fetchStory = useCallback(
+    async (id: string) => {
+      if (!state.isLoading) {
+        dispatch({ type: 'SET_LOADING', payload: true });
+      }
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      try {
+        // First check if we already have the story in state
+        const existingStory = state.stories.find((s) => s.id === id);
+        if (existingStory) {
+          dispatch({ type: 'SET_CURRENT_STORY', payload: existingStory });
+          return;
+        }
+
+        const response = await fetch(`/api/stories/${id}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message || `Failed to fetch story: ${response.status}`
+          );
+        }
+
+        const story = await response.json();
+        dispatch({ type: 'SET_CURRENT_STORY', payload: story });
+      } catch (error) {
+        console.error('Error fetching story:', error);
+        dispatch({
+          type: 'SET_ERROR',
+          payload:
+            error instanceof Error ? error.message : 'Failed to fetch story',
+        });
+        throw error; // Re-throw to handle in the component
+      }
+    },
+    [state.isLoading, state.stories]
+  );
 
   const createStory = async (story: Story) => {
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -262,6 +308,7 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
     dispatch({ type: 'SET_ERROR', payload: null }); // Clear previous errors
 
     try {
+      // Generate story text
       const response = await fetch('/api/generate-story', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -276,7 +323,27 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       const data = await response.json();
-      return data.content;
+      const storyContent = data.content;
+
+      // Generate illustrations for the story
+      const illustrations = await generateStoryIllustrations({
+        ...storyData,
+        content: storyContent,
+      });
+
+      // Update the story with both content and illustrations
+      const updatedStory = {
+        ...storyData,
+        content: storyContent,
+        illustrations,
+      };
+
+      // If the story has an ID, update it in the database
+      if (storyData.id) {
+        await updateStory(updatedStory);
+      }
+
+      return storyContent;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';

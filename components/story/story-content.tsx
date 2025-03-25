@@ -93,7 +93,10 @@ function StoryDisplay({ className }: { className?: string }) {
         />
 
         <div className="mt-8">
-          <StoryIllustration title={currentStory.title} />
+          <StoryIllustration
+            title={currentStory.title}
+            illustrations={currentStory.illustrations}
+          />
           <StoryText paragraphs={paragraphs} />
         </div>
       </div>
@@ -101,7 +104,35 @@ function StoryDisplay({ className }: { className?: string }) {
   );
 }
 
-function StoryIllustration({ title }: { title: string }) {
+function StoryIllustration({
+  title,
+  illustrations,
+}: {
+  title: string;
+  illustrations?: { url: string; scene: string }[];
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  if (!illustrations || illustrations.length === 0) {
+    return (
+      <div
+        className={cn(
+          'relative h-64 md:h-96 mb-8 rounded-xl overflow-hidden',
+          'shadow-md border border-border/10',
+          'dark:border-border/5',
+          'transition-colors'
+        )}
+      >
+        <Image
+          src="/placeholder.svg?height=400&width=800"
+          alt={`Illustration for ${title}`}
+          fill
+          className="object-cover"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -111,12 +142,40 @@ function StoryIllustration({ title }: { title: string }) {
         'transition-colors'
       )}
     >
-      <Image
-        src="/placeholder.svg?height=400&width=800"
-        alt={`Illustration for ${title}`}
-        fill
-        className="object-cover"
-      />
+      {illustrations.map((illustration, index) => (
+        <div
+          key={illustration.url}
+          className={cn(
+            'absolute inset-0 transition-opacity duration-500',
+            index === currentIndex ? 'opacity-100' : 'opacity-0'
+          )}
+        >
+          <Image
+            src={illustration.url}
+            alt={`Illustration ${index + 1} for ${title}`}
+            fill
+            className="object-cover"
+          />
+        </div>
+      ))}
+
+      {illustrations.length > 1 && (
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+          {illustrations.map((_, index) => (
+            <button
+              key={index}
+              className={cn(
+                'w-2 h-2 rounded-full transition-colors',
+                index === currentIndex
+                  ? 'bg-primary'
+                  : 'bg-primary/30 hover:bg-primary/50'
+              )}
+              onClick={() => setCurrentIndex(index)}
+              aria-label={`View illustration ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
