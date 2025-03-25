@@ -1,26 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';
+import {
+  ThemeProvider as NextThemesProvider,
+  useTheme,
+  type ThemeProviderProps as NextThemesProviderProps,
+} from 'next-themes';
 
-type Props = {
+type ThemeProviderProps = NextThemesProviderProps & {
   children: React.ReactNode;
-  defaultTheme?: string;
-  themes?: string[];
-  forcedTheme?: string;
-  enableSystem?: boolean;
-  disableTransitionOnChange?: boolean;
-  enableColorScheme?: boolean;
-};
-
-type Attribute = string;
-
-type ThemeProviderProps = Omit<
-  React.ComponentProps<typeof NextThemesProvider>,
-  'attribute'
-> & {
-  children: React.ReactNode;
-  attribute?: string[];
 };
 
 export function ThemeProvider(props: ThemeProviderProps) {
