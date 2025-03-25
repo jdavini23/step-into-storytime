@@ -128,7 +128,7 @@ const StoryContext = createContext<{
   fetchStories: () => Promise<void>;
   fetchStory: (id: string) => Promise<void>;
   createStory: (story: Story) => Promise<Story>;
-  updateStory: (story: Story) => Promise<Story>;
+  updateStory: (id: string, updates: Partial<Story>) => Promise<Story>;
   deleteStory: (id: string) => Promise<void>;
   generateStoryContent: (storyData: Story) => Promise<string>;
 }>({
@@ -191,12 +191,14 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
     dispatch({ type: 'SET_ERROR', payload: null }); // Clear previous errors
 
     try {
-      const response = await fetch('/api/stories');
+      const response = await fetch('/api/stories', {
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `Failed to fetch stories: ${response.status}`
+          errorData.error || `Failed to fetch stories: ${response.status}`
         );
       }
 
@@ -209,6 +211,8 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
         payload:
           error instanceof Error ? error.message : 'Failed to fetch stories',
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [state.isLoading]);
 
@@ -220,18 +224,14 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
       dispatch({ type: 'SET_ERROR', payload: null });
 
       try {
-        // First check if we already have the story in state
-        const existingStory = state.stories.find((s) => s.id === id);
-        if (existingStory) {
-          dispatch({ type: 'SET_CURRENT_STORY', payload: existingStory });
-          return;
-        }
+        const response = await fetch(`/api/stories/${id}`, {
+          credentials: 'include',
+        });
 
-        const response = await fetch(`/api/stories/${id}`);
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(
-            errorData.message || `Failed to fetch story: ${response.status}`
+            errorData.error || `Failed to fetch story: ${response.status}`
           );
         }
 
@@ -244,62 +244,115 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
           payload:
             error instanceof Error ? error.message : 'Failed to fetch story',
         });
-        throw error; // Re-throw to handle in the component
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
-    [state.isLoading, state.stories]
+    [state.isLoading]
   );
 
   const createStory = async (story: Story) => {
     dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+
     try {
       const response = await fetch('/api/stories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(story),
       });
-      if (!response.ok) throw new Error('Failed to create story');
-      const data = await response.json();
-      dispatch({ type: 'ADD_STORY', payload: data });
-      return data;
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Failed to create story: ${response.status}`
+        );
+      }
+
+      const newStory = await response.json();
+      dispatch({ type: 'ADD_STORY', payload: newStory });
+      return newStory;
     } catch (error) {
-      dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
       console.error('Error creating story:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload:
+          error instanceof Error ? error.message : 'Failed to create story',
+      });
       throw error;
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
-  const updateStory = async (story: Story) => {
+  const updateStory = async (id: string, updates: Partial<Story>) => {
     dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+
     try {
-      const response = await fetch(`/api/stories/${story.id}`, {
+      const response = await fetch(`/api/stories/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(story),
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
       });
-      if (!response.ok) throw new Error('Failed to update story');
-      const data = await response.json();
-      dispatch({ type: 'UPDATE_STORY', payload: data });
-      return data;
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Failed to update story: ${response.status}`
+        );
+      }
+
+      const updatedStory = await response.json();
+      dispatch({ type: 'UPDATE_STORY', payload: updatedStory });
+      return updatedStory;
     } catch (error) {
-      dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
       console.error('Error updating story:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload:
+          error instanceof Error ? error.message : 'Failed to update story',
+      });
       throw error;
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const deleteStory = async (id: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+
     try {
       const response = await fetch(`/api/stories/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to delete story');
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Failed to delete story: ${response.status}`
+        );
+      }
+
       dispatch({ type: 'DELETE_STORY', payload: id });
     } catch (error) {
-      dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
       console.error('Error deleting story:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload:
+          error instanceof Error ? error.message : 'Failed to delete story',
+      });
       throw error;
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -311,6 +364,7 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
       // Generate story text
       const response = await fetch('/api/generate-story', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(storyData),
       });
@@ -340,7 +394,7 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
 
       // If the story has an ID, update it in the database
       if (storyData.id) {
-        await updateStory(updatedStory);
+        await updateStory(storyData.id, updatedStory);
       }
 
       return storyContent;

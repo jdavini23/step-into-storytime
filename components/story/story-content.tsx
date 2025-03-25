@@ -70,7 +70,13 @@ function StoryDisplay({ className }: { className?: string }) {
       ? `Created by ${currentStory.mainCharacter.name}'s family`
       : 'Anonymous');
 
-  const paragraphs = currentStory.content?.split('\n').filter(Boolean) || [];
+  const paragraphs = typeof currentStory.content === 'string' 
+    ? currentStory.content.split('\n').filter(Boolean)
+    : Array.isArray(currentStory.content) 
+      ? currentStory.content
+      : typeof currentStory.content === 'object' && (currentStory.content as any)?.en
+        ? (currentStory.content as any).en
+        : [];
 
   return (
     <div

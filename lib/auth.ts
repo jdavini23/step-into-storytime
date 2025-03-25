@@ -1,3 +1,28 @@
+import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase';
+
+export async function getServerSession() {
+  try {
+    const cookieStore = cookies();
+    const supabase = createServerSupabaseClient();
+    
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error('Error getting session:', error);
+      return null;
+    }
+
+    return session;
+  } catch (error) {
+    console.error('Error in getServerSession:', error);
+    return null;
+  }
+}
+
 export async function authenticateUser(username: string, password: string): Promise<boolean> {
   // Simulate API call delay
   await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -28,4 +53,3 @@ export function signOut(): void {
   localStorage.removeItem("auth-token")
   // In a real app, you might also want to invalidate the token on the server
 }
-

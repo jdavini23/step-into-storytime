@@ -1,7 +1,8 @@
+'use client';
+
 import Navbar from '@/components/navbar';
 import StoryContent from '@/components/story/story-content';
 import StoryControls from '@/components/story/story-controls';
-import StoryHeader from '@/components/story/story-header';
 import Footer from '@/components/sections/footer';
 
 interface StoryPageProps {
@@ -17,13 +18,6 @@ export default function StoryPage({ params }: StoryPageProps) {
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <div className="max-w-4xl mx-auto">
-          <StoryHeader
-            title="Emma's Space Adventure"
-            author="Created by Emma's family"
-            date="March 17, 2025"
-            theme="Space Adventure"
-          />
-
           <div className="mt-8 bg-white rounded-2xl shadow-xl overflow-hidden">
             <StoryContent storyId={params.storyId} />
             <StoryControls />
