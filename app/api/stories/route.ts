@@ -58,47 +58,24 @@ export async function POST(request: NextRequest) {
     const json = await request.json();
     
     // Validate required fields
-    if (!json.title || !json.content) {
+    if (!json.title || !json.mainCharacter) {
       return NextResponse.json(
-        { error: 'Title and content are required' },
+        { error: 'Title and main character are required' },
         { status: 400 }
       );
     }
 
-    // Ensure character_traits is an array
-    if (json.character_traits && !Array.isArray(json.character_traits)) {
-      json.character_traits = [json.character_traits];
-    }
-
-    // Ensure accessibility_settings is an object
-    if (typeof json.accessibility_settings !== 'object') {
-      json.accessibility_settings = {
-        contrast: 'normal',
-        motion_reduced: false,
-        font_size: 'medium',
-        line_height: 1.5
-      };
-    }
-
-    // Convert target_age to number
-    if (json.target_age) {
-      json.target_age = parseInt(json.target_age.toString(), 10);
-    }
-
-    // Convert word_count and reading_time to numbers
-    json.word_count = parseInt(json.word_count?.toString() || '0', 10);
-    json.reading_time = parseInt(json.reading_time?.toString() || '0', 10);
-
     // Prepare story data
     const storyData = {
-      ...json,
+      title: json.title,
+      main_character: json.mainCharacter,
+      setting: json.setting,
+      theme: json.theme,
+      plot_elements: json.plotElements || [],
+      content: json.content,
       user_id: user.id,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      reading_level: json.reading_level || 'beginner',
-      status: json.status || 'draft',
-      character_traits: json.character_traits || [],
-      accessibility_settings: json.accessibility_settings
+      updated_at: new Date().toISOString()
     };
 
     const { data: story, error } = await supabase
