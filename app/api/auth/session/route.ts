@@ -1,34 +1,37 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { type NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get session token from cookies
-    const sessionToken = cookies().get("session-token")?.value
+    const cookieStore = cookies();
+    const supabase = await createClient();
 
-    if (!sessionToken) {
-      return NextResponse.json({ user: null })
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error('Session error:', error);
+      return NextResponse.json(
+        { error: 'Session check failed' },
+        { status: 500 }
+      );
     }
 
-    // In a real app, you would validate the session token against your database
-    // and retrieve the associated user
-
-    // For demo purposes, we'll simulate a valid session if the token exists
-    if (sessionToken.startsWith("demo-token-")) {
-      const user = {
-        id: "user-1",
-        name: "Demo User",
-        email: "user@example.com",
-        role: "user",
-      }
-
-      return NextResponse.json({ user })
-    }
-
-    return NextResponse.json({ user: null })
+    return NextResponse.json({
+      session,
+      user: session?.user || null,
+    });
   } catch (error) {
-    console.error("Session check error:", error)
-    return NextResponse.json({ error: "Session check failed" }, { status: 500 })
+    console.error('Session check error:', error);
+    return NextResponse.json(
+      { error: 'Session check failed' },
+      { status: 500 }
+    );
   }
 }
-

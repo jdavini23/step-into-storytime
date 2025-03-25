@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create server-side Supabase client
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     // Attempt to sign in with Supabase
     const { data: authData, error: authError } =
