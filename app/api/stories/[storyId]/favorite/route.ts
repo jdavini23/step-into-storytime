@@ -1,15 +1,44 @@
-import { type NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 
 // In-memory storage for demo purposes
 // TODO: Replace with database storage
 const favoriteStories = new Set<string>();
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { storyId: string } }
-): Promise<Response> {
+export async function GET(request: NextRequest) {
   try {
-    const { storyId } = params;
+    const storyId = request.nextUrl.pathname.split('/').pop();
+    if (!storyId) {
+      return new Response(JSON.stringify({ error: 'Story ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(
+      JSON.stringify({ isFavorite: favoriteStories.has(storyId) }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: 'Failed to get favorite status' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const storyId = request.nextUrl.pathname.split('/').pop();
+    if (!storyId) {
+      return new Response(JSON.stringify({ error: 'Story ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const { isFavorite } = await request.json();
 
     if (isFavorite) {
@@ -18,26 +47,16 @@ export async function PUT(
       favoriteStories.delete(storyId);
     }
 
-    return Response.json({ success: true });
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    return Response.json(
-      { error: 'Failed to update favorite status' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { storyId: string } }
-): Promise<Response> {
-  try {
-    const { storyId } = params;
-    return Response.json({ isFavorite: favoriteStories.has(storyId) });
-  } catch (error) {
-    return Response.json(
-      { error: 'Failed to get favorite status' },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({ error: 'Failed to update favorite status' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
     );
   }
 }
