@@ -64,11 +64,13 @@ export function StoryList({
             onClick={() => onSelect(story)}
           >
             <div className="flex justify-between items-start">
-              <div className="space-y-1">
+              <div className="space-y-1 w-full">
                 <h3 className="text-lg font-semibold">{story.title}</h3>
                 <p className="text-sm text-muted-foreground">
                   {story.description}
                 </p>
+                <p>Reading Time: {story.metadata.readingTime} minutes</p>
+                <p>Character Traits: {story.mainCharacter.traits.join(', ')}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>
                     Created {formatDistanceToNow(new Date(story.createdAt))} ago
@@ -81,64 +83,53 @@ export function StoryList({
               </div>
 
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(story.id);
-                  }}
-                >
-                  <Star
-                    className={
-                      favoriteStories.has(story.id)
-                        ? 'fill-yellow-400 text-yellow-400'
-                        : ''
-                    }
-                  />
-                </Button>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit(story);
-                      }}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onShare(story);
-                      }}
-                    >
-                      <Share className="mr-2 h-4 w-4" />
-                      Share
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(story.id);
-                      }}
-                    >
-                      <Trash className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex justify-between items-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(story);
+                    }}
+                  >
+                    <Edit />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(story.id);
+                    }}
+                  >
+                    <Trash />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShare(story);
+                    }}
+                  >
+                    <Share />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(story.id);
+                    }}
+                  >
+                    {favoriteStories.has(story.id) ? (
+                      <Star className="fill-yellow-400 text-yellow-400" />
+                    ) : (
+                      <Star />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>

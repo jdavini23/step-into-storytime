@@ -3,6 +3,7 @@
 import { ChatContainer } from '../chat/ChatContainer';
 import type { StoryData } from '../story/common/types';
 import type { StoryDataState } from '../chat/types';
+import { useState } from 'react';
 
 interface StoryWizardProps {
   onComplete: (story: StoryData) => void;
@@ -10,7 +11,10 @@ interface StoryWizardProps {
 }
 
 export default function StoryWizard({ onComplete, onError }: StoryWizardProps) {
-  const handleComplete = (storyData: StoryDataState) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generateStoryContent = async (storyData: StoryDataState): Promise<StoryData> => {
     // Convert StoryDataState to StoryData
     const story: StoryData = {
       id: Date.now().toString(),
@@ -51,8 +55,35 @@ export default function StoryWizard({ onComplete, onError }: StoryWizardProps) {
         lineHeight: 1.5,
       },
     };
-    onComplete(story);
+    return story;
   };
 
-  return <ChatContainer onComplete={handleComplete} onError={onError} />;
+  const handleComplete = async (storyData: StoryDataState) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const story = await generateStoryContent(storyData);
+      onComplete(story);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError('Failed to generate story. Please try again.');
+        onError(err.message);
+      } else {
+        setError('An unexpected error occurred.');
+        onError('An unexpected error occurred.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Create Your Story</h1>
+      {loading && <p>Generating story...</p>}
+      {error && <p className="error">{error}</p>}
+      <ChatContainer onComplete={handleComplete} onError={onError} />
+    </div>
+  );
 }

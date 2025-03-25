@@ -50,6 +50,7 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
     if (!story) return;
 
     setIsSaving(true);
+
     try {
       const response = await fetch(`/api/stories/${storyId}`, {
         method: 'PUT',
@@ -60,13 +61,13 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update story');
+        throw new Error('Failed to save story');
       }
 
-      toast.success('Story updated successfully');
+      toast.success('Story saved successfully!');
       onSave();
     } catch (error) {
-      toast.error('Failed to update story');
+      toast.error('Failed to save story');
     } finally {
       setIsSaving(false);
     }
@@ -91,124 +92,20 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
   }
 
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="title">
-            Title
-          </label>
-          <Input
-            id="title"
-            value={story.title}
-            onChange={(e) => setStory({ ...story, title: e.target.value })}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="description">
-            Description
-          </label>
-          <Textarea
-            id="description"
-            value={story.description}
-            onChange={(e) =>
-              setStory({ ...story, description: e.target.value })
-            }
-            required
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="targetAge">
-              Target Age
-            </label>
-            <Input
-              id="targetAge"
-              type="number"
-              min={1}
-              max={12}
-              value={story.targetAge}
-              onChange={(e) =>
-                setStory({ ...story, targetAge: parseInt(e.target.value) || 6 })
-              }
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="readingLevel">
-              Reading Level
-            </label>
-            <Select
-              value={story.readingLevel as ReadingLevel}
-              onValueChange={(value: ReadingLevel) =>
-                setStory({ ...story, readingLevel: value })
-              }
-            >
-              <SelectTrigger id="readingLevel">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="beginner">Beginner</SelectItem>
-                <SelectItem value="intermediate">Intermediate</SelectItem>
-                <SelectItem value="advanced">Advanced</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Story Content (English)</label>
-          <div className="space-y-4">
-            {story.content.en.map((paragraph, index) => (
-              <Textarea
-                key={index}
-                value={paragraph}
-                onChange={(e) => {
-                  const newContent = [...story.content.en];
-                  newContent[index] = e.target.value;
-                  setStory({
-                    ...story,
-                    content: { ...story.content, en: newContent },
-                  });
-                }}
-                className="min-h-[100px]"
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Story Content (Spanish)</label>
-          <div className="space-y-4">
-            {story.content.es.map((paragraph, index) => (
-              <Textarea
-                key={index}
-                value={paragraph}
-                onChange={(e) => {
-                  const newContent = [...story.content.es];
-                  newContent[index] = e.target.value;
-                  setStory({
-                    ...story,
-                    content: { ...story.content, es: newContent },
-                  });
-                }}
-                className="min-h-[100px]"
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </div>
+    <Card>
+      <form onSubmit={handleSubmit}>
+        <Input value={story.title} onChange={(e) => setStory({ ...story, title: e.target.value })} />
+        <Textarea value={story.content.en[0]} onChange={(e) => setStory({ ...story, content: { ...story.content, en: [e.target.value] } })} />
+        <Select value={story.readingLevel} onValueChange={(value) => setStory({ ...story, readingLevel: value as ReadingLevel })}>
+          <SelectTrigger><SelectValue placeholder="Select Reading Level" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="beginner">Beginner</SelectItem>
+            <SelectItem value="intermediate">Intermediate</SelectItem>
+            <SelectItem value="advanced">Advanced</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button type="submit" disabled={isSaving}>Save Story</Button>
+        <Button type="button" onClick={onCancel}>Cancel</Button>
       </form>
     </Card>
   );
