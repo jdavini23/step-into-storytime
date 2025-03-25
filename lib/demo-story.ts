@@ -2,6 +2,7 @@ import { StoryData } from '@/components/story/common/types';
 
 export const demoStory: StoryData = {
   id: 'demo-story',
+  userId: 'demo-user',
   title: 'The Magic of Reading',
   description: 'A delightful tale about the joy of reading and imagination',
   content: {
