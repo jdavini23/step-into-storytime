@@ -73,14 +73,6 @@ if (typeof window === 'undefined') {
       labelFormat: '[local]',
     },
   };
-  // Add this to your nextConfig object
-  nextConfig.postcss = {
-    plugins: {
-      tailwindcss: {},
-      autoprefixer: {},
-      'postcss-nesting': {},
-    }
-  };
 } else {
   nextConfig.compiler = {
     emotion: {

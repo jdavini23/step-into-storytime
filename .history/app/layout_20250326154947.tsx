@@ -16,11 +16,12 @@ const APP_DESCRIPTION =
   "Create magical, personalized bedtime stories for children";
 const DEFAULT_URL = "http://localhost:3002";
 
-// Modify the font import section
-// Inter font is already imported at the top of the file
-
-// Initialize font with simpler configuration
-const inter = Inter({ subsets: ["latin"] });
+// Initialize font
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 // Configure metadata
 const createMetadataTitle = (template: string = "%s") => ({
@@ -80,7 +81,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.className}>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen bg-background font-sans antialiased">
         <Providers>
           <PathnameInitializer />
