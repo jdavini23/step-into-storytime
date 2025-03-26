@@ -11,7 +11,10 @@
   }
 
   body {
-    @apply font-sans text-base text-foreground bg-background;
+    font-family: sans-serif;
+    font-size: 1rem;
+    color: var(--foreground);
+    background-color: var(--background);
   }
 
   /* Heading Styles */

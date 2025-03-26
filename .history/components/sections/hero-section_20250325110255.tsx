@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ChevronRight, BookOpen } from "lucide-react";
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { Sparkles, ArrowRight, Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ChevronRight, BookOpen } from 'lucide-react';
 
 export default function HeroSection() {
   const router = useRouter();
@@ -24,10 +24,10 @@ export default function HeroSection() {
               <span>AI-Powered Storytelling</span>
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
-              Create Magical{" "}
+              Create Magical{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600">
                 Bedtime Stories
-              </span>{" "}
+              </span>{' '}
               in Seconds
             </h1>
             <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-xl mx-auto lg:mx-0">
@@ -40,16 +40,16 @@ export default function HeroSection() {
                 variant="default"
                 size="lg"
                 className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-8 py-3 text-lg font-medium"
-                onClick={() => router.push("/create")}
+                onClick={() => router.push('/create')}
               >
-                Start Your Story{" "}
+                Start Your Story{' '}
                 <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" />
               </Button>
               <Button
                 variant="outline"
                 size="lg"
                 className="border-2 border-slate-200 text-slate-700 px-8 py-3 text-lg font-medium"
-                onClick={() => router.push("/#how-it-works")}
+                onClick={() => router.push('/#how-it-works')}
               >
                 Watch Demo
               </Button>
@@ -62,8 +62,8 @@ export default function HeroSection() {
                     className="inline-block h-10 w-10 rounded-full ring-4 ring-white overflow-hidden bg-white"
                   >
                     <Image
-                      src={`/images/users/user-${i}.jpg`}
-                      alt={`User ${i} avatar`}
+                      src="/placeholder-user.jpg"
+                      alt="User avatar"
                       width={40}
                       height={40}
                       className="object-cover w-full h-full"
@@ -104,7 +104,7 @@ function HeroImage() {
       <div className="absolute -inset-4 bg-gradient-to-r from-violet-500/20 to-indigo-500/20 rounded-2xl blur-xl"></div>
       <div className="relative bg-white rounded-2xl shadow-xl overflow-hidden aspect-[4/3]">
         <Image
-          src="/images/hero/storybook-portal.jpg"
+          src="/placeholder.jpg"
           alt="Child stepping into a storybook portal"
           width={800}
           height={600}
@@ -128,7 +128,7 @@ function HeroImage() {
                 variant="ghost"
                 size="sm"
                 className="text-violet-600 hover:text-violet-700"
-                onClick={() => router.push("/story")}
+                onClick={() => router.push('/story')}
               >
                 Read Story <ChevronRight className="h-4 w-4 ml-1" />
               </Button>

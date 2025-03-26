@@ -12,10 +12,6 @@
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.mjs --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.mjs --coverage"
   },
-  "resolutions": {
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
-  },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
