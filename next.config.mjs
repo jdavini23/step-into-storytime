@@ -54,6 +54,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  env: {
+    NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
+  },
 };
 
 // Ensure process is only used in server-side or build-time context
@@ -77,10 +80,5 @@ if (typeof window === 'undefined') {
     },
   };
 }
-
-// Ensure VAR_ORIGINAL_PATHNAME is exposed to the client
-nextConfig.env = {
-  NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
-};
 
 export default nextConfig;

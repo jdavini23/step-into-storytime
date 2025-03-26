@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default function NotFound() {
-  console.log('VAR_ORIGINAL_PATHNAME:', process.env.VAR_ORIGINAL_PATHNAME);
+  console.log('VAR_ORIGINAL_PATHNAME:', process.env.NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME);
   const pathname = usePathname();
 
   useEffect(() => {
