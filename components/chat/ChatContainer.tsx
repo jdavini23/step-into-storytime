@@ -177,18 +177,24 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         plotElements: [],
       };
 
-      const response = await fetch('/api/generate-story/', {
+      console.log('Payload being sent:', payload);
+      const response = await fetch('/api/stories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = JSON.parse(responseText);
+        console.error('Error generating story:', errorData);
         throw new Error(errorData.error || 'Failed to generate story');
       }
 
-      const data = await response.json();
+      const data = JSON.parse(responseText);
       const initialContent = data.content;
 
       // Create story in Supabase
