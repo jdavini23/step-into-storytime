@@ -1,15 +1,26 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+interface StoryParams {
+  storyId: string;
+}
+
+interface RouteContext {
+  params: Promise<StoryParams>;
+}
+
 export async function GET(
-  request: Request,
-  { params }: { params: { storyId: string } }
-) {
+  request: NextRequest,
+  context: RouteContext
+): Promise<NextResponse> {
   try {
     const supabase = await createClient();
+    const { storyId } = await context.params;
 
-    // Get the story ID from the URL params
-    const storyId = params.storyId;
     if (!storyId) {
       return NextResponse.json(
         { error: 'Story ID is required' },
@@ -72,9 +83,9 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { storyId: string } }
-) {
+  request: NextRequest,
+  context: RouteContext
+): Promise<NextResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -89,7 +100,7 @@ export async function PUT(
       );
     }
 
-    const storyId = params.storyId;
+    const { storyId } = await context.params;
     const body = await request.json();
 
     // Verify story ownership
@@ -135,9 +146,9 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { storyId: string } }
-) {
+  request: NextRequest,
+  context: RouteContext
+): Promise<NextResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -152,7 +163,7 @@ export async function DELETE(
       );
     }
 
-    const storyId = params.storyId;
+    const { storyId } = await context.params;
     if (!storyId) {
       return NextResponse.json(
         { error: 'Story ID is required' },

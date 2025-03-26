@@ -9,15 +9,15 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          const cookie = cookies().get(name);
+        async get(name: string) {
+          const cookie = (await cookies()).get(name);
           return cookie?.value ?? '';
         },
-        set(name: string, value: string, options: CookieOptions) {
-          cookies().set(name, value);
+        async set(name: string, value: string, options: CookieOptions) {
+          (await cookies()).set(name, value);
         },
-        remove(name: string, options: CookieOptions) {
-          cookies().delete(name);
+        async remove(name: string, options: CookieOptions) {
+          (await cookies()).delete(name);
         },
       },
       auth: {
