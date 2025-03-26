@@ -5,14 +5,8 @@ import type { Database } from '@/types/supabase';
 export type TypedSupabaseClient = ReturnType<typeof createBrowserClient<Database>>;
 
 // Environment variables for Supabase connection
-const supabaseUrl =
-  process.env.STEP_NEXT_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  '';
-const supabaseAnonKey =
-  process.env.STEP_NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Debug logging for environment variables
 console.log('[DEBUG] Supabase Environment Variables:', {
@@ -42,13 +36,10 @@ let supabase = createBrowserClient<Database>(
   }
 );
 
-// Determine if we're in a browser environment
-const isBrowser = typeof window !== 'undefined';
-
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
-    '[ERROR] Missing Supabase environment variables. Authentication and database features will not work.',
+    '[ERROR] Missing Supabase environment variables.',
     'Required variables:',
     {
       NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set ✓' : 'Missing ✗',
@@ -56,13 +47,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
     }
   );
 
-  // In development, throw an error to make it obvious
   if (process.env.NODE_ENV === 'development') {
     throw new Error('Missing required Supabase environment variables');
   }
 
   // In production, create a dummy client that will fail gracefully
-  // This prevents the app from crashing completely
   const dummyClient = {
     auth: {
       getSession: () =>
@@ -128,8 +117,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Invalid Supabase URL format');
     }
   }
-
-  // No need for additional options with createBrowserClient
 }
 
 export { supabase };

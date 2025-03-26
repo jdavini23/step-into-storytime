@@ -10,6 +10,7 @@ const nextConfig = {
         'localhost:3003',
       ],
     },
+    fallbackNodePolyfills: false, // Ensure unnecessary polyfills are off
   },
   compiler: {
     emotion: {
@@ -56,6 +57,7 @@ const nextConfig = {
   },
   env: {
     NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
+    VAR_ORIGINAL_PATHNAME: '/', // Add the missing variable
   },
 };
 

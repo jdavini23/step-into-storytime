@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { AuthProvider } from '@/contexts/auth-context';
 import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
+import { PathnameInitializer } from '@/components/pathname-initializer';
 import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
 
@@ -71,6 +72,7 @@ export default function RootLayout({
             <AuthProvider>
               <SubscriptionProvider>
                 <StoryProvider>
+                  <PathnameInitializer />
                   {children}
                   <Toaster />
                 </StoryProvider>
