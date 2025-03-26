@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server';
 import { generateStory } from '@/utils/ai/story-generator';
 import type { Database } from '@/types/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
 // In-memory storage for demo purposes
 // TODO: Replace with database storage
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Generate the story using AI
+      // Generate the story using AI with optimized settings
       const generatedStory = await generateStory({
         character: json.character,
         theme: json.theme,
@@ -84,47 +85,53 @@ export async function POST(request: NextRequest) {
         educationalFocus: json.educationalFocus,
       });
 
-      // Prepare story data for database
+      // Format story data to match database schema
       const storyData = {
-        title: generatedStory.title,
-        description: generatedStory.description,
-        main_character: generatedStory.mainCharacter,
-        setting: generatedStory.setting,
-        theme: generatedStory.theme,
+        id: uuidv4(), // Generate a UUID for the story
+        title: generatedStory.title || 'Untitled Story',
         content: generatedStory.content,
-        target_age: generatedStory.targetAge,
-        reading_level: generatedStory.readingLevel,
-        metadata: generatedStory.metadata,
+        main_character: {
+          name: json.character.name,
+          age: json.character.age,
+          traits: json.character.traits || [],
+        },
+        setting: json.setting,
+        theme: json.theme,
         plot_elements: [],
+        is_published: false,
         user_id: user.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
+      // Use upsert for better performance
       const { data: story, error } = await supabase
         .from('stories')
-        .insert([storyData])
+        .upsert([storyData])
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating story:', error);
+        console.error('Error saving story:', error);
         return NextResponse.json(
-          { error: error.message || 'Failed to create story' },
+          { error: 'Failed to save story' },
           { status: 500 }
         );
       }
 
-      return NextResponse.json({ story });
-    } catch (error) {
+      return NextResponse.json(story);
+    } catch (error: any) {
       console.error('Error generating story:', error);
       return NextResponse.json(
-        { error: 'Failed to generate story' },
+        {
+          error: 'Failed to generate story',
+          details: error.message,
+        },
         { status: 500 }
       );
     }
-  } catch (error) {
-    console.error('Unexpected error in POST /api/stories:', error);
+  } catch (error: any) {
+    console.error('Error in story creation endpoint:', error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }

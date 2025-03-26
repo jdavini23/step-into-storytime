@@ -20,6 +20,19 @@ interface StoryListProps {
   onSelect: (story: StoryData) => void;
 }
 
+// Helper function to format date safely
+const formatDate = (dateString?: string | null) => {
+  if (!dateString) return 'Recently';
+  try {
+    const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) return 'Recently';
+    return `${formatDistanceToNow(date)} ago`;
+  } catch (error) {
+    return 'Recently';
+  }
+};
+
 export function StoryList({
   stories,
   onEdit,
@@ -59,9 +72,9 @@ export function StoryList({
       <div className="grid grid-cols-1 gap-4">
         {stories.map((story) => (
           <Card
-            key={story.id}
+            key={story.id || 'temp-id'}
             className="p-4 hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => onSelect(story)}
+            onClick={() => story.id && onSelect(story)}
           >
             <div className="flex justify-between items-start">
               <div className="space-y-1">
@@ -70,28 +83,34 @@ export function StoryList({
                   {story.description}
                 </p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>
-                    Created {formatDistanceToNow(new Date(story.createdAt))} ago
-                  </span>
-                  <span>•</span>
-                  <span>Age {story.targetAge}</span>
-                  <span>•</span>
-                  <span className="capitalize">{story.theme}</span>
+                  <span>Created {formatDate(story.created_at)}</span>
+                  {story.main_character?.age && (
+                    <>
+                      <span>•</span>
+                      <span>Age {story.main_character.age}</span>
+                    </>
+                  )}
+                  {story.theme && (
+                    <>
+                      <span>•</span>
+                      <span className="capitalize">{story.theme}</span>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleFavorite(story.id);
+                    story.id && toggleFavorite(story.id);
                   }}
                 >
                   <Star
                     className={
-                      favoriteStories.has(story.id)
+                      story.id && favoriteStories.has(story.id)
                         ? 'fill-yellow-400 text-yellow-400'
                         : ''
                     }
@@ -108,7 +127,7 @@ export function StoryList({
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent>
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -131,7 +150,7 @@ export function StoryList({
                       className="text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDelete(story.id);
+                        story.id && onDelete(story.id);
                       }}
                     >
                       <Trash className="mr-2 h-4 w-4" />

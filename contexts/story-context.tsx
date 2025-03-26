@@ -27,31 +27,22 @@ export type StoryBranch = {
 };
 
 export type Story = {
-  storyData: StoryData;
   id?: string;
+  user_id: string;
   title: string;
-  mainCharacter: {
+  content: string | null;
+  main_character: {
     name: string;
     age: string;
     traits: string[];
-    appearance: string;
-  };
-  setting: string;
-  theme: string;
-  plotElements: string[];
-  content?: string;
-  illustrations?: {
-    url: string;
-    prompt: string;
-    scene: string;
-  }[];
-  branches?: {
-    [key: string]: StoryBranch;
-  };
-  currentBranchId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  author?: string;
+  } | null;
+  setting: string | null;
+  theme: string | null;
+  plot_elements: string[] | null;
+  is_published: boolean;
+  thumbnail_url: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type StoryState = {
@@ -225,11 +216,20 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
 
       try {
         const response = await fetch(`/api/stories/${id}`, {
+          method: 'GET',
           credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
         });
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          console.error('Story fetch error:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+          });
           throw new Error(
             errorData.error || `Failed to fetch story: ${response.status}`
           );

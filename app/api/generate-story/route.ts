@@ -11,14 +11,15 @@ export async function POST(request: Request) {
     // Validate OpenAI API key
     if (
       !process.env.OPENAI_API_KEY ||
-      !process.env.OPENAI_API_KEY.startsWith('sk-')
+      (!process.env.OPENAI_API_KEY.startsWith('sk-') &&
+        !process.env.OPENAI_API_KEY.startsWith('sk-proj-'))
     ) {
       return NextResponse.json(
         {
           error:
             'Invalid OpenAI API key configuration. Please check your environment variables.',
           details:
-            'The API key should start with "sk-". Current key format is incorrect.',
+            'The API key should start with either "sk-" or "sk-proj-". Current key format is incorrect.',
         },
         { status: 500 }
       );

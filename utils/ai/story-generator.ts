@@ -1,9 +1,12 @@
 import OpenAI from 'openai';
 import { StoryData } from '@/components/story/common/types';
+import type { Database } from '@/types/supabase';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+type Story = Database['public']['Tables']['stories']['Row'];
 
 interface StoryPrompt {
   character: {
@@ -23,7 +26,7 @@ interface StoryPrompt {
 
 export async function generateStory(
   prompt: StoryPrompt
-): Promise<Partial<StoryData>> {
+): Promise<Partial<Story>> {
   const systemPrompt = `You are a master storyteller specializing in children's literature. 
 Create an engaging, age-appropriate story with the following characteristics:
 - Target age: ${prompt.targetAge} years old
@@ -36,12 +39,18 @@ ${
 }
 
 The story should:
+- Start with a catchy, engaging title on the first line
 - Be engaging and imaginative
 - Include clear moral lessons or educational elements
 - Use age-appropriate vocabulary and sentence structure
 - Have a clear beginning, middle, and end
 - Include descriptive language and dialogue
-- Encourage critical thinking and emotional intelligence`;
+- Encourage critical thinking and emotional intelligence
+
+Format your response as:
+TITLE: [Your catchy title here]
+
+[Story content here...]`;
 
   const userPrompt = `Create a story about ${prompt.character.name}, a ${
     prompt.character.age
@@ -69,79 +78,32 @@ ${
     const storyContent = completion.choices[0].message.content;
     if (!storyContent) throw new Error('No story content generated');
 
-    // Split into paragraphs and clean up
-    const paragraphs = storyContent
+    // Extract title and content
+    const [titleLine, ...contentLines] = storyContent
+      .split('\n')
+      .filter((line) => line.trim());
+    const title = titleLine.replace(/^TITLE:\s*/, '').trim();
+
+    // Split remaining content into paragraphs and clean up
+    const paragraphs = contentLines
+      .join('\n')
       .split('\n\n')
       .filter((para) => para.trim().length > 0);
 
-    // Generate a title based on the story
-    const titleCompletion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        {
-          role: 'system',
-          content:
-            "Generate a short, engaging title for this children's story. The title should be catchy and reflect the main theme or adventure.",
-        },
-        { role: 'user', content: storyContent },
-      ],
-      temperature: 0.7,
-      max_tokens: 50,
-    });
-
-    const title =
-      titleCompletion.choices[0].message.content?.trim() ||
-      `${prompt.character.name}'s Adventure`;
-
-    // Generate a brief description
-    const descriptionCompletion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        {
-          role: 'system',
-          content:
-            "Generate a brief, engaging description (2-3 sentences) for this children's story.",
-        },
-        { role: 'user', content: storyContent },
-      ],
-      temperature: 0.7,
-      max_tokens: 100,
-    });
-
-    const description =
-      descriptionCompletion.choices[0].message.content?.trim() || '';
-
-    // Calculate basic metadata
-    const wordCount = storyContent.split(/\s+/).length;
-    const readingTime = Math.ceil(wordCount / 200); // Assuming 200 words per minute for children
-
+    // Return data that matches the database schema
     return {
-      title,
-      description,
-      content: {
-        en: prompt.language === 'en' ? paragraphs : [],
-        es: prompt.language === 'es' ? paragraphs : [],
+      title: title || `${prompt.character.name}'s Adventure`,
+      content: paragraphs.join('\n\n'),
+      main_character: {
+        name: prompt.character.name,
+        age: prompt.character.age,
+        traits: prompt.character.traits,
+        appearance: prompt.character.appearance,
       },
-      mainCharacter: prompt.character,
       setting: prompt.setting,
       theme: prompt.theme,
-      targetAge: prompt.targetAge,
-      readingLevel: prompt.readingLevel,
-      metadata: {
-        targetAge: prompt.targetAge,
-        difficulty:
-          prompt.readingLevel === 'beginner'
-            ? 'easy'
-            : prompt.readingLevel === 'intermediate'
-            ? 'medium'
-            : 'hard',
-        theme: prompt.theme,
-        setting: prompt.setting,
-        wordCount,
-        readingTime,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
+      plot_elements: [],
+      is_published: false,
     };
   } catch (error) {
     console.error('Error generating story:', error);

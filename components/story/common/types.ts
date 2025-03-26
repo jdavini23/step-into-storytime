@@ -30,29 +30,23 @@ export interface AccessibilitySettings {
 }
 
 export interface StoryData {
-  id: string;
-  userId: string;
+  description: ReactNode;
+  id?: string;
+  user_id: string;
   title: string;
-  description: string;
-  content: {
-    en: string[];
-    es: string[];
-  };
-  mainCharacter: {
+  content: string | null;
+  main_character: {
     name: string;
     age: string;
     traits: string[];
-    appearance: string;
-  };
-  setting: string;
-  theme: string;
-  plotElements: string[];
-  targetAge: number;
-  readingLevel: 'beginner' | 'intermediate' | 'advanced';
-  createdAt: string;
-  updatedAt: string;
-  metadata: StoryMetadata;
-  accessibility: AccessibilitySettings;
+  } | null;
+  setting: string | null;
+  theme: string | null;
+  plot_elements: string[] | null;
+  is_published: boolean;
+  thumbnail_url: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type Story = StoryData;
