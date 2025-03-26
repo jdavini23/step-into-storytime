@@ -33,32 +33,29 @@ export interface AccessibilitySettings {
 
 type ReadingLevel = 'beginner' | 'intermediate' | 'advanced';
 
-export interface StoryData {
-  id?: string;
-  user_id: string;
+export interface Story {
+  prompt(prompt: any): unknown;
+  id: string;
   title: string;
-  description: string;
+  description?: string;
   content: {
     en: string[];
     es: string[];
   };
-  targetAge: number;
-  readingLevel: ReadingLevel;
-  main_character: {
+  character: {
     name: string;
-    age: string;
-    traits: string[];
-  } | null;
-  setting: string | null;
-  theme: string | null;
-  plot_elements: string[] | null;
+    age?: string;
+    traits?: string[];
+  };
+  setting: string;
+  theme: string;
+  plot_elements?: string[];
   is_published: boolean;
-  thumbnail_url: string | null;
-  created_at?: string;
-  updated_at?: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  thumbnail_url?: string | null;
 }
-
-export type Story = StoryData;
 
 export interface StoryParagraph {
   content: string;

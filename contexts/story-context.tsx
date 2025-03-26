@@ -8,7 +8,7 @@ import {
   useEffect,
   useCallback,
 } from 'react';
-import type { StoryData } from '@/components/story/common/types';
+import { Story } from '@/components/story/common/types';
 import { generateStoryIllustrations } from '@/lib/image-generation';
 
 // Define types
@@ -26,29 +26,23 @@ export type StoryBranch = {
   };
 };
 
-export type Story = {
-  id?: string;
-  user_id: string;
-  title: string;
-  content: string | null;
-  main_character: {
-    name: string;
-    age: string;
-    traits: string[];
-  } | null;
-  setting: string | null;
-  theme: string | null;
-  plot_elements: string[] | null;
-  is_published: boolean;
-  thumbnail_url: string | null;
-  created_at?: string;
-  updated_at?: string;
-};
+interface StoryContextType {
+  state: StoryState;
+  dispatch: React.Dispatch<StoryAction>;
+  fetchStories: () => Promise<void>;
+  fetchStory: (id: string) => Promise<void>;
+  createStory: (story: Story) => Promise<Story>;
+  updateStory: (id: string, updates: Partial<Story>) => Promise<Story>;
+  deleteStory: (id: string) => Promise<void>;
+  generateStoryContent: (
+    storyData: Story
+  ) => Promise<{ en: string[]; es: string[] }>;
+}
 
 type StoryState = {
   stories: Story[];
   currentStory: Story | null;
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
 };
 
@@ -66,7 +60,7 @@ type StoryAction =
 const initialState: StoryState = {
   stories: [],
   currentStory: null,
-  isLoading: false,
+  loading: false,
   error: null,
 };
 
@@ -74,9 +68,9 @@ const initialState: StoryState = {
 const storyReducer = (state: StoryState, action: StoryAction): StoryState => {
   switch (action.type) {
     case 'SET_STORIES':
-      return { ...state, stories: action.payload, isLoading: false };
+      return { ...state, stories: action.payload, loading: false };
     case 'SET_CURRENT_STORY':
-      return { ...state, currentStory: action.payload, isLoading: false };
+      return { ...state, currentStory: action.payload, loading: false };
     case 'CLEAR_CURRENT_STORY':
       return { ...state, currentStory: null };
     case 'ADD_STORY':
@@ -84,7 +78,7 @@ const storyReducer = (state: StoryState, action: StoryAction): StoryState => {
         ...state,
         stories: [...state.stories, action.payload],
         currentStory: action.payload,
-        isLoading: false,
+        loading: false,
       };
     case 'UPDATE_STORY':
       return {
@@ -93,7 +87,7 @@ const storyReducer = (state: StoryState, action: StoryAction): StoryState => {
           story.id === action.payload.id ? action.payload : story
         ),
         currentStory: action.payload,
-        isLoading: false,
+        loading: false,
       };
     case 'DELETE_STORY':
       return {
@@ -101,28 +95,18 @@ const storyReducer = (state: StoryState, action: StoryAction): StoryState => {
         stories: state.stories.filter((story) => story.id !== action.payload),
         currentStory:
           state.currentStory?.id === action.payload ? null : state.currentStory,
-        isLoading: false,
+        loading: false,
       };
     case 'SET_LOADING':
-      return { ...state, isLoading: action.payload };
+      return { ...state, loading: action.payload };
     case 'SET_ERROR':
-      return { ...state, error: action.payload, isLoading: false };
+      return { ...state, error: action.payload, loading: false };
     default:
       return state;
   }
 };
 
-// Create context
-const StoryContext = createContext<{
-  state: StoryState;
-  dispatch: React.Dispatch<StoryAction>;
-  fetchStories: () => Promise<void>;
-  fetchStory: (id: string) => Promise<void>;
-  createStory: (story: Story) => Promise<Story>;
-  updateStory: (id: string, updates: Partial<Story>) => Promise<Story>;
-  deleteStory: (id: string) => Promise<void>;
-  generateStoryContent: (storyData: Story) => Promise<string>;
-}>({
+const StoryContext = createContext<StoryContextType>({
   state: initialState,
   dispatch: () => null,
   fetchStories: async () => {},
@@ -130,7 +114,7 @@ const StoryContext = createContext<{
   createStory: async () => ({} as Story),
   updateStory: async () => ({} as Story),
   deleteStory: async () => {},
-  generateStoryContent: async () => '',
+  generateStoryContent: async () => ({ en: [], es: [] }),
 });
 
 // Create provider
@@ -176,7 +160,7 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
   // API functions
   const fetchStories = useCallback(async () => {
     // Don't set loading state if already loading to prevent additional renders
-    if (!state.isLoading) {
+    if (!state.loading) {
       dispatch({ type: 'SET_LOADING', payload: true });
     }
     dispatch({ type: 'SET_ERROR', payload: null }); // Clear previous errors
@@ -205,11 +189,11 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [state.isLoading]);
+  }, [state.loading]);
 
   const fetchStory = useCallback(
     async (id: string) => {
-      if (!state.isLoading) {
+      if (!state.loading) {
         dispatch({ type: 'SET_LOADING', payload: true });
       }
       dispatch({ type: 'SET_ERROR', payload: null });
@@ -248,43 +232,46 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
-    [state.isLoading]
+    [state.loading]
   );
 
-  const createStory = async (story: Story) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
-
+  const createStory = async (storyData: Story): Promise<Story> => {
     try {
+      const content = await generateStoryContent(storyData);
+      const illustrations = await generateStoryIllustrations({
+        ...storyData,
+        content: {
+          en: content.en,
+          es: content.es,
+        },
+      });
+
       const response = await fetch('/api/stories', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(story),
+        body: JSON.stringify({
+          ...storyData,
+          content,
+          illustrations: illustrations.map((ill) => ({
+            url: ill.url,
+            prompt: ill.prompt,
+            scene: ill.scene,
+          })),
+        }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Failed to create story: ${response.status}`
-        );
+        throw new Error('Failed to create story');
       }
 
-      const newStory = await response.json();
-      dispatch({ type: 'ADD_STORY', payload: newStory });
-      return newStory;
+      const story = await response.json();
+      dispatch({ type: 'ADD_STORY', payload: story });
+      return story;
     } catch (error) {
       console.error('Error creating story:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload:
-          error instanceof Error ? error.message : 'Failed to create story',
-      });
       throw error;
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -356,56 +343,30 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const generateStoryContent = async (storyData: Story) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null }); // Clear previous errors
-
+  const generateStoryContent = async (
+    storyData: Story
+  ): Promise<{ en: string[]; es: string[] }> => {
     try {
-      // Generate story text
       const response = await fetch('/api/generate-story', {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(storyData),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `Failed to generate story: ${response.status}`
-        );
+        throw new Error('Failed to generate story content');
       }
 
       const data = await response.json();
-      const storyContent = data.content;
-
-      // Generate illustrations for the story
-      const illustrations = await generateStoryIllustrations({
-        ...storyData,
-        content: storyContent,
-      });
-
-      // Update the story with both content and illustrations
-      const updatedStory = {
-        ...storyData,
-        content: storyContent,
-        illustrations,
+      return {
+        en: data.content.split('\n'),
+        es: [],
       };
-
-      // If the story has an ID, update it in the database
-      if (storyData.id) {
-        await updateStory(storyData.id, updatedStory);
-      }
-
-      return storyContent;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
-      console.error('Error generating story:', error);
+      console.error('Error generating story content:', error);
       throw error;
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -439,3 +400,5 @@ export const useStory = () => {
   }
   return context;
 };
+
+export type { Story };

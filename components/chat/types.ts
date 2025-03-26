@@ -1,3 +1,5 @@
+import type { Story } from '@/components/story/common/types';
+
 export interface Message {
   id: string;
   type: 'ai' | 'user';
@@ -31,6 +33,6 @@ export interface ConversationState {
 }
 
 export interface ChatContainerProps {
-  onComplete: (storyData: StoryDataState) => void;
+  onComplete: (story: Story) => void;
   onError: (error: string) => void;
 }

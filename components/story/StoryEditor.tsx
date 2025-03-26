@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StoryData } from './common/types';
 import { toast } from 'sonner';
 
 interface StoryEditorProps {
@@ -24,7 +23,7 @@ type ReadingLevel = 'beginner' | 'intermediate' | 'advanced';
 export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [story, setStory] = useState<StoryData | null>(null);
+  const [story, setStory] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchStory = async () => {

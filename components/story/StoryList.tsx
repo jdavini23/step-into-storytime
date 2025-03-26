@@ -7,17 +7,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { StoryData } from './common/types';
+import { Story } from './common/types';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreVertical, Edit, Trash, Share, Star } from 'lucide-react';
 
 interface StoryListProps {
-  stories: StoryData[];
-  onEdit: (story: StoryData) => void;
+  stories: Story[];
+  onEdit: (story: Story) => void;
   onDelete: (storyId: string) => void;
-  onShare: (story: StoryData) => void;
+  onShare: (story: Story) => void;
   onFavorite: (storyId: string, isFavorite: boolean) => void;
-  onSelect: (story: StoryData) => void;
+  onSelect: (story: Story) => void;
 }
 
 // Helper function to format date safely
@@ -86,10 +86,10 @@ export function StoryList({
                 </p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>Created {formatDate(story.created_at)}</span>
-                  {story.main_character?.age && (
+                  {story.character?.age && (
                     <>
                       <span>•</span>
-                      <span>Age {story.main_character.age}</span>
+                      <span>Age {story.character.age}</span>
                     </>
                   )}
                   {story.theme && (
@@ -99,6 +99,11 @@ export function StoryList({
                     </>
                   )}
                 </div>
+                {story.character?.name && (
+                  <p className="text-sm text-gray-600">
+                    Character: {story.character.name}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">

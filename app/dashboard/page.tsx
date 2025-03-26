@@ -160,9 +160,8 @@ export default function DashboardPage() {
                     <CardTitle className="text-lg">{story.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground mb-2">
-                      {story.main_character?.name}'s adventure in{' '}
-                      {story.setting}
+                    <p className="text-sm text-gray-600">
+                      {story.character?.name}'s adventure in {story.setting}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Created{' '}

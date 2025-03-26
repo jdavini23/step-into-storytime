@@ -1,18 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { Metadata } from 'next';
 import './globals.css';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 
-export const metadata: Metadata = {
-  title: 'Page Not Found',
-  description: 'The page you are looking for could not be found.',
-};
-
 export default function NotFound() {
-  console.log('VAR_ORIGINAL_PATHNAME:', process.env.VAR_ORIGINAL_PATHNAME);
   const pathname = usePathname();
 
   useEffect(() => {

@@ -134,8 +134,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 });
 
 // Helper function to create a Supabase client for server components
-export const createServerSupabaseClient = () => {
-  const cookieStore = cookies();
+export const createServerSupabaseClient = async () => {
+  const cookieStore = await cookies();
 
   return createServerClient(supabaseUrl || '', supabaseAnonKey || '', {
     cookies: {
@@ -684,7 +684,7 @@ export async function fetchStory(storyId: string, userId: string) {
         user_id: userId,
         title: 'The Enchanted Forest',
         content: 'Once upon a time in an enchanted forest...',
-        main_character: {
+        character: {
           name: 'Emma',
           age: '8',
           traits: ['brave', 'curious'],

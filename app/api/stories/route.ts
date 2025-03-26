@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { StoryData } from '@/components/story/common/types';
 import type { Story } from '@/contexts/story-context';
 import { createClient } from '@/utils/supabase/server';
 import { generateStory } from '@/utils/ai/story-generator';
@@ -88,21 +87,26 @@ export async function POST(request: NextRequest) {
       // Format story data to match database schema
       const storyData = {
         id: uuidv4(), // Generate a UUID for the story
-        title: generatedStory.title || 'Untitled Story',
-        content: generatedStory.content,
-        main_character: {
-          name: json.character.name,
-          age: json.character.age,
-          traits: json.character.traits || [],
+        title: json.title || 'Untitled Story',
+        description: json.description || '',
+        content: {
+          en: [json.content],
+          es: [],
         },
+        character: json.character,
         setting: json.setting,
         theme: json.theme,
-        plot_elements: [],
+        plot_elements: json.plot_elements || [],
         is_published: false,
         user_id: user.id,
+        targetAge: json.targetAge || 6,
+        readingLevel: json.readingLevel || 'beginner',
+        thumbnail_url: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
+      console.log('Creating story with data:', storyData);
 
       // Use upsert for better performance
       const { data: story, error } = await supabase

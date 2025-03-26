@@ -162,75 +162,160 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       setIsGenerating(true);
       const { storyData } = currentState;
 
-      const payload = {
-        title: `${storyData.character?.name}'s ${
-          SETTINGS.find((s) => s.id === storyData.setting)?.title || 'Adventure'
-        }`,
-        mainCharacter: {
-          name: storyData.character?.name || '',
-          age: storyData.character?.age || '',
-          traits: storyData.character?.traits || [],
-        },
-        setting:
-          SETTINGS.find((s) => s.id === storyData.setting)?.description || '',
-        theme: THEMES.find((t) => t.id === storyData.theme)?.description || '',
-        plotElements: [],
-      };
-
-      const response = await fetch('/api/generate-story/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      // Detailed validation logging
+      console.log('Validating story data:', {
+        character: storyData.character,
+        setting: storyData.setting,
+        theme: storyData.theme,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate story');
+      // Validate character data
+      if (!storyData.character || typeof storyData.character !== 'object') {
+        throw new Error('Invalid character data structure');
       }
 
-      const data = await response.json();
-      const initialContent = data.content;
+      if (
+        !storyData.character.name ||
+        typeof storyData.character.name !== 'string'
+      ) {
+        throw new Error('Character name is required and must be a string');
+      }
 
-      // Create story in Supabase
-      const storyResponse = await fetch('/api/stories', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: payload.title,
-          description: `A story about ${storyData.character?.name} in ${
-            SETTINGS.find((s) => s.id === storyData.setting)?.title ||
-            'a magical place'
-          }`,
-          content: initialContent,
+      // Validate setting
+      if (!storyData.setting || typeof storyData.setting !== 'string') {
+        throw new Error('Setting ID is required and must be a string');
+      }
+
+      const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
+      if (!selectedSetting) {
+        throw new Error(`Invalid setting selected: ${storyData.setting}`);
+      }
+
+      // Validate theme
+      if (!storyData.theme || typeof storyData.theme !== 'string') {
+        throw new Error('Theme ID is required and must be a string');
+      }
+
+      const selectedTheme = THEMES.find((t) => t.id === storyData.theme);
+      if (!selectedTheme) {
+        throw new Error(`Invalid theme selected: ${storyData.theme}`);
+      }
+
+      console.log('Story data validation passed:', {
+        selectedSetting,
+        selectedTheme,
+        character: storyData.character,
+      });
+
+      try {
+        console.log('Initiating story generation request...');
+        const generationPayload = {
           character: {
-            name: storyData.character?.name || '',
-            age: storyData.character?.age || '',
-            traits: storyData.character?.traits || [],
+            name: storyData.character.name,
+            age: storyData.character.age || '',
+            traits: storyData.character.traits || [],
           },
-          theme: storyData.theme || '',
-          setting: storyData.setting || '',
+          setting: selectedSetting.description,
+          theme: selectedTheme.description,
+          targetAge: parseInt(storyData.character.age || '6'),
           readingLevel: 'beginner',
           language: 'en',
           style: 'adventure',
-          targetAge: parseInt(storyData.character?.age || '6'),
-        }),
-      });
+        };
 
-      if (!storyResponse.ok) {
-        const errorData = await storyResponse.json();
-        throw new Error(errorData.error || 'Failed to save story');
+        console.log('Sending generation payload:', generationPayload);
+
+        const response = await fetch('/api/generate-story', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(generationPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Story generation API error:', errorData);
+          throw new Error(errorData.error || 'Failed to generate story');
+        }
+
+        const data = await response.json();
+        const storyContent = data.content;
+
+        if (!storyContent) {
+          throw new Error('No story content received');
+        }
+
+        // Create story in Supabase
+        const storyPayload = {
+          id: crypto.randomUUID(),
+          title: `${storyData.character.name}'s ${selectedSetting.title}`,
+          description: `A story about ${storyData.character.name} in ${selectedSetting.title}`,
+          content: {
+            en: [storyContent],
+            es: [],
+          },
+          character: {
+            name: storyData.character.name,
+            age: storyData.character.age || '',
+            traits: storyData.character.traits || [],
+          },
+          setting: selectedSetting.id,
+          theme: selectedTheme.id,
+          plot_elements: [],
+          is_published: false,
+          user_id: authState.user?.id,
+          targetAge: parseInt(storyData.character.age || '6'),
+          readingLevel: 'beginner',
+          thumbnail_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        console.log('Sending story payload:', storyPayload);
+
+        const storyResponse = await fetch('/api/stories', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(storyPayload),
+        });
+
+        if (!storyResponse.ok) {
+          const errorData = await storyResponse.json();
+          console.error('Story save error:', errorData);
+          throw new Error(errorData.error || 'Failed to save story');
+        }
+
+        const story = await storyResponse.json();
+        console.log('Story saved successfully:', story);
+
+        // Add a completion message
+        setState((prev) => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            {
+              id: Date.now().toString(),
+              type: 'ai',
+              content:
+                '✨ Story created successfully! Redirecting you to your story...',
+              timestamp: Date.now(),
+            } as Message,
+          ],
+        }));
+
+        // Call onComplete with the story data
+        onComplete(story);
+      } catch (error: any) {
+        console.error('Story generation error:', error);
+        handleError(error, setState, onError);
+      } finally {
+        setIsGenerating(false);
       }
-
-      const story = await storyResponse.json();
-      onComplete(story);
     } catch (error: any) {
       console.error('Story generation error:', error);
       handleError(error, setState, onError);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
