@@ -10,16 +10,17 @@ interface StoryParams {
 }
 
 interface RouteContext {
-  params: Promise<StoryParams>;
+  params: Promise<{ storyId: string }>;
 }
 
 export async function GET(
   request: NextRequest,
-  context: RouteContext
+  context: { params: Promise<{ storyId: string }> }
 ): Promise<NextResponse> {
   try {
     const supabase = await createClient();
-    const { storyId } = await context.params;
+    const params = await context.params;
+    const storyId = params.storyId;
 
     if (!storyId) {
       return NextResponse.json(
@@ -84,7 +85,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  context: RouteContext
+  context: { params: Promise<{ storyId: string }> }
 ): Promise<NextResponse> {
   try {
     const supabase = await createClient();
@@ -100,7 +101,8 @@ export async function PUT(
       );
     }
 
-    const { storyId } = await context.params;
+    const params = await context.params;
+    const storyId = params.storyId;
     const body = await request.json();
 
     // Verify story ownership
@@ -118,10 +120,34 @@ export async function PUT(
       );
     }
 
+    // Validate content structure
+    if (!body.content || typeof body.content !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid content format - content must be an object' },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(body.content.en) || !Array.isArray(body.content.es)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid content format - content must have en and es arrays',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Format the update data
+    const updateData = {
+      ...body,
+      content: JSON.stringify(body.content), // Stringify for database storage
+      updated_at: new Date().toISOString(),
+    };
+
     // Update the story
     const { data: story, error } = await supabase
       .from('stories')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', storyId)
       .eq('user_id', user.id)
       .select()
@@ -147,7 +173,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  context: RouteContext
+  context: { params: Promise<{ storyId: string }> }
 ): Promise<NextResponse> {
   try {
     const supabase = await createClient();
@@ -163,7 +189,9 @@ export async function DELETE(
       );
     }
 
-    const { storyId } = await context.params;
+    const params = await context.params;
+    const storyId = params.storyId;
+
     if (!storyId) {
       return NextResponse.json(
         { error: 'Story ID is required' },

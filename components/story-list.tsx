@@ -29,7 +29,7 @@ export function StoryList({ stories }: StoryListProps) {
   const router = useRouter();
 
   const handleEdit = (id: string) => {
-    router.push(`/edit/${id}`);
+    router.push(`/stories/${id}/edit`);
   };
 
   const handleDelete = async (id: string) => {

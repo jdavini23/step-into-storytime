@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,7 @@ const formatDate = (dateString?: string | null) => {
   } catch (error) {
     return 'Recently';
   }
+  console.log(`formatDate called with dateString: ${dateString}`); // Added log
 };
 
 export function StoryList({
@@ -55,6 +56,7 @@ export function StoryList({
       onFavorite(storyId, true);
     }
     setFavoriteStories(newFavorites);
+    console.log(`toggleFavorite called with storyId: ${storyId}`); // Added log
   };
 
   return (
@@ -63,7 +65,9 @@ export function StoryList({
         <h2 className="text-2xl font-bold">Your Stories</h2>
         <Button
           variant="outline"
-          onClick={() => (window.location.href = '/create')}
+          onClick={() => {
+            window.location.href = '/create';
+          }}
         >
           Create New Story
         </Button>
@@ -101,9 +105,9 @@ export function StoryList({
 
               <div className="flex items-center space-x-2">
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
+                  // variant="ghost"
+                  // size="icon"
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                     e.stopPropagation();
                     story.id && toggleFavorite(story.id);
                   }}
@@ -120,16 +124,18 @@ export function StoryList({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => e.stopPropagation()}
+                      // variant="ghost"
+                      // size="icon"
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
+                        e.stopPropagation()
+                      }
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         onEdit(story);
                       }}
@@ -138,7 +144,7 @@ export function StoryList({
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         onShare(story);
                       }}
@@ -148,7 +154,7 @@ export function StoryList({
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         story.id && onDelete(story.id);
                       }}
@@ -169,7 +175,7 @@ export function StoryList({
               No stories yet. Create your first story!
             </p>
             <Button
-              variant="default"
+              // variant="default"
               className="mt-4"
               onClick={() => (window.location.href = '/create')}
             >

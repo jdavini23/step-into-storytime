@@ -13,43 +13,22 @@ export default function StoryWizard({ onComplete, onError }: StoryWizardProps) {
   const handleComplete = (storyData: StoryDataState) => {
     // Convert StoryDataState to StoryData
     const story: StoryData = {
-      id: Date.now().toString(),
-      userId: '', // Will be set by the API
+      user_id: '', // Will be set by the API
       title: `${storyData.character?.name}'s Adventure`,
       description: `A story about ${storyData.character?.name}`,
-      content: {
-        en: [''], // Will be populated by the API
-        es: ['Translation will be added later...'],
-      },
-      targetAge: parseInt(storyData.character?.age || '6'),
-      readingLevel: 'beginner',
-      theme: storyData.theme || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      mainCharacter: {
+      content: { en: [], es: [] }, // Will be populated by the API
+      main_character: {
         name: storyData.character?.name || '',
         age: storyData.character?.age || '',
         traits: storyData.character?.traits || [],
-        appearance: '',
       },
-      setting: '',
-      plotElements: [],
-      metadata: {
-        targetAge: parseInt(storyData.character?.age || '6'),
-        difficulty: 'easy',
-        theme: storyData.theme || '',
-        setting: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        wordCount: 0,
-        readingTime: 0,
-      },
-      accessibility: {
-        contrast: 'normal',
-        motionReduced: false,
-        fontSize: 'medium',
-        lineHeight: 1.5,
-      },
+      setting: storyData.setting || null,
+      theme: storyData.theme || null,
+      plot_elements: [],
+      is_published: false,
+      thumbnail_url: null,
+      targetAge: 0,
+      readingLevel: 'beginner',
     };
     onComplete(story);
   };

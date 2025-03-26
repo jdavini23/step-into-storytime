@@ -301,7 +301,7 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         {getQuickReplies().map((reply) => (
           <Button
             key={reply}
-            variant="outline"
+            className="border border-input hover:bg-accent hover:text-accent-foreground"
             size="sm"
             onClick={() => {
               setInput(reply);

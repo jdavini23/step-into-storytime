@@ -4,11 +4,11 @@ import type { Story } from '@/contexts/story-context';
 import { createClient } from '@/utils/supabase/server';
 import { generateStory } from '@/utils/ai/story-generator';
 import type { Database } from '@/types/supabase';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
 // In-memory storage for demo purposes
 // TODO: Replace with database storage
+// Consider using a more robust storage solution like a database
 let stories: Story[] = [];
 
 export async function GET(request: NextRequest) {
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { storyId: string } }
+  context: { params: Promise<{ storyId: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -159,11 +159,15 @@ export async function PUT(
     const body = await request.json();
     const { id, ...updateData } = body;
 
+    // Get storyId from params if available
+    const params = await context.params;
+    const storyId = params?.storyId || id;
+
     // Verify story ownership
     const { data: existingStory } = await supabase
       .from('stories')
       .select('user_id')
-      .eq('id', id)
+      .eq('id', storyId)
       .single();
 
     if (!existingStory || existingStory.user_id !== user.id) {
@@ -176,7 +180,7 @@ export async function PUT(
     const { data: story, error } = await supabase
       .from('stories')
       .update(updateData)
-      .eq('id', id)
+      .eq('id', storyId)
       .select()
       .single();
 
@@ -200,7 +204,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { storyId: string } }
+  context: { params: Promise<{ storyId: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -215,7 +219,17 @@ export async function DELETE(
       );
     }
 
-    const storyId = params.storyId;
+    // Get storyId from params if available
+    const params = await context.params;
+    const storyId =
+      params?.storyId || request.nextUrl.pathname.split('/').pop();
+
+    if (!storyId) {
+      return NextResponse.json(
+        { error: 'Story ID is required' },
+        { status: 400 }
+      );
+    }
 
     // Verify story ownership
     const { data: existingStory } = await supabase

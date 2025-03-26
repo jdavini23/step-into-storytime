@@ -150,55 +150,57 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {Array.isArray(storyState.stories) && storyState.stories.map((story) => (
-              <Card
-                key={story.id}
-                className="border-0 shadow-md hover:shadow-lg transition-shadow"
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{story.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-slate-600 text-sm mb-2">
-                    {story.mainCharacter?.name}'s adventure in {story.setting}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Created:{' '}
-                    {new Date(
-                      story.createdAt || Date.now()
-                    ).toLocaleDateString()}
-                  </p>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-slate-600"
-                    onClick={() => router.push(`/story/${story.id}`)}
-                  >
-                    Read
-                  </Button>
-                  <div className="flex gap-2">
+            {Array.isArray(storyState.stories) &&
+              storyState.stories.map((story) => (
+                <Card
+                  key={story.id}
+                  className="border-0 shadow-md hover:shadow-lg transition-shadow"
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">{story.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-2">
+                      {story.main_character?.name}'s adventure in{' '}
+                      {story.setting}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Created{' '}
+                      {story.created_at
+                        ? new Date(story.created_at).toLocaleDateString()
+                        : 'recently'}
+                    </p>
+                  </CardContent>
+                  <CardFooter className="flex justify-between">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       className="text-slate-600"
-                      onClick={() => router.push(`/edit/${story.id}`)}
+                      onClick={() => router.push(`/story/${story.id}`)}
                     >
-                      <Edit className="h-4 w-4" />
+                      Read
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDeleteStory(story.id || '')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-600"
+                        onClick={() => router.push(`/stories/${story.id}/edit`)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteStory(story.id || '')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
           </div>
         )}
       </main>

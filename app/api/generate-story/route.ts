@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     // Validate request data
     if (
-      !storyData.mainCharacter?.name ||
+      !storyData.main_character?.name ||
       !storyData.setting ||
       !storyData.theme
     ) {
@@ -56,10 +56,10 @@ export async function POST(request: Request) {
           {
             role: 'user',
             content: `Create an interactive children's story with the following elements:
-            - Main character: ${storyData.mainCharacter.name}, age ${
-              storyData.mainCharacter.age
+            - Main character: ${storyData.main_character.name}, age ${
+              storyData.main_character.age
             }
-            - Character traits: ${storyData.mainCharacter.traits.join(', ')}
+            - Character traits: ${storyData.main_character.traits.join(', ')}
             - Setting: ${storyData.setting}
             - Theme: ${storyData.theme}
             - Plot elements: ${
@@ -168,7 +168,7 @@ async function generateBranch(
         content: `Continue the story with these elements:
         - Previous content: ${previousContent}
         - Chosen path: ${choiceText}
-        - Main character: ${storyData.mainCharacter.name}
+        - Main character: ${storyData.main_character?.name || 'Unknown'}
         - Setting: ${storyData.setting}
         - Theme: ${storyData.theme}
         
