@@ -31,7 +31,6 @@ const formatDate = (dateString?: string | null) => {
   } catch (error) {
     return 'Recently';
   }
-  console.log(`formatDate called with dateString: ${dateString}`); // Added log
 };
 
 export function StoryList({
@@ -56,7 +55,6 @@ export function StoryList({
       onFavorite(storyId, true);
     }
     setFavoriteStories(newFavorites);
-    console.log(`toggleFavorite called with storyId: ${storyId}`); // Added log
   };
 
   return (
@@ -105,8 +103,8 @@ export function StoryList({
 
               <div className="flex items-center space-x-2">
                 <Button
-                  // variant="ghost"
-                  // size="icon"
+                  variant="ghost"
+                  size="icon"
                   onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                     e.stopPropagation();
                     story.id && toggleFavorite(story.id);
@@ -124,8 +122,8 @@ export function StoryList({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      // variant="ghost"
-                      // size="icon"
+                      variant="ghost"
+                      size="icon"
                       onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
                         e.stopPropagation()
                       }
@@ -175,7 +173,7 @@ export function StoryList({
               No stories yet. Create your first story!
             </p>
             <Button
-              // variant="default"
+              variant="default"
               className="mt-4"
               onClick={() => (window.location.href = '/create')}
             >
