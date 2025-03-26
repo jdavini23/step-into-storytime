@@ -15,11 +15,11 @@ import type {
   StoryDataState,
 } from './types';
 import {
-  ConversationStep,
   determineNextStep,
   generateResponse,
   processUserInput,
 } from '@/lib/conversation-manager';
+import type { ConversationStep } from '@/lib/conversation-manager';
 import { SETTINGS, THEMES, LENGTH_OPTIONS } from '../../lib/story-options';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -68,6 +68,8 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [currentStep, setCurrentStep] = useState<ConversationStep>('name');
+  let nextStep: ConversationStep;
+  let previousStep: ConversationStep;
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -127,11 +129,15 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
     };
 
     // Determine next step
-    const nextStep = determineNextStep(newState);
+    nextStep = determineNextStep(newState);
+    previousStep = currentStep;
     setCurrentStep(nextStep);
 
+    console.log('Current step:', previousStep);
+    console.log('User input:', input);
+
     // If we've reached confirm and user says yes, generate the story
-    if (currentStep === 'confirm' && input.toLowerCase().includes('yes')) {
+    if (previousStep === 'confirm' && input.toLowerCase().includes('yes')) {
       await generateStory(newState);
       return;
     }
@@ -192,25 +198,28 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       const initialContent = data.content;
 
         // Create story in Supabase
+        const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
+        const selectedTheme = THEMES.find((s) => s.id === storyData.theme);
+
         const storyPayload = {
           id: crypto.randomUUID(),
-          title: `${storyData.character.name}'s ${selectedSetting.title}`,
-          description: `A story about ${storyData.character.name} in ${selectedSetting.title}`,
+          title: `${storyData.character?.name}'s ${selectedSetting?.title || 'Adventure'}`,
+          description: `A story about ${storyData.character?.name} in ${selectedSetting?.title || 'Adventure'}`,
           content: {
-            en: [storyContent],
+            en: [initialContent],
             es: [],
           },
           character: {
-            name: storyData.character.name,
-            age: storyData.character.age || '',
-            traits: storyData.character.traits || [],
+            name: storyData.character?.name || '',
+            age: storyData.character?.age || '',
+            traits: storyData.character?.traits || [],
           },
-          setting: selectedSetting.id,
-          theme: selectedTheme.id,
+          setting: selectedSetting?.id,
+          theme: selectedTheme?.id,
           plot_elements: [],
           is_published: false,
           user_id: authState.user?.id,
-          targetAge: parseInt(storyData.character.age || '6'),
+          targetAge: parseInt(storyData.character?.age || '6'),
           readingLevel: 'beginner',
           thumbnail_url: null,
           created_at: new Date().toISOString(),
@@ -260,9 +269,6 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       } finally {
         setIsGenerating(false);
       }
-    } catch (error: any) {
-      console.error('Story generation error:', error);
-      handleError(error, setState, onError);
     }
   };
 
@@ -328,7 +334,6 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         </Button>
       </form>
 
-      {/* Quick replies */}
       <div className="flex flex-wrap gap-2 mt-2">
         {getQuickReplies().map((reply) => (
           <Button
