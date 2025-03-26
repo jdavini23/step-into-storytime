@@ -197,78 +197,77 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       const data = await response.json();
       const initialContent = data.content;
 
-        // Create story in Supabase
-        const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
-        const selectedTheme = THEMES.find((s) => s.id === storyData.theme);
+      // Create story in Supabase
+      const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
+      const selectedTheme = THEMES.find((s) => s.id === storyData.theme);
 
-        const storyPayload = {
-          id: crypto.randomUUID(),
-          title: `${storyData.character?.name}'s ${selectedSetting?.title || 'Adventure'}`,
-          description: `A story about ${storyData.character?.name} in ${selectedSetting?.title || 'Adventure'}`,
-          content: {
-            en: [initialContent],
-            es: [],
-          },
-          character: {
-            name: storyData.character?.name || '',
-            age: storyData.character?.age || '',
-            traits: storyData.character?.traits || [],
-          },
-          setting: selectedSetting?.id,
-          theme: selectedTheme?.id,
-          plot_elements: [],
-          is_published: false,
-          user_id: authState.user?.id,
-          targetAge: parseInt(storyData.character?.age || '6'),
-          readingLevel: 'beginner',
-          thumbnail_url: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+      const storyPayload = {
+        id: crypto.randomUUID(),
+        title: `${storyData.character?.name}'s ${selectedSetting?.title || 'Adventure'}`,
+        description: `A story about ${storyData.character?.name} in ${selectedSetting?.title || 'Adventure'}`,
+        content: {
+          en: [initialContent],
+          es: [],
+        },
+        character: {
+          name: storyData.character?.name || '',
+          age: storyData.character?.age || '',
+          traits: storyData.character?.traits || [],
+        },
+        setting: selectedSetting?.id,
+        theme: selectedTheme?.id,
+        plot_elements: [],
+        is_published: false,
+        user_id: authState.user?.id,
+        targetAge: parseInt(storyData.character?.age || '6'),
+        readingLevel: 'beginner',
+        thumbnail_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-        console.log('Sending story payload:', storyPayload);
+      console.log('Sending story payload:', storyPayload);
 
-        const storyResponse = await fetch('/api/stories', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(storyPayload),
-        });
+      const storyResponse = await fetch('/api/stories', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(storyPayload),
+      });
 
-        if (!storyResponse.ok) {
-          const errorData = await storyResponse.json();
-          console.error('Story save error:', errorData);
-          throw new Error(errorData.error || 'Failed to save story');
-        }
-
-        const story = await storyResponse.json();
-        console.log('Story saved successfully:', story);
-
-        // Add a completion message
-        setState((prev) => ({
-          ...prev,
-          messages: [
-            ...prev.messages,
-            {
-              id: Date.now().toString(),
-              type: 'ai',
-              content:
-                '✨ Story created successfully! Redirecting you to your story...',
-              timestamp: Date.now(),
-            } as Message,
-          ],
-        }));
-
-        // Call onComplete with the story data
-        onComplete(story);
-      } catch (error: any) {
-        console.error('Story generation error:', error);
-        handleError(error, setState, onError);
-      } finally {
-        setIsGenerating(false);
+      if (!storyResponse.ok) {
+        const errorData = await storyResponse.json();
+        console.error('Story save error:', errorData);
+        throw new Error(errorData.error || 'Failed to save story');
       }
+
+      const story = await storyResponse.json();
+      console.log('Story saved successfully:', story);
+
+      // Add a completion message
+      setState((prev) => ({
+        ...prev,
+        messages: [
+          ...prev.messages,
+          {
+            id: Date.now().toString(),
+            type: 'ai',
+            content:
+              '✨ Story created successfully! Redirecting you to your story...',
+            timestamp: Date.now(),
+          } as Message,
+        ],
+      }));
+
+      // Call onComplete with the story data
+      onComplete(story);
+    } catch (error: any) {
+      console.error('Story generation error:', error);
+      handleError(error, setState, onError);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
