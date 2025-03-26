@@ -13,7 +13,8 @@ const nextConfig = {
   },
   compiler: {
     emotion: {
-      sourceMap: process.env.NODE_ENV === 'development',
+      // eslint-disable-next-line no-undef
+      sourceMap: typeof process !== 'undefined' && process.env.NODE_ENV === 'development',
       autoLabel: 'dev-only',
       labelFormat: '[local]',
     },
@@ -55,8 +56,31 @@ const nextConfig = {
   },
 };
 
+// Ensure process is only used in server-side or build-time context
+if (typeof window === 'undefined') {
+  // eslint-disable-next-line no-undef
+  const isDevelopment = typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
+
+  nextConfig.compiler = {
+    emotion: {
+      sourceMap: isDevelopment,
+      autoLabel: 'dev-only',
+      labelFormat: '[local]',
+    },
+  };
+} else {
+  nextConfig.compiler = {
+    emotion: {
+      sourceMap: false,
+      autoLabel: 'dev-only',
+      labelFormat: '[local]',
+    },
+  };
+}
+
+// Ensure VAR_ORIGINAL_PATHNAME is exposed to the client
 nextConfig.env = {
-  VAR_ORIGINAL_PATHNAME: '/',
+  NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
 };
 
 export default nextConfig;
