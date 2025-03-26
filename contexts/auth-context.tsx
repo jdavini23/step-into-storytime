@@ -30,7 +30,7 @@ export interface UserProfile {
 
 export interface User {
   id: string;
-  email: string;
+  email: string | undefined;
   user_metadata: {
     name?: string;
     avatar_url?: string;
@@ -47,8 +47,14 @@ export interface AuthState {
 }
 
 type AuthAction =
-  | { type: 'INITIALIZE'; payload: { user: User | null; profile: UserProfile | null } }
-  | { type: 'LOGIN_SUCCESS'; payload: { user: User; profile: UserProfile | null } }
+  | {
+      type: 'INITIALIZE';
+      payload: { user: User | null; profile: UserProfile | null };
+    }
+  | {
+      type: 'LOGIN_SUCCESS';
+      payload: { user: User; profile: UserProfile | null };
+    }
   | { type: 'PROFILE_LOADED'; payload: UserProfile }
   | { type: 'LOGOUT' }
   | { type: 'SET_LOADING'; payload: boolean }
@@ -163,172 +169,108 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      // Check if we're in a browser environment
-      if (typeof window === 'undefined') {
-        console.log('[DEBUG] Server-side rendering, skipping auth initialization');
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
-        return;
-      }
-
-      console.log('[DEBUG] Initializing auth on client-side');
-      
-      // Get current session first
       const {
         data: { session },
-        error: sessionError
+        error: sessionError,
       } = await supabase.auth.getSession();
-      
+
       if (sessionError) {
-        console.error('[DEBUG] Error getting session:', sessionError);
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
+        console.error('[AUTH] Session error:', sessionError);
+        dispatch({ type: 'SET_ERROR', payload: sessionError.message });
         return;
       }
 
-      // If no session, initialize with null values (not an error case)
       if (!session) {
-        console.log('[DEBUG] No active session found');
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
+        dispatch({
+          type: 'INITIALIZE',
+          payload: { user: null, profile: null },
         });
         return;
       }
 
-      console.log('[DEBUG] Session found, getting user data');
-
-      // Session exists, now try to get the user
       const {
         data: { user },
-        error: userError
+        error: userError,
       } = await supabase.auth.getUser();
-      
-      if (userError) {
-        console.error('[DEBUG] Error getting user:', userError);
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
+
+      if (userError || !user || !user.email) {
+        console.error('[AUTH] User error:', userError);
+        dispatch({
+          type: 'SET_ERROR',
+          payload: userError?.message || 'Failed to get user',
         });
         return;
       }
 
-      // If no user despite having a session, handle this edge case
-      if (!user) {
-        console.log('[DEBUG] No authenticated user found despite having session');
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
+      // Get user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('[AUTH] Profile error:', profileError);
+        dispatch({ type: 'SET_ERROR', payload: profileError.message });
         return;
-      }
-
-      console.log('[DEBUG] User found, fetching profile');
-
-      // If user exists, fetch their profile with retries
-      let profile = null;
-      let retryCount = 0;
-      const maxRetries = 3;
-
-      while (retryCount < maxRetries) {
-        try {
-          console.log(
-            '[DEBUG] Attempting to fetch profile, attempt:',
-            retryCount + 1
-          );
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-          if (error) throw error;
-          profile = data;
-          break;
-        } catch (error) {
-          console.error('[DEBUG] Error fetching profile:', {
-            attempt: retryCount + 1,
-            error,
-          });
-
-          retryCount++;
-          if (retryCount === maxRetries) {
-            console.error(
-              '[DEBUG] Failed to fetch profile after max retries'
-            );
-            // Don't throw, just continue with null profile
-            break;
-          }
-
-          // Wait before retrying with exponential backoff
-          await new Promise((resolve) =>
-            setTimeout(
-              resolve,
-              Math.min(1000 * Math.pow(2, retryCount), 5000)
-            )
-          );
-        }
       }
 
       dispatch({
         type: 'INITIALIZE',
         payload: {
-          user: user as User | null,
-          profile: profile as UserProfile | null,
+          user: {
+            id: user.id,
+            email: user.email,
+            user_metadata: user.user_metadata,
+          },
+          profile: profile || null,
         },
       });
     } catch (error) {
-      console.error('[DEBUG] Error initializing auth:', error);
-      // Provide more detailed error information
-      if (error instanceof Error) {
-        console.error('[DEBUG] Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
-      }
-      dispatch({ type: 'INITIALIZE', payload: { user: null, profile: null } });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      console.error('[AUTH] Initialization error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload:
+          error instanceof Error ? error.message : 'Failed to initialize auth',
+      });
     }
-  }, []);
+  }, [dispatch]);
 
   // Listen for auth state changes
   useEffect(() => {
     console.log('[AUTH] Setting up auth listener');
-    
+
     // Initialize auth first - only on client side
     if (typeof window !== 'undefined') {
       initializeAuth();
     } else {
       console.log('[AUTH] Skipping auth initialization on server');
-      dispatch({ 
-        type: 'INITIALIZE', 
-        payload: { user: null, profile: null } 
+      dispatch({
+        type: 'INITIALIZE',
+        payload: { user: null, profile: null },
       });
     }
-    
+
     // Skip setting up listener on server
     if (typeof window === 'undefined') {
       console.log('[AUTH] Skipping auth listener on server');
       return () => {};
     }
-    
+
     try {
       const { data } = supabase.auth.onAuthStateChange(
         async (event, session) => {
-          console.log('[AUTH] Auth state changed:', { event, hasSession: !!session });
-          
+          console.log('[AUTH] Auth state changed:', {
+            event,
+            hasSession: !!session,
+          });
+
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
             console.log('[AUTH] User signed in or token refreshed');
-            
+
             if (session?.user?.id) {
               console.log('[AUTH] Fetching user profile after sign in');
-              
+
               // Fetch user profile
               const { data: profile, error } = await supabase
                 .from('profiles')
@@ -337,30 +279,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 .single();
 
               if (error) {
-                console.error('[AUTH] Error fetching profile after sign in:', error);
-                
+                console.error(
+                  '[AUTH] Error fetching profile after sign in:',
+                  error
+                );
+
                 // Check if error is because profile doesn't exist
                 if (error.code === 'PGRST116') {
                   console.log('[AUTH] Profile not found, creating new profile');
-                  
+
                   // Create a new profile
-                  const { data: newProfile, error: createError } = await supabase
-                    .from('profiles')
-                    .insert({
-                      id: session.user.id,
-                      name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                      email: session.user.email || '',  
-                      avatar_url: session.user.user_metadata.avatar_url || null,
-                      created_at: new Date().toISOString(),
-                    })
-                    .select()
-                    .single();
-                  
+                  const { data: newProfile, error: createError } =
+                    await supabase
+                      .from('profiles')
+                      .insert({
+                        id: session.user.id,
+                        name:
+                          session.user.user_metadata.name ||
+                          session.user.email?.split('@')[0] ||
+                          'User',
+                        email: session.user.email || '',
+                        avatar_url:
+                          session.user.user_metadata.avatar_url || null,
+                        created_at: new Date().toISOString(),
+                      })
+                      .select()
+                      .single();
+
                   if (createError) {
-                    console.error('[AUTH] Error creating profile:', createError);
+                    console.error(
+                      '[AUTH] Error creating profile:',
+                      createError
+                    );
                   } else {
                     console.log('[AUTH] New profile created successfully');
-                    
+
                     dispatch({
                       type: 'LOGIN_SUCCESS',
                       payload: {
@@ -372,7 +325,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
               } else {
                 console.log('[AUTH] Profile fetched successfully');
-                
+
                 dispatch({
                   type: 'LOGIN_SUCCESS',
                   payload: {
@@ -412,7 +365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         console.error('[AUTH] Error details:', {
           message: error.message,
           name: error.name,
-          stack: error.stack
+          stack: error.stack,
         });
       }
       return () => {};
@@ -422,13 +375,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const login = async (email: string, password: string) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
+      console.log('[DEBUG] Attempting login with email:', email);
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AUTH] Login error:', error);
+        dispatch({ type: 'SET_ERROR', payload: error.message });
+        return;
+      }
+
+      if (!data.user || !data.user.email) {
+        dispatch({ type: 'SET_ERROR', payload: 'No user returned from login' });
+        return;
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -439,22 +402,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
-          user: data.user as User,
-          profile: profile as UserProfile | null,
+          user: {
+            id: data.user.id,
+            email: data.user.email,
+            user_metadata: data.user.user_metadata,
+          },
+          profile: profile || null,
         },
       });
 
       router.push('/dashboard');
     } catch (error) {
-      console.error('[DEBUG] Login error:', error);
+      console.error('[AUTH] Login error:', error);
       dispatch({
         type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to login',
-      });
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Failed to login',
-        variant: 'destructive',
+        payload: error instanceof Error ? error.message : 'Failed to login',
       });
     }
   };
