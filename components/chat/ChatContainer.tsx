@@ -172,14 +172,13 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         title: `${storyData.character?.name}'s ${
           SETTINGS.find((s) => s.id === storyData.setting)?.title || 'Adventure'
         }`,
-        mainCharacter: {
+        character: {
           name: storyData.character?.name || '',
           age: storyData.character?.age || '',
           traits: storyData.character?.traits || [],
         },
-        setting:
-          SETTINGS.find((s) => s.id === storyData.setting)?.description || '',
-        theme: THEMES.find((t) => t.id === storyData.theme)?.description || '',
+        setting: SETTINGS.find((s) => s.id === storyData.setting)?.id || '',
+        theme: THEMES.find((t) => t.id === storyData.theme)?.id || '',
         plotElements: [],
       };
 
@@ -195,20 +194,15 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       }
 
       const data = await response.json();
-      const initialContent = data.content;
-
+      
       // Create story in Supabase
       const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
-      const selectedTheme = THEMES.find((s) => s.id === storyData.theme);
+      const selectedTheme = THEMES.find((t) => t.id === storyData.theme);
 
       const storyPayload = {
         id: crypto.randomUUID(),
         title: `${storyData.character?.name}'s ${selectedSetting?.title || 'Adventure'}`,
-        description: `A story about ${storyData.character?.name} in ${selectedSetting?.title || 'Adventure'}`,
-        content: {
-          en: [initialContent],
-          es: [],
-        },
+        content: JSON.stringify(data.content), // The content is already in the correct format
         character: {
           name: storyData.character?.name || '',
           age: storyData.character?.age || '',
@@ -219,8 +213,6 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         plot_elements: [],
         is_published: false,
         user_id: authState.user?.id,
-        targetAge: parseInt(storyData.character?.age || '6'),
-        readingLevel: 'beginner',
         thumbnail_url: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -237,10 +229,16 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         body: JSON.stringify(storyPayload),
       });
 
+      let errorData;
       if (!storyResponse.ok) {
-        const errorData = await storyResponse.json();
-        console.error('Story save error:', errorData);
-        throw new Error(errorData.error || 'Failed to save story');
+        try {
+          errorData = await storyResponse.json();
+          console.error('Story save error:', errorData);
+          throw new Error(errorData.error || `Failed to save story: ${storyResponse.status}`);
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          throw new Error(`Failed to save story: ${storyResponse.status}`);
+        }
       }
 
       const story = await storyResponse.json();

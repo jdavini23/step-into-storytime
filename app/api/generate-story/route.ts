@@ -41,7 +41,13 @@ export async function POST(request: Request) {
       language,
     });
 
-    return NextResponse.json({ content: storyContent });
+    // Format response to match expected structure
+    const formattedContent = {
+      en: [storyContent.content], // Place the content directly in the array
+      es: []
+    };
+
+    return NextResponse.json({ content: formattedContent });
   } catch (error) {
     console.error('Error generating story:', error);
     return NextResponse.json(

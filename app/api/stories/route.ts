@@ -12,11 +12,11 @@ let stories: Story[] = [];
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error: authError,
-    } = await (await supabase).auth.getUser();
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: stories, error } = await (await supabase)
+    const { data: stories, error } = await supabase
       .from('stories')
       .select('*')
       .eq('user_id', user.id)
@@ -72,35 +72,17 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Generate the story using AI with optimized settings
-      const generatedStory = await generateStory({
-        character: json.character,
-        theme: json.theme,
-        setting: json.setting,
-        targetAge: parseInt(json.character.age) || 6,
-        readingLevel: json.readingLevel || 'beginner',
-        language: json.language || 'en',
-        style: json.style,
-        educationalFocus: json.educationalFocus,
-      });
-
       // Format story data to match database schema
       const storyData = {
-        id: uuidv4(), // Generate a UUID for the story
+        id: json.id || crypto.randomUUID(),
         title: json.title || 'Untitled Story',
-        description: json.description || '',
-        content: {
-          en: [json.content],
-          es: [],
-        },
+        content: typeof json.content === 'string' ? json.content : JSON.stringify(json.content),
         character: json.character,
         setting: json.setting,
         theme: json.theme,
         plot_elements: json.plot_elements || [],
         is_published: false,
         user_id: user.id,
-        targetAge: json.targetAge || 6,
-        readingLevel: json.readingLevel || 'beginner',
         thumbnail_url: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -108,27 +90,27 @@ export async function POST(request: NextRequest) {
 
       console.log('Creating story with data:', storyData);
 
-      // Use upsert for better performance
+      // Use insert instead of upsert since this is a new story
       const { data: story, error } = await supabase
         .from('stories')
-        .upsert([storyData])
+        .insert([storyData])
         .select()
         .single();
 
       if (error) {
         console.error('Error saving story:', error);
         return NextResponse.json(
-          { error: 'Failed to save story' },
+          { error: 'Failed to save story', details: error.message },
           { status: 500 }
         );
       }
 
       return NextResponse.json(story);
     } catch (error: any) {
-      console.error('Error generating story:', error);
+      console.error('Error saving story:', error);
       return NextResponse.json(
         {
-          error: 'Failed to generate story',
+          error: 'Failed to save story',
           details: error.message,
         },
         { status: 500 }
@@ -137,7 +119,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error in story creation endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal Server Error' },
+      { error: 'Internal Server Error', details: error.message },
       { status: 500 }
     );
   }
