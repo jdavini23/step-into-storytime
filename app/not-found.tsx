@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function NotFound() {
+  console.log('VAR_ORIGINAL_PATHNAME:', process.env.VAR_ORIGINAL_PATHNAME);
   const pathname = usePathname();
 
   useEffect(() => {

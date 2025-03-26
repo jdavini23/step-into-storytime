@@ -162,87 +162,34 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       setIsGenerating(true);
       const { storyData } = currentState;
 
-      // Detailed validation logging
-      console.log('Validating story data:', {
-        character: storyData.character,
-        setting: storyData.setting,
-        theme: storyData.theme,
+      const payload = {
+        title: `${storyData.character?.name}'s ${
+          SETTINGS.find((s) => s.id === storyData.setting)?.title || 'Adventure'
+        }`,
+        mainCharacter: {
+          name: storyData.character?.name || '',
+          age: storyData.character?.age || '',
+          traits: storyData.character?.traits || [],
+        },
+        setting:
+          SETTINGS.find((s) => s.id === storyData.setting)?.description || '',
+        theme: THEMES.find((t) => t.id === storyData.theme)?.description || '',
+        plotElements: [],
+      };
+
+      const response = await fetch('/api/generate-story/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      // Validate character data
-      if (!storyData.character || typeof storyData.character !== 'object') {
-        throw new Error('Invalid character data structure');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate story');
       }
 
-      if (
-        !storyData.character.name ||
-        typeof storyData.character.name !== 'string'
-      ) {
-        throw new Error('Character name is required and must be a string');
-      }
-
-      // Validate setting
-      if (!storyData.setting || typeof storyData.setting !== 'string') {
-        throw new Error('Setting ID is required and must be a string');
-      }
-
-      const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
-      if (!selectedSetting) {
-        throw new Error(`Invalid setting selected: ${storyData.setting}`);
-      }
-
-      // Validate theme
-      if (!storyData.theme || typeof storyData.theme !== 'string') {
-        throw new Error('Theme ID is required and must be a string');
-      }
-
-      const selectedTheme = THEMES.find((t) => t.id === storyData.theme);
-      if (!selectedTheme) {
-        throw new Error(`Invalid theme selected: ${storyData.theme}`);
-      }
-
-      console.log('Story data validation passed:', {
-        selectedSetting,
-        selectedTheme,
-        character: storyData.character,
-      });
-
-      try {
-        console.log('Initiating story generation request...');
-        const generationPayload = {
-          character: {
-            name: storyData.character.name,
-            age: storyData.character.age || '',
-            traits: storyData.character.traits || [],
-          },
-          setting: selectedSetting.description,
-          theme: selectedTheme.description,
-          targetAge: parseInt(storyData.character.age || '6'),
-          readingLevel: 'beginner',
-          language: 'en',
-          style: 'adventure',
-        };
-
-        console.log('Sending generation payload:', generationPayload);
-
-        const response = await fetch('/api/generate-story', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(generationPayload),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Story generation API error:', errorData);
-          throw new Error(errorData.error || 'Failed to generate story');
-        }
-
-        const data = await response.json();
-        const storyContent = data.content;
-
-        if (!storyContent) {
-          throw new Error('No story content received');
-        }
+      const data = await response.json();
+      const initialContent = data.content;
 
         // Create story in Supabase
         const storyPayload = {
