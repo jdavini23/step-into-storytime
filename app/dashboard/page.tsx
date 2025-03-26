@@ -150,7 +150,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {storyState.stories.map((story) => (
+            {Array.isArray(storyState.stories) && storyState.stories.map((story) => (
               <Card
                 key={story.id}
                 className="border-0 shadow-md hover:shadow-lg transition-shadow"

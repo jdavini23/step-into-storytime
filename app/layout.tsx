@@ -6,7 +6,8 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { AuthProvider } from '@/contexts/auth-context';
 import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
-import '@/styles/globals.css';
+// Import the consolidated CSS file
+import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
 import { Metadata as NextMetadata } from 'next';
 
@@ -20,7 +21,7 @@ const inter = Inter({
 // Define metadata
 export const metadata: Metadata = {
   title: 'Step Into Storytime',
-  description: 'Create magical, personalized bedtime stories for children',
+  description: 'An interactive storytelling experience for children',
   metadataBase: new URL('http://localhost:3002'),
   openGraph: {
     title: 'Step Into Storytime',
@@ -42,8 +43,7 @@ export const viewport: Viewport = {
   ],
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  minimumScale: 1,
 };
 
 export default function RootLayout({
@@ -53,10 +53,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, minimum-scale=1"
+        />
+      </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ErrorBoundary>
           <ThemeProvider
-            attribute="class"
+            attribute={['class']}
             defaultTheme="light"
             enableSystem
             disableTransitionOnChange

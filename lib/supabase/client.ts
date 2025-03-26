@@ -1,12 +1,18 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
 
 // Type for Supabase instance with all tables
-export type TypedSupabaseClient = SupabaseClient<Database>;
+export type TypedSupabaseClient = ReturnType<typeof createBrowserClient<Database>>;
 
 // Environment variables for Supabase connection
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl =
+  process.env.STEP_NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  '';
+const supabaseAnonKey =
+  process.env.STEP_NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
 
 // Debug logging for environment variables
 console.log('[DEBUG] Supabase Environment Variables:', {
@@ -18,33 +24,112 @@ console.log('[DEBUG] Supabase Environment Variables:', {
   isClient: typeof window !== 'undefined',
 });
 
+// Create a singleton instance of the Supabase client
+let supabase = createBrowserClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      detectSessionInUrl: false,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+    global: {
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    },
+  }
+);
+
+// Determine if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
-    'Missing Supabase environment variables. Authentication and database features will not work.',
+    '[ERROR] Missing Supabase environment variables. Authentication and database features will not work.',
     'Required variables:',
     {
       NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set ✓' : 'Missing ✗',
       NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey ? 'Set ✓' : 'Missing ✗',
     }
   );
-  throw new Error('Missing required Supabase environment variables');
+
+  // In development, throw an error to make it obvious
+  if (process.env.NODE_ENV === 'development') {
+    throw new Error('Missing required Supabase environment variables');
+  }
+
+  // In production, create a dummy client that will fail gracefully
+  // This prevents the app from crashing completely
+  const dummyClient = {
+    auth: {
+      getSession: () =>
+        Promise.resolve({
+          data: { session: null },
+          error: new Error('No Supabase credentials'),
+        }),
+      getUser: () =>
+        Promise.resolve({
+          data: { user: null },
+          error: new Error('No Supabase credentials'),
+        }),
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe: () => {} } },
+      }),
+      signInWithPassword: () =>
+        Promise.resolve({
+          data: null,
+          error: new Error('No Supabase credentials'),
+        }),
+      signInWithOAuth: () =>
+        Promise.resolve({
+          data: null,
+          error: new Error('No Supabase credentials'),
+        }),
+      signOut: () => Promise.resolve({ error: null }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error('No Supabase credentials'),
+            }),
+        }),
+      }),
+      insert: () =>
+        Promise.resolve({
+          data: null,
+          error: new Error('No Supabase credentials'),
+        }),
+      update: () =>
+        Promise.resolve({
+          data: null,
+          error: new Error('No Supabase credentials'),
+        }),
+    }),
+  } as unknown as ReturnType<typeof createBrowserClient<Database>>;
+
+  console.warn(
+    '[WARN] Using fallback Supabase client that will fail gracefully'
+  );
+  supabase = dummyClient;
+} else {
+  // Validate URL format
+  try {
+    new URL(supabaseUrl);
+  } catch (error) {
+    console.error('[ERROR] Invalid Supabase URL format:', supabaseUrl);
+
+    if (process.env.NODE_ENV === 'development') {
+      throw new Error('Invalid Supabase URL format');
+    }
+  }
+
+  // No need for additional options with createBrowserClient
 }
 
-// Validate URL format
-try {
-  new URL(supabaseUrl);
-} catch (error) {
-  console.error('Invalid Supabase URL format:', supabaseUrl);
-  throw new Error('Invalid Supabase URL format');
-}
-
-// Initialize Supabase client with additional options
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'sb-auth-token',
-  },
-});
+export { supabase };

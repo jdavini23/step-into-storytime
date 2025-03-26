@@ -1,0 +1,106 @@
+/** @jsxImportSource @emotion/react */
+'use client';
+
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Download, Share2, Save, Edit } from 'lucide-react';
+import { ThemeColors } from './types';
+import { storyStyles } from './styles';
+
+interface ActionControlsProps {
+  onDownload?: () => void;
+  onShare?: () => void;
+  onSave?: () => void;
+  onEdit?: () => void;
+  showEdit?: boolean;
+  showSave?: boolean;
+  themeColors?: ThemeColors;
+  className?: string;
+}
+
+export default function ActionControls({
+  onDownload,
+  onShare,
+  onSave,
+  onEdit,
+  showEdit = false,
+  showSave = false,
+  themeColors,
+  className = '',
+}: ActionControlsProps) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`} css={storyStyles.controls}>
+      {onDownload && (
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDownload}
+            className="hidden md:flex items-center bg-white/90 hover:bg-white shadow-sm"
+            style={themeColors ? {
+              borderColor: themeColors.accent,
+              color: themeColors.accent,
+            } : undefined}
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Download
+          </Button>
+        </motion.div>
+      )}
+
+      {onShare && (
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onShare}
+            className="hidden md:flex items-center bg-white/90 hover:bg-white shadow-sm"
+            style={themeColors ? {
+              borderColor: themeColors.secondary,
+              color: themeColors.secondary,
+            } : undefined}
+          >
+            <Share2 className="h-3.5 w-3.5 mr-1" />
+            Share
+          </Button>
+        </motion.div>
+      )}
+
+      {showSave && onSave && (
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSave}
+            className="flex items-center bg-white/90 hover:bg-white shadow-sm"
+            style={themeColors ? {
+              borderColor: themeColors.primary,
+              color: themeColors.primary,
+            } : undefined}
+          >
+            <Save className="h-3.5 w-3.5 mr-1" />
+            Save
+          </Button>
+        </motion.div>
+      )}
+
+      {showEdit && onEdit && (
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEdit}
+            className="flex items-center bg-white/90 hover:bg-white shadow-sm"
+            style={themeColors ? {
+              borderColor: themeColors.accent,
+              color: themeColors.accent,
+            } : undefined}
+          >
+            <Edit className="h-3.5 w-3.5 mr-1" />
+            Edit
+          </Button>
+        </motion.div>
+      )}
+    </div>
+  );
+}

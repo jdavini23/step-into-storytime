@@ -1,56 +1,252 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { v4 as uuidv4 } from "uuid"
+import { NextRequest, NextResponse } from 'next/server';
+import { StoryData } from '@/components/story/common/types';
+import type { Story } from '@/contexts/story-context';
+import { createClient } from '@/utils/supabase/server';
+import { generateStory } from '@/utils/ai/story-generator';
+import type { Database } from '@/types/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
-// In a real app, this would connect to a database
-// For now, we'll simulate with an in-memory store
-const stories: any[] = []
+// In-memory storage for demo purposes
+// TODO: Replace with database storage
+let stories: Story[] = [];
 
 export async function GET(request: NextRequest) {
   try {
-    // In a real app, you would fetch from a database
-    // and include authentication/authorization checks
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await (await supabase).auth.getUser();
 
-    // Get user ID from session (simulated)
-    const userId = request.headers.get("x-user-id") || "demo-user"
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
 
-    // Filter stories by user ID
-    const userStories = stories.filter((story) => story.userId === userId)
+    const { data: stories, error } = await (await supabase)
+      .from('stories')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-    return NextResponse.json(userStories)
+    if (error) {
+      console.error('Error fetching stories:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(stories);
   } catch (error) {
-    console.error("Error fetching stories:", error)
-    return NextResponse.json({ error: "Failed to fetch stories" }, { status: 500 })
+    console.error('Error in stories route:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
+    const json = await request.json();
 
     // Validate required fields
-    if (!body.title || !body.mainCharacter?.name) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    if (!json.character || !json.theme || !json.setting) {
+      return NextResponse.json(
+        { error: 'Character, theme, and setting are required' },
+        { status: 400 }
+      );
     }
 
-    // Get user ID from session (simulated)
-    const userId = request.headers.get("x-user-id") || "demo-user"
+    try {
+      // Generate the story using AI with optimized settings
+      const generatedStory = await generateStory({
+        character: json.character,
+        theme: json.theme,
+        setting: json.setting,
+        targetAge: parseInt(json.character.age) || 6,
+        readingLevel: json.readingLevel || 'beginner',
+        language: json.language || 'en',
+        style: json.style,
+        educationalFocus: json.educationalFocus,
+      });
 
-    // Create new story
-    const newStory = {
-      id: uuidv4(),
-      userId,
-      ...body,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      // Format story data to match database schema
+      const storyData = {
+        id: uuidv4(), // Generate a UUID for the story
+        title: generatedStory.title || 'Untitled Story',
+        content: generatedStory.content,
+        main_character: {
+          name: json.character.name,
+          age: json.character.age,
+          traits: json.character.traits || [],
+        },
+        setting: json.setting,
+        theme: json.theme,
+        plot_elements: [],
+        is_published: false,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Use upsert for better performance
+      const { data: story, error } = await supabase
+        .from('stories')
+        .upsert([storyData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving story:', error);
+        return NextResponse.json(
+          { error: 'Failed to save story' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json(story);
+    } catch (error: any) {
+      console.error('Error generating story:', error);
+      return NextResponse.json(
+        {
+          error: 'Failed to generate story',
+          details: error.message,
+        },
+        { status: 500 }
+      );
     }
-
-    // Save to database (simulated)
-    stories.push(newStory)
-
-    return NextResponse.json(newStory, { status: 201 })
-  } catch (error) {
-    console.error("Error creating story:", error)
-    return NextResponse.json({ error: "Failed to create story" }, { status: 500 })
+  } catch (error: any) {
+    console.error('Error in story creation endpoint:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { storyId: string } }
+) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { id, ...updateData } = body;
+
+    // Verify story ownership
+    const { data: existingStory } = await supabase
+      .from('stories')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (!existingStory || existingStory.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Story not found or access denied' },
+        { status: 403 }
+      );
+    }
+
+    const { data: story, error } = await supabase
+      .from('stories')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating story:', error);
+      return NextResponse.json(
+        { error: 'Failed to update story' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ story });
+  } catch (error) {
+    console.error('Unexpected error in PUT /api/stories:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { storyId: string } }
+) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
+    const storyId = params.storyId;
+
+    // Verify story ownership
+    const { data: existingStory } = await supabase
+      .from('stories')
+      .select('user_id')
+      .eq('id', storyId)
+      .single();
+
+    if (!existingStory || existingStory.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Story not found or access denied' },
+        { status: 403 }
+      );
+    }
+
+    const { error } = await supabase.from('stories').delete().eq('id', storyId);
+
+    if (error) {
+      console.error('Error deleting story:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete story' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Unexpected error in DELETE /api/stories:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
+}

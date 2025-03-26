@@ -147,7 +147,7 @@ export function SubscriptionProvider({
   const router = useRouter();
 
   // Sample subscription plans - in a real app, these would come from your database
-  const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  const defaultPlans: SubscriptionPlan[] = [
     {
       id: '1',
       name: 'Unlimited stories',
@@ -199,54 +199,45 @@ export function SubscriptionProvider({
       return;
     }
 
-    if (!auth.state.isInitialized || !auth.state.user) {
-      dispatch({ type: 'RESET' });
-      return;
-    }
+    const fetchSubscriptionData = async () => {
+      if (!auth.state.user?.id) return;
 
-    initializeSubscription();
-  }, [auth.state.isInitialized, auth.state.user?.id]);
+      try {
+        // First check if user has a subscription
+        const { data: subscription, error } = await supabase
+          .from('subscriptions')
+          .select()
+          .match({ user_id: auth.state.user.id })
+          .maybeSingle();
 
-  // Initialize subscription state
-  const initializeSubscription = async () => {
-    const userId = auth.state.user?.id;
+        if (error) {
+          console.error('Error fetching subscription:', error);
+          dispatch({
+            type: 'SET_ERROR',
+            payload: 'Failed to fetch subscription',
+          });
+          return;
+        }
 
-    if (!userId) {
-      dispatch({
-        type: 'INITIALIZE',
-        payload: { subscription: null, plans: SUBSCRIPTION_PLANS },
-      });
-      return;
-    }
-
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      // Fetch user's subscription
-      const { data, error } = (await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .single()) as unknown as { data: Subscription | null; error: any };
-
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 means no rows returned, which is fine for new users
-        console.error('Error fetching subscription', error);
-        throw error;
+        // Initialize with subscription (or null) and default plans
+        dispatch({
+          type: 'INITIALIZE',
+          payload: {
+            subscription,
+            plans: defaultPlans,
+          },
+        });
+      } catch (error) {
+        console.error('Error in subscription fetch:', error);
+        dispatch({
+          type: 'SET_ERROR',
+          payload: 'Failed to initialize subscription',
+        });
       }
+    };
 
-      dispatch({
-        type: 'INITIALIZE',
-        payload: { subscription: data, plans: SUBSCRIPTION_PLANS },
-      });
-    } catch (error) {
-      console.error('Error initializing subscription', error);
-      dispatch({
-        type: 'INITIALIZE',
-        payload: { subscription: null, plans: SUBSCRIPTION_PLANS },
-      });
-    }
-  };
+    fetchSubscriptionData();
+  }, [auth.state.isInitialized, auth.state.user?.id]);
 
   const fetchSubscription = async () => {
     const userId = auth.state.user?.id;
@@ -454,7 +445,7 @@ export function SubscriptionProvider({
 
   const hasFeature = (feature: string): boolean => {
     const tier = getSubscriptionTier();
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === tier);
+    const plan = defaultPlans.find((p) => p.tier === tier);
     if (!plan) return false;
     return plan.features.some((f) => f.name === feature);
   };

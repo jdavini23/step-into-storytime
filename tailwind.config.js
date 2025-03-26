@@ -54,6 +54,15 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        story: {
+          primary: 'var(--story-primary)',
+          secondary: 'var(--story-secondary)',
+          accent: 'var(--story-accent)',
+          background: 'var(--story-background)',
+          text: 'var(--story-text)',
+          heading: 'var(--story-heading)',
+          border: 'var(--story-border)',
+        },
         slate: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -95,6 +104,24 @@ module.exports = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        story: '12px 24px 24px 12px',
+      },
+      fontSize: {
+        'story-title': ['2rem', { lineHeight: '1.2' }],
+        'story-text': ['1.125rem', { lineHeight: '1.8' }],
+        'story-heading': ['1.5rem', { lineHeight: '1.4' }],
+      },
+      spacing: {
+        'story-padding': '2rem',
+        'story-gap': '1rem',
+      },
+      minHeight: {
+        story: '400px',
+        'story-content': '60vh',
+      },
+      boxShadow: {
+        story:
+          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
       },
       keyframes: {
         'accordion-down': {

@@ -1,47 +1,60 @@
-"use client"
+'use client';
 
-import type React from "react"
-
-import { useState } from "react"
-import { Send } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState, useRef, useEffect } from 'react';
+import { Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface UserInputProps {
-  onSubmit: (value: string) => void
-  placeholder?: string
+  onSubmit: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  autoFocus?: boolean;
 }
 
-export default function UserInput({ onSubmit, placeholder = "Type your response..." }: UserInputProps) {
-  const [value, setValue] = useState("")
+export default function UserInput({
+  onSubmit,
+  placeholder = 'Type your message...',
+  className,
+  autoFocus = true,
+}: UserInputProps) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [autoFocus]);
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (value.trim()) {
-      onSubmit(value.trim())
-      setValue("")
+      onSubmit(value.trim());
+      setValue('');
     }
-  }
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2">
+    <form onSubmit={handleSubmit} className={cn('flex gap-2', className)}>
       <Input
+        ref={inputRef}
+        type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
         className="flex-1"
-        autoFocus
       />
       <Button
         type="submit"
         size="icon"
         disabled={!value.trim()}
-        className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+        className="shrink-0"
       >
         <Send className="h-4 w-4" />
-        <span className="sr-only">Send</span>
+        <span className="sr-only">Send message</span>
       </Button>
     </form>
-  )
+  );
 }
-
