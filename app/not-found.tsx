@@ -1,6 +1,10 @@
+'use client';
+
 import Link from 'next/link';
 import { Metadata } from 'next';
 import './globals.css';
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 
 export const metadata: Metadata = {
   title: 'Page Not Found',
@@ -8,6 +12,13 @@ export const metadata: Metadata = {
 };
 
 export default function NotFound() {
+  console.log('VAR_ORIGINAL_PATHNAME:', process.env.VAR_ORIGINAL_PATHNAME);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    console.log('pathname (useEffect):', pathname);
+  }, [pathname]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-6 p-8">

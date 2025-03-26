@@ -55,4 +55,8 @@ const nextConfig = {
   },
 };
 
+nextConfig.env = {
+  VAR_ORIGINAL_PATHNAME: '/',
+};
+
 export default nextConfig;
