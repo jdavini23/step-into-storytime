@@ -4,17 +4,18 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   
-  // Next.js 14.1.0 compatible experimental options
+  // Add this for Next.js 15 compatibility
   experimental: {
     esmExternals: true,
     serverComponentsExternalPackages: [],
+    appDir: true,
     serverActions: {
       bodySizeLimit: '2mb',
     },
     optimizePackageImports: ['@heroicons/react']
   },
   
-  // This can help with routing issues
+  // This can help with the VAR_ORIGINAL_PATHNAME issue
   pageExtensions: ['js', 'jsx', 'ts', 'tsx']
 }
 
