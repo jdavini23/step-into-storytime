@@ -46,7 +46,7 @@ export default function HowItWorksSection() {
             number={1}
             title="Choose Your Theme"
             description="Select from fantasy, adventure, sci-fi, and many more magical worlds to explore"
-            image="/placeholder.svg?height=160&width=300"
+            image="/placeholder.svg"
             color="violet"
           />
 
@@ -54,7 +54,7 @@ export default function HowItWorksSection() {
             number={2}
             title="Customize Characters"
             description="Name them, pick traits, and make them truly your own with our intuitive editor"
-            image="/placeholder.svg?height=160&width=300"
+            image="/placeholder.svg"
             color="indigo"
           />
 
@@ -62,7 +62,7 @@ export default function HowItWorksSection() {
             number={3}
             title="Generate & Enjoy!"
             description="Our AI creates a magical bedtime story instantly, ready to read and share"
-            image="/placeholder.svg?height=160&width=300"
+            image="/placeholder.svg"
             color="sky"
           />
         </div>

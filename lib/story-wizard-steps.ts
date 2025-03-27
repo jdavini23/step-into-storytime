@@ -1,70 +1,81 @@
 export const storySteps = [
   {
     message:
-      "Great! Now, let's create the main character. What's your character's name?",
+      "✨ Let's begin our magical adventure! First, tell me the name of our story's hero - who will be starring in this tale?",
     inputType: 'text',
     field: 'mainCharacter.name',
   },
   {
-    message: 'How old is your character?',
+    message: '🎂 And how many birthdays has our hero celebrated?',
     inputType: 'text',
     field: 'mainCharacter.age',
   },
   {
     message:
-      'What are some traits that describe your character? Select all that apply.',
+      '🌟 What makes our hero special? Pick the magical qualities that make them shine! (Choose as many as you like)',
     inputType: 'multiselect',
     field: 'mainCharacter.traits',
     options: [
-      { label: 'Brave', value: 'brave' },
-      { label: 'Curious', value: 'curious' },
-      { label: 'Kind', value: 'kind' },
-      { label: 'Clever', value: 'clever' },
-      { label: 'Adventurous', value: 'adventurous' },
-      { label: 'Shy', value: 'shy' },
-      { label: 'Funny', value: 'funny' },
-      { label: 'Creative', value: 'creative' },
-    ],
-  },
-  {
-    message: 'Where does your story take place? Choose a setting.',
-    inputType: 'choice',
-    field: 'setting',
-    options: [
-      { label: 'Enchanted Forest', value: 'an enchanted forest' },
-      { label: 'Magical Kingdom', value: 'a magical kingdom' },
-      { label: 'Outer Space', value: 'outer space' },
-      { label: 'Underwater World', value: 'an underwater world' },
-      { label: 'Cozy Village', value: 'a cozy village' },
-      { label: 'Mysterious Island', value: 'a mysterious island' },
-    ],
-  },
-  {
-    message: 'What theme would you like for your story?',
-    inputType: 'choice',
-    field: 'theme',
-    options: [
-      { label: 'Friendship', value: 'friendship' },
-      { label: 'Courage', value: 'courage' },
-      { label: 'Discovery', value: 'discovery' },
-      { label: 'Kindness', value: 'kindness' },
-      { label: 'Imagination', value: 'imagination' },
-      { label: 'Teamwork', value: 'teamwork' },
+      { label: '🦁 Brave as a Lion', value: 'brave' },
+      { label: '🔍 Curious as a Cat', value: 'curious' },
+      { label: '💝 Kind as an Angel', value: 'kind' },
+      { label: '🦊 Clever as a Fox', value: 'clever' },
+      { label: '🌈 Adventurous as a Dragon', value: 'adventurous' },
+      { label: '🦋 Gentle as a Butterfly', value: 'shy' },
+      { label: '😄 Funny as a Monkey', value: 'funny' },
+      { label: '🎨 Creative as a Wizard', value: 'creative' },
     ],
   },
   {
     message:
-      'What elements would you like to include in your story? Select all that apply.',
+      "🗺️ Now, let's pick a magical place where our story will unfold! Where shall we go?",
+    inputType: 'choice',
+    field: 'setting',
+    options: [
+      {
+        label: '🌳 The Whispering Enchanted Forest',
+        value: 'an enchanted forest',
+      },
+      { label: '👑 The Sparkling Magical Kingdom', value: 'a magical kingdom' },
+      { label: '🚀 The Twinkling Galaxy of Wonder', value: 'outer space' },
+      {
+        label: "🐠 The Mysterious Mermaid's Kingdom",
+        value: 'an underwater world',
+      },
+      { label: '🏡 The Charming Storybook Village', value: 'a cozy village' },
+      { label: '🏝️ The Secret Rainbow Island', value: 'a mysterious island' },
+    ],
+  },
+  {
+    message:
+      '💫 Every great story has a special message! Which magical theme speaks to your heart?',
+    inputType: 'choice',
+    field: 'theme',
+    options: [
+      { label: '🤝 The Magic of Friendship', value: 'friendship' },
+      { label: '⚔️ The Power of Courage', value: 'courage' },
+      { label: '🔮 The Joy of Discovery', value: 'discovery' },
+      { label: '💖 The Wonder of Kindness', value: 'kindness' },
+      { label: '✨ The Spark of Imagination', value: 'imagination' },
+      { label: '🤗 The Spirit of Teamwork', value: 'teamwork' },
+    ],
+  },
+  {
+    message:
+      '🎭 Time to add some extra magic! What special ingredients should we sprinkle into our story? (Pick as many as you like)',
     inputType: 'multiselect',
     field: 'plotElements',
     options: [
-      { label: 'Magic Spell', value: 'magic spell' },
-      { label: 'Hidden Treasure', value: 'hidden treasure' },
-      { label: 'Talking Animals', value: 'talking animals' },
-      { label: 'Secret Door', value: 'secret door' },
-      { label: 'Special Power', value: 'special power' },
-      { label: 'New Friend', value: 'new friend' },
-      { label: 'Mysterious Stranger', value: 'mysterious stranger' },
+      { label: '✨ A Sparkling Magic Spell', value: 'magic spell' },
+      { label: '💎 A Glowing Hidden Treasure', value: 'hidden treasure' },
+      { label: '🦊 Wise Talking Animals', value: 'talking animals' },
+      { label: '🚪 A Mysterious Secret Door', value: 'secret door' },
+      { label: '⭐ An Amazing Special Power', value: 'special power' },
+      { label: '🤝 A Wonderful New Friend', value: 'new friend' },
+      {
+        label: '🎭 An Intriguing Mystery Friend',
+        value: 'mysterious stranger',
+      },
     ],
   },
 ];

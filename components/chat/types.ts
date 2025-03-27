@@ -1,38 +1,39 @@
 import type { Story } from '@/components/story/common/types';
 
+export type MessageType = 'user' | 'ai';
+
 export interface Message {
   id: string;
-  type: 'ai' | 'user';
+  type: MessageType;
   content: string;
-  context?: {
-    field: 'character' | 'setting' | 'theme' | 'length';
-    value: any;
-  };
   timestamp: number;
-  isEditing?: boolean;
   error?: boolean;
-  severity?: 'info' | 'warning' | 'error';
+  severity?: 'error' | 'warning' | 'info';
+  avatar?: string;
+  reactions?: string[];
+  status?: 'sent' | 'delivered' | 'seen';
+  isRepeat?: boolean;
 }
 
 export interface StoryDataState {
   character?: {
-    name: string;
-    age: string;
-    traits: string[];
+    name?: string;
+    age?: string;
+    traits?: string[];
   };
   setting?: string;
   theme?: string;
-  length?: 'short' | 'medium' | 'long';
+  length?: string;
 }
 
 export interface ConversationState {
   messages: Message[];
-  storyData: StoryDataState;
+  storyData: Partial<StoryDataState>;
   isTyping: boolean;
   editingMessageId: string | null;
 }
 
 export interface ChatContainerProps {
-  onComplete: (story: Story) => void;
+  onComplete: (storyData: StoryDataState) => void;
   onError: (error: string) => void;
 }

@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar';
 import Footer from '@/components/sections/footer';
 import StoryWizard from '@/components/story-wizard/StoryWizard';
+import { StoryWizardHeader } from '@/components/story-wizard/StoryWizardHeader';
 import Loading from '@/components/loading';
 import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { StoryData } from '@/components/story/common/types';
+import type { Story } from '@/components/story/common/types';
 
 export default function CreateStoryPage() {
   const router = useRouter();
@@ -35,36 +36,28 @@ export default function CreateStoryPage() {
     return null; // Will redirect in useEffect
   }
 
-  const handleStoryComplete = (story: StoryData) => {
+  const handleStoryComplete = (story: Story) => {
     // Navigate to the story view page
     router.push(`/story/${story.id}`);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50">
+    <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
       <Navbar />
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8 pt-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Create Your Story
-            </h1>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-              Let's craft a magical story together! I'll guide you through the
-              process with a few simple questions.
-            </p>
-          </div>
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex items-center justify-center min-h-[calc(100vh-4rem)]">
+        <div className="max-w-4xl w-full">
+          {/* Fun animated header */}
+          <StoryWizardHeader />
 
           {error && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
+              <AlertDescription className="flex items-center gap-2">
                 {error}
                 <Button
                   variant="outline"
                   size="sm"
-                  className="ml-2"
                   onClick={() => setError(null)}
                 >
                   Dismiss
@@ -73,13 +66,15 @@ export default function CreateStoryPage() {
             </Alert>
           )}
 
-          {/* Wrap StoryWizard in Suspense to handle any potential loading issues */}
-          <Suspense fallback={<Loading />}>
-            <StoryWizard
-              onComplete={handleStoryComplete}
-              onError={(errorMessage) => setError(errorMessage)}
-            />
-          </Suspense>
+          {/* Story creation wizard */}
+          <div className="mt-6">
+            <Suspense fallback={<Loading />}>
+              <StoryWizard
+                onComplete={handleStoryComplete}
+                onError={setError}
+              />
+            </Suspense>
+          </div>
         </div>
       </main>
       <Footer />

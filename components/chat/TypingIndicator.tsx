@@ -1,25 +1,32 @@
 'use client';
 
-import { forwardRef } from 'react';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
-export const TypingIndicator = forwardRef<HTMLDivElement>((_, ref) => {
+export function TypingIndicator() {
   return (
-    <div ref={ref} className="flex items-center space-x-1 p-2">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="flex items-center gap-2 px-4 py-3 max-w-[100px] bg-secondary rounded-2xl rounded-tl-sm"
+    >
       {[0, 1, 2].map((i) => (
         <motion.div
           key={i}
-          className="h-2 w-2 bg-secondary rounded-full"
+          className="w-2 h-2 bg-secondary-foreground/50 rounded-full"
           animate={{
-            y: ['0%', '-50%', '0%'],
+            scale: [1, 1.2, 1],
+            opacity: [0.4, 1, 0.4],
           }}
           transition={{
-            duration: 0.6,
+            duration: 1,
             repeat: Infinity,
             delay: i * 0.2,
+            ease: 'easeInOut',
           }}
         />
       ))}
-    </div>
+    </motion.div>
   );
-});
+}

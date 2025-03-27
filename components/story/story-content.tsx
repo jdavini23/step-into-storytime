@@ -66,17 +66,19 @@ function StoryDisplay({ className }: { className?: string }) {
 
   const authorName =
     currentStory.author ||
-    (currentStory.mainCharacter?.name
-      ? `Created by ${currentStory.mainCharacter.name}'s family`
+    (currentStory.character?.name
+      ? `Created by ${currentStory.character.name}'s family`
       : 'Anonymous');
 
-  const paragraphs = typeof currentStory.content === 'string' 
-    ? currentStory.content.split('\n').filter(Boolean)
-    : Array.isArray(currentStory.content) 
+  const paragraphs =
+    typeof currentStory.content === 'string'
+      ? (currentStory.content as string).split('\n').filter(Boolean)
+      : Array.isArray(currentStory.content)
       ? currentStory.content
-      : typeof currentStory.content === 'object' && (currentStory.content as any)?.en
-        ? (currentStory.content as any).en
-        : [];
+      : typeof currentStory.content === 'object' &&
+        (currentStory.content as any)?.en
+      ? (currentStory.content as any).en
+      : [];
 
   return (
     <div

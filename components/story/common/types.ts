@@ -34,6 +34,9 @@ export interface AccessibilitySettings {
 type ReadingLevel = 'beginner' | 'intermediate' | 'advanced';
 
 export interface Story {
+  author: string;
+  createdAt: number;
+  illustrations: { url: string; scene: string }[] | undefined;
   prompt(prompt: any): unknown;
   id: string;
   title: string;
