@@ -1,8 +1,9 @@
 import { headers } from 'next/headers';
-import getConfig from 'next/config';
 
-export function getTemplateVariables() {
+export async function getTemplateVariables() {
+  const headersList = await headers();
+
   return {
-    VAR_ORIGINAL_PATHNAME: process.env.VAR_ORIGINAL_PATHNAME || '/',
+    VAR_ORIGINAL_PATHNAME: headersList.get('x-var-original-pathname') || '/',
   };
 }

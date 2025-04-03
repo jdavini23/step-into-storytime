@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  return NextResponse.next();
+  const response = NextResponse.next();
+
+  // Set the template variable in the response headers
+  response.headers.set('x-var-original-pathname', request.nextUrl.pathname);
+
+  return response;
 }
 
 export const config = {

@@ -10,6 +10,13 @@ const nextConfig = {
         'localhost:3003',
       ],
     },
+    runtime: {
+      edge: {
+        templateVars: {
+          VAR_ORIGINAL_PATHNAME: '/',
+        },
+      },
+    },
   },
   compiler: {
     emotion: {
@@ -57,7 +64,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   env: {
-    VAR_ORIGINAL_PATHNAME: process.env.VAR_ORIGINAL_PATHNAME || '/',
+    VAR_ORIGINAL_PATHNAME: '/',
   },
 };
 
