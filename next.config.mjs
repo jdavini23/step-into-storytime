@@ -10,6 +10,7 @@ const nextConfig = {
         'localhost:3003',
       ],
     },
+    templateRewrite: true,
   },
   compiler: {
     emotion: {
