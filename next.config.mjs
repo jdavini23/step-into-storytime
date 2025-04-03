@@ -14,7 +14,9 @@ const nextConfig = {
   compiler: {
     emotion: {
       // eslint-disable-next-line no-undef
-      sourceMap: typeof process !== 'undefined' && process.env.NODE_ENV === 'development',
+      sourceMap:
+        typeof process !== 'undefined' &&
+        process.env.NODE_ENV === 'development',
       autoLabel: 'dev-only',
       labelFormat: '[local]',
     },
@@ -55,6 +57,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   env: {
+    VAR_ORIGINAL_PATHNAME: '/',
     NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
   },
 };
@@ -62,7 +65,8 @@ const nextConfig = {
 // Ensure process is only used in server-side or build-time context
 if (typeof window === 'undefined') {
   // eslint-disable-next-line no-undef
-  const isDevelopment = typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
+  const isDevelopment =
+    typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
 
   nextConfig.compiler = {
     emotion: {
