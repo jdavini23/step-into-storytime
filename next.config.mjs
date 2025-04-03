@@ -10,13 +10,6 @@ const nextConfig = {
         'localhost:3003',
       ],
     },
-    runtime: {
-      edge: {
-        templateVars: {
-          VAR_ORIGINAL_PATHNAME: '/',
-        },
-      },
-    },
   },
   compiler: {
     emotion: {
@@ -63,8 +56,10 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Environment variables
   env: {
     VAR_ORIGINAL_PATHNAME: '/',
+    NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
   },
 };
 
@@ -89,6 +84,12 @@ if (typeof window === 'undefined') {
       labelFormat: '[local]',
     },
   };
+}
+
+// Set process.env variables for template handling
+if (typeof process !== 'undefined') {
+  process.env.VAR_ORIGINAL_PATHNAME = '/';
+  process.env.NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME = '/';
 }
 
 export default nextConfig;

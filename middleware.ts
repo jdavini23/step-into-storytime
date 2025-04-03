@@ -4,10 +4,22 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
-  // Set the template variable in the response headers
-  response.headers.set('x-var-original-pathname', request.nextUrl.pathname);
+  // Set the template variables in the response headers
+  const pathname = request.nextUrl.pathname;
+  response.headers.set('x-pathname', pathname);
+  response.headers.set('x-var-original-pathname', pathname);
 
-  return response;
+  // Also set them in the request headers for edge functions
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', pathname);
+  requestHeaders.set('x-var-original-pathname', pathname);
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+    headers: response.headers,
+  });
 }
 
 export const config = {
