@@ -30,7 +30,7 @@ export interface UserProfile {
 
 export interface User {
   id: string;
-  email: string;
+  email?: string;
   user_metadata: {
     name?: string;
     avatar_url?: string;
@@ -44,17 +44,25 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
+  isInitializing: boolean;
 }
 
 type AuthAction =
-  | { type: 'INITIALIZE'; payload: { user: User | null; profile: UserProfile | null } }
-  | { type: 'LOGIN_SUCCESS'; payload: { user: User; profile: UserProfile | null } }
+  | {
+      type: 'INITIALIZE';
+      payload: { user: User | null; profile: UserProfile | null };
+    }
+  | {
+      type: 'LOGIN_SUCCESS';
+      payload: { user: User; profile: UserProfile | null };
+    }
   | { type: 'PROFILE_LOADED'; payload: UserProfile }
   | { type: 'LOGOUT' }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'UPDATE_PROFILE'; payload: Partial<UserProfile> }
-  | { type: 'UPDATE_USER'; payload: { user: User } };
+  | { type: 'UPDATE_USER'; payload: { user: User } }
+  | { type: 'SET_INITIALIZING'; payload: boolean };
 
 // Create initial state
 const initialState: AuthState = {
@@ -64,6 +72,7 @@ const initialState: AuthState = {
   isLoading: true,
   error: null,
   isInitialized: false,
+  isInitializing: true,
 };
 
 // Create reducer
@@ -77,6 +86,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: !!action.payload.user,
         isLoading: false,
         isInitialized: true,
+        isInitializing: false,
       };
     case 'LOGIN_SUCCESS':
       return {
@@ -86,11 +96,15 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: true,
         isLoading: false,
         error: null,
+        isInitializing: false,
       };
     case 'PROFILE_LOADED':
       return {
         ...state,
         profile: action.payload,
+        isLoading: false,
+        error: null,
+        isInitializing: false,
       };
     case 'LOGOUT':
       return {
@@ -100,11 +114,18 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        isInitialized: false,
+        isInitializing: false,
       };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_ERROR':
-      return { ...state, error: action.payload, isLoading: false };
+      return {
+        ...state,
+        error: action.payload,
+        isLoading: false,
+        isInitializing: false,
+      };
     case 'UPDATE_PROFILE':
       return {
         ...state,
@@ -112,6 +133,8 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       };
     case 'UPDATE_USER':
       return { ...state, user: action.payload.user };
+    case 'SET_INITIALIZING':
+      return { ...state, isInitializing: action.payload };
     default:
       return state;
   }
@@ -137,14 +160,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-  const [authChangeUnsubscribe, setAuthChangeUnsubscribe] = useState<
-    (() => void) | null
-  >(null);
   const router = useRouter();
 
   // Debug logging for auth context
   useEffect(() => {
-    console.log('[DEBUG] AuthContext mounted:', {
+    console.log('AuthContext state update:', {
       hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       isClient: typeof window !== 'undefined',
@@ -152,310 +172,279 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         isAuthenticated: state.isAuthenticated,
         isLoading: state.isLoading,
         isInitialized: state.isInitialized,
+        isInitializing: state.isInitializing,
         hasUser: !!state.user,
         hasProfile: !!state.profile,
       },
     });
   }, [state]);
 
-  // Initialize auth state
-  const initializeAuth = useCallback(async () => {
+  // Helper function to fetch or create user profile
+  const fetchOrCreateUserProfile = async (
+    user: User
+  ): Promise<UserProfile | null> => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
+      // Get profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-      // Check if we're in a browser environment
-      if (typeof window === 'undefined') {
-        console.log('[DEBUG] Server-side rendering, skipping auth initialization');
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
-        return;
-      }
-
-      console.log('[DEBUG] Initializing auth on client-side');
-      
-      // Get current session first
-      const {
-        data: { session },
-        error: sessionError
-      } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('[DEBUG] Error getting session:', sessionError);
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
-        return;
-      }
-
-      // If no session, initialize with null values (not an error case)
-      if (!session) {
-        console.log('[DEBUG] No active session found');
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
-        return;
-      }
-
-      console.log('[DEBUG] Session found, getting user data');
-
-      // Session exists, now try to get the user
-      const {
-        data: { user },
-        error: userError
-      } = await supabase.auth.getUser();
-      
-      if (userError) {
-        console.error('[DEBUG] Error getting user:', userError);
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
-        return;
-      }
-
-      // If no user despite having a session, handle this edge case
-      if (!user) {
-        console.log('[DEBUG] No authenticated user found despite having session');
-        dispatch({ 
-          type: 'INITIALIZE', 
-          payload: { user: null, profile: null } 
-        });
-        return;
-      }
-
-      console.log('[DEBUG] User found, fetching profile');
-
-      // If user exists, fetch their profile with retries
-      let profile = null;
-      let retryCount = 0;
-      const maxRetries = 3;
-
-      while (retryCount < maxRetries) {
-        try {
-          console.log(
-            '[DEBUG] Attempting to fetch profile, attempt:',
-            retryCount + 1
-          );
-          const { data, error } = await supabase
+      if (profileError) {
+        if (profileError.code === 'PGRST116') {
+          // Profile not found, create it
+          console.log(`Profile not found for ${user.id}. Creating...`);
+          const { data: newProfile, error: createError } = await supabase
             .from('profiles')
-            .select('*')
-            .eq('id', user.id)
+            .insert({
+              id: user.id,
+              name:
+                user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+              email: user.email || '',
+              avatar_url: user.user_metadata?.avatar_url || null,
+              subscription_tier: 'free',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select()
             .single();
 
-          if (error) throw error;
-          profile = data;
-          break;
-        } catch (error) {
-          console.error('[DEBUG] Error fetching profile:', {
-            attempt: retryCount + 1,
-            error,
-          });
-
-          retryCount++;
-          if (retryCount === maxRetries) {
-            console.error(
-              '[DEBUG] Failed to fetch profile after max retries'
-            );
-            // Don't throw, just continue with null profile
-            break;
+          if (createError) {
+            console.error('Profile creation error:', createError);
+            throw createError; // Re-throw to be caught by initializeAuth
           }
-
-          // Wait before retrying with exponential backoff
-          await new Promise((resolve) =>
-            setTimeout(
-              resolve,
-              Math.min(1000 * Math.pow(2, retryCount), 5000)
-            )
-          );
+          console.log(`Profile created for ${user.id}`);
+          return newProfile as UserProfile;
+        } else {
+          console.error('Profile fetch error:', profileError);
+          throw profileError; // Re-throw other profile errors
         }
+      } else {
+        console.log(`Profile fetched for ${user.id}`);
+        return profile as UserProfile;
+      }
+    } catch (error) {
+      console.error('Profile operation error in helper:', error);
+      // Return null if profile cannot be fetched or created, let initializeAuth handle state
+      return null;
+    }
+  };
+
+  // Initialize auth state
+  const initializeAuth = useCallback(async () => {
+    // No SET_LOADING/SET_INITIALIZING here, handled by listener/direct calls
+    try {
+      console.log('Starting auth initialization');
+      // dispatch({ type: 'SET_LOADING', payload: true });        // Removed
+      // dispatch({ type: 'SET_INITIALIZING', payload: true }); // Removed
+
+      // Remove delay: await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error('Session error during init:', sessionError);
+        throw sessionError;
       }
 
+      const session = sessionData?.session;
+
+      if (!session) {
+        console.log('No active session found during init.');
+        dispatch({
+          type: 'INITIALIZE',
+          payload: { user: null, profile: null },
+        });
+        return; // Exit early if no session
+      }
+
+      // Remove delay: await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError) {
+        console.error('User error during init:', userError);
+        // If user fetch fails despite session, treat as logged out
+        throw userError;
+      }
+
+      if (!userData?.user) {
+        console.error('No user data found despite active session.');
+        // This case might indicate an inconsistent state, treat as logged out
+        throw new Error('No user data available despite session');
+      }
+
+      const user = userData.user as User; // Cast User type
+
+      // Remove delay: await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Use the helper function to get/create profile
+      const profile = await fetchOrCreateUserProfile(user);
+
+      // Remove delays and previous profile logic block
+
+      // Dispatch success with user and profile (profile might be null if helper failed)
+      console.log('Initialization complete. Dispatching INITIALIZE.');
       dispatch({
         type: 'INITIALIZE',
-        payload: {
-          user: user as User | null,
-          profile: profile as UserProfile | null,
-        },
+        payload: { user, profile },
       });
     } catch (error) {
-      console.error('[DEBUG] Error initializing auth:', error);
-      // Provide more detailed error information
-      if (error instanceof Error) {
-        console.error('[DEBUG] Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
-      }
-      dispatch({ type: 'INITIALIZE', payload: { user: null, profile: null } });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      console.error('Auth initialization error:', error);
+      // Ensure state is reset on any initialization error
+      dispatch({
+        type: 'INITIALIZE',
+        payload: { user: null, profile: null },
+      });
+      // Optionally dispatch SET_ERROR if specific error feedback is needed
+      // dispatch({ type: 'SET_ERROR', payload: 'Initialization failed' });
     }
-  }, []);
+    // No finally block needed as INITIALIZE sets loading/initializing states
+    // Remove delays: await new Promise((resolve) => setTimeout(resolve, 100));
+    // dispatch({ type: 'SET_LOADING', payload: false }); // Removed
+  }, [dispatch]); // Added dispatch to dependency array
 
-  // Listen for auth state changes
+  // Set up auth listener
   useEffect(() => {
-    console.log('[AUTH] Setting up auth listener');
-    
-    // Initialize auth first - only on client side
-    if (typeof window !== 'undefined') {
-      initializeAuth();
-    } else {
-      console.log('[AUTH] Skipping auth initialization on server');
-      dispatch({ 
-        type: 'INITIALIZE', 
-        payload: { user: null, profile: null } 
-      });
-    }
-    
-    // Skip setting up listener on server
-    if (typeof window === 'undefined') {
-      console.log('[AUTH] Skipping auth listener on server');
-      return () => {};
-    }
-    
-    try {
-      const { data } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          console.log('[AUTH] Auth state changed:', { event, hasSession: !!session });
-          
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            console.log('[AUTH] User signed in or token refreshed');
-            
-            if (session?.user?.id) {
-              console.log('[AUTH] Fetching user profile after sign in');
-              
-              // Fetch user profile
-              const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
+    if (typeof window === 'undefined') return;
 
-              if (error) {
-                console.error('[AUTH] Error fetching profile after sign in:', error);
-                
-                // Check if error is because profile doesn't exist
-                if (error.code === 'PGRST116') {
-                  console.log('[AUTH] Profile not found, creating new profile');
-                  
-                  // Create a new profile
-                  const { data: newProfile, error: createError } = await supabase
-                    .from('profiles')
-                    .insert({
-                      id: session.user.id,
-                      name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                      email: session.user.email || '',  
-                      avatar_url: session.user.user_metadata.avatar_url || null,
-                      created_at: new Date().toISOString(),
-                    })
-                    .select()
-                    .single();
-                  
-                  if (createError) {
-                    console.error('[AUTH] Error creating profile:', createError);
-                  } else {
-                    console.log('[AUTH] New profile created successfully');
-                    
-                    dispatch({
-                      type: 'LOGIN_SUCCESS',
-                      payload: {
-                        user: session.user as User,
-                        profile: newProfile as unknown as UserProfile | null,
-                      },
-                    });
-                  }
-                }
-              } else {
-                console.log('[AUTH] Profile fetched successfully');
-                
-                dispatch({
-                  type: 'LOGIN_SUCCESS',
-                  payload: {
-                    user: session.user as User,
-                    profile: profile as unknown as UserProfile | null,
-                  },
-                });
-              }
-            }
-          } else if (event === 'SIGNED_OUT') {
-            console.log('[AUTH] User signed out');
-            dispatch({ type: 'LOGOUT' });
-          } else if (event === 'USER_UPDATED') {
-            console.log('[AUTH] User updated');
-            // Update the user in the state
-            if (session?.user) {
-              dispatch({
-                type: 'UPDATE_USER',
-                payload: { user: session.user as User },
-              });
-            }
+    console.log('Setting up auth listener');
+
+    let authListener: (() => void) | null = null;
+
+    const setupAuthListener = async () => {
+      try {
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('Auth state changed:', {
+            event,
+            hasSession: !!session,
+          });
+
+          // Reset loading/initializing state before handling change
+          dispatch({ type: 'SET_LOADING', payload: true });
+          dispatch({ type: 'SET_INITIALIZING', payload: true });
+
+          if (!session) {
+            dispatch({ type: 'LOGOUT' }); // LOGOUT now also sets loading/initializing to false
+            return;
           }
-        }
-      );
 
-      setAuthChangeUnsubscribe(() => data.subscription.unsubscribe);
-
-      return () => {
-        console.log('[AUTH] Cleaning up auth listener');
-        if (authChangeUnsubscribe) {
-          authChangeUnsubscribe();
-        }
-      };
-    } catch (error) {
-      console.error('[AUTH] Error setting up auth listener:', error);
-      if (error instanceof Error) {
-        console.error('[AUTH] Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
+          // Call initializeAuth on SIGNED_IN, USER_UPDATED, or TOKEN_REFRESHED
+          // INITIALIZE action within initializeAuth will set loading/initializing to false
+          if (
+            event === 'SIGNED_IN' ||
+            event === 'USER_UPDATED' ||
+            event === 'TOKEN_REFRESHED'
+          ) {
+            await initializeAuth();
+          } else {
+            // For other events or if initializeAuth isn't called, ensure loading states are reset
+            dispatch({ type: 'SET_LOADING', payload: false });
+            dispatch({ type: 'SET_INITIALIZING', payload: false });
+          }
         });
+
+        authListener = subscription.unsubscribe;
+      } catch (error) {
+        console.error('Auth listener setup error:', error);
+        // Ensure loading state is reset if listener setup fails
+        dispatch({ type: 'SET_LOADING', payload: false });
+        dispatch({ type: 'SET_INITIALIZING', payload: false });
       }
-      return () => {};
-    }
-  }, [initializeAuth]);
+    };
+
+    // Initial setup call
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_INITIALIZING', payload: true });
+    setupAuthListener().then(() => {
+      initializeAuth(); // Initial check on mount
+    });
+
+    return () => {
+      if (authListener) {
+        console.log('Cleaning up auth listener');
+        authListener();
+      }
+    };
+  }, [initializeAuth, dispatch]); // Added dispatch
 
   const login = async (email: string, password: string) => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
+    // Set loading state at the beginning
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_INITIALIZING', payload: true }); // Consider if needed, listener handles post-login init
+    dispatch({ type: 'SET_ERROR', payload: null });
 
+    try {
+      console.log('Starting login process');
+
+      // Removed delay: await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Attempt login
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Login error from Supabase:', error);
+        throw error;
+      }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+      if (!data.user) {
+        console.error('No user data returned from signInWithPassword');
+        throw new Error('Login successful but no user data received');
+      }
 
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: {
-          user: data.user as User,
-          profile: profile as UserProfile | null,
-        },
+      // Login successful
+      console.log('signInWithPassword successful. User:', data.user.id);
+
+      // Removed profile fetch logic - handled by initializeAuth via listener
+
+      // Removed wait loop: while (!state.isInitialized && attempts < maxAttempts)
+      // Rely on the onAuthStateChange listener to trigger initializeAuth and update state.
+      // The UI should show a loading state until the context updates.
+
+      console.log(
+        'Login successful, navigating to dashboard. Listener will handle state update.'
+      );
+      router.push('/dashboard');
+
+      // Note: State update (user, profile, isAuthenticated) happens asynchronously via the listener.
+      // SET_LOADING/SET_INITIALIZING will be set to false by the INITIALIZE action in initializeAuth.
+    } catch (error) {
+      console.error('Login error caught:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       });
 
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('[DEBUG] Login error:', error);
       dispatch({
         type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to login',
+        payload: error instanceof Error ? error.message : 'Failed to login',
       });
+
       toast({
         title: 'Error',
-        description: (error as Error).message || 'Failed to login',
+        description: error instanceof Error ? error.message : 'Failed to login',
         variant: 'destructive',
       });
+
+      // Re-throw the error if needed by the caller
+      // throw error;
+    } finally {
+      // Ensure loading/initializing flags are reset if login fails before listener runs
+      // If login succeeded, the listener -> initializeAuth -> INITIALIZE will handle resetting these.
+      // However, setting them here covers immediate signInWithPassword errors.
+      // Consider if this introduces race conditions with the listener.
+      // A safer approach might be to only dispatch SET_LOADING/INITIALIZING false within the catch block.
+      // For now, keeping it in finally for broad coverage.
+      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_INITIALIZING', payload: false });
     }
   };
 
@@ -472,7 +461,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (error) throw error;
     } catch (error) {
-      console.error('[DEBUG] Google login error:', error);
+      console.error('Google login error:', error);
       dispatch({
         type: 'SET_ERROR',
         payload: (error as Error).message || 'Failed to login with Google',
@@ -498,7 +487,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (error) throw error;
     } catch (error) {
-      console.error('[DEBUG] Facebook login error:', error);
+      console.error('Facebook login error:', error);
       dispatch({
         type: 'SET_ERROR',
         payload: (error as Error).message || 'Failed to login with Facebook',
@@ -530,7 +519,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         description: 'Magic link sent to your email',
       });
     } catch (error) {
-      console.error('[DEBUG] Magic link error:', error);
+      console.error('Magic link error:', error);
       dispatch({
         type: 'SET_ERROR',
         payload: (error as Error).message || 'Failed to send magic link',
@@ -553,7 +542,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       dispatch({ type: 'LOGOUT' });
       router.push('/');
     } catch (error) {
-      console.error('[DEBUG] Logout error:', error);
+      console.error('Logout error:', error);
       dispatch({
         type: 'SET_ERROR',
         payload: (error as Error).message || 'Failed to logout',
@@ -601,7 +590,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       router.push('/auth/verify');
     } catch (error) {
-      console.error('[DEBUG] Signup error:', error);
+      console.error('Signup error:', error);
       dispatch({
         type: 'SET_ERROR',
         payload: (error as Error).message || 'Failed to sign up',
@@ -634,7 +623,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         description: 'Profile updated successfully',
       });
     } catch (error) {
-      console.error('[DEBUG] Profile update error:', error);
+      console.error('Profile update error:', error);
       dispatch({
         type: 'SET_ERROR',
         payload: (error as Error).message || 'Failed to update profile',
@@ -675,7 +664,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       });
     } catch (error) {
-      console.error('[DEBUG] Session refresh error:', error);
+      console.error('Session refresh error:', error);
       dispatch({
         type: 'SET_ERROR',
         payload: (error as Error).message || 'Failed to refresh session',

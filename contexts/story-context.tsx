@@ -159,6 +159,11 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
 
   // API functions
   const fetchStories = useCallback(async () => {
+    console.log('[DEBUG] fetchStories called:', {
+      currentLoading: state.loading,
+      storiesCount: state.stories.length,
+    });
+
     // Don't set loading state if already loading to prevent additional renders
     if (!state.loading) {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -166,21 +171,30 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
     dispatch({ type: 'SET_ERROR', payload: null }); // Clear previous errors
 
     try {
+      console.log('[DEBUG] Making API request to /api/stories');
       const response = await fetch('/api/stories', {
         credentials: 'include',
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('[DEBUG] API request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
         throw new Error(
           errorData.error || `Failed to fetch stories: ${response.status}`
         );
       }
 
       const stories = await response.json();
+      console.log('[DEBUG] Stories fetched successfully:', {
+        count: stories.length,
+      });
       dispatch({ type: 'SET_STORIES', payload: stories });
     } catch (error) {
-      console.error('Error fetching stories:', error);
+      console.error('[DEBUG] Error in fetchStories:', error);
       dispatch({
         type: 'SET_ERROR',
         payload:

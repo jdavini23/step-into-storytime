@@ -23,27 +23,48 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[DEBUG] Dashboard useEffect:', {
+      authLoading: authState.isLoading,
+      authInitialized: authState.isInitialized,
+      authAuthenticated: authState.isAuthenticated,
+      storyLoading: storyState.loading,
+      storiesCount: storyState.stories.length,
+      isLoading,
+    });
+
     // Check if user is authenticated
-    if (!authState.isAuthenticated && !authState.isLoading) {
+    if (!authState.isLoading && !authState.isAuthenticated) {
+      console.log('[DEBUG] User not authenticated, redirecting to sign-in');
       router.push('/sign-in');
+      return;
     }
 
     // Fetch stories
     const loadStories = async () => {
       try {
+        console.log('[DEBUG] Loading stories...');
         setIsLoading(true);
         await fetchStories();
+        console.log('[DEBUG] Stories loaded successfully');
       } catch (error) {
-        console.error('Error fetching stories:', error);
+        console.error('[DEBUG] Error fetching stories:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (authState.isAuthenticated) {
+    if (authState.isAuthenticated && !storyState.loading) {
       loadStories();
+    } else if (!authState.isLoading && !authState.isAuthenticated) {
+      setIsLoading(false);
     }
-  }, [authState.isAuthenticated, authState.isLoading, router, fetchStories]);
+  }, [
+    authState.isAuthenticated,
+    authState.isLoading,
+    router,
+    fetchStories,
+    storyState.loading,
+  ]);
 
   const handleLogout = async () => {
     try {
@@ -64,7 +85,20 @@ export default function DashboardPage() {
     }
   };
 
-  if (!authState.isAuthenticated && !authState.isLoading) {
+  if (authState.isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mx-auto animate-pulse">
+            <BookOpen className="h-4 w-4 text-white" />
+          </div>
+          <p className="mt-4 text-slate-600">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authState.isAuthenticated) {
     return null; // Will redirect in useEffect
   }
 

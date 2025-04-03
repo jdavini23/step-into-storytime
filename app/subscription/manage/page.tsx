@@ -61,18 +61,24 @@ export default function ManageSubscriptionPage() {
       return;
     }
 
-    // Fetch subscription data
-    const loadSubscription = async () => {
-      try {
-        await fetchSubscription();
-      } catch (error) {
-        console.error('Error loading subscription:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    // Only fetch subscription if authenticated and not already loaded
+    if (authState.isAuthenticated && !subscriptionState.isInitialized) {
+      console.log('[DEBUG] ManageSubscription useEffect:', {
+        authLoading: authState.isLoading,
+        authInitialized: authState.isInitialized,
+        subscriptionLoading: subscriptionState.isLoading,
+        subscriptionInitialized: subscriptionState.isInitialized,
+      });
+      const loadSubscription = async () => {
+        try {
+          await fetchSubscription();
+        } catch (error) {
+          console.error('[DEBUG] Error loading subscription:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
-    if (authState.isAuthenticated && subscriptionState.isInitialized) {
       loadSubscription();
     } else if (subscriptionState.isInitialized) {
       setIsLoading(false);
@@ -80,6 +86,7 @@ export default function ManageSubscriptionPage() {
   }, [
     authState.isAuthenticated,
     authState.isLoading,
+    authState.isInitialized,
     fetchSubscription,
     router,
     subscriptionState.isInitialized,
@@ -128,13 +135,20 @@ export default function ManageSubscriptionPage() {
   // Get remaining days
   const remainingDays = getRemainingDays();
 
-  if (isLoading) {
+  if (isLoading || authState.isLoading || !subscriptionState.isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-violet-600 mx-auto" />
           <p className="mt-4 text-lg text-slate-600">
             Loading subscription details...
+          </p>
+          <p className="mt-2 text-sm text-slate-500">
+            {!authState.isInitialized
+              ? 'Initializing auth...'
+              : !subscriptionState.isInitialized
+              ? 'Loading subscription...'
+              : 'Please wait...'}
           </p>
         </div>
       </div>
