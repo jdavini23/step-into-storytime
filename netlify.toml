@@ -10,5 +10,5 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-[[plugins.inputs]]
-  nodeVersion = "18.18.0" 
+  [plugins.inputs]
+    nodeVersion = "18.18.0" 
