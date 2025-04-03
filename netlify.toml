@@ -5,6 +5,10 @@
 [build.environment]
   NODE_VERSION = "18.18.0"
   NPM_VERSION = "9.8.1"
+  NEXT_TELEMETRY_DISABLED = "1"
 
 [[plugins]]
-  package = "@netlify/plugin-nextjs" 
+  package = "@netlify/plugin-nextjs"
+
+[[plugins.inputs]]
+  nodeVersion = "18.18.0" 
