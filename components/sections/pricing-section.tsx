@@ -44,19 +44,19 @@ export default function PricingSection() {
         <div className="text-center mb-16">
           <div className="inline-flex items-center px-3 py-1 rounded-full bg-sky-100 text-sky-800 text-sm font-medium mb-4">
             <Crown className="h-4 w-4 mr-2" aria-hidden="true" />
-            <span>Flexible Plans</span>
+            <span>Simple Pricing</span>
           </div>
           <h2 className="responsive-text-2xl font-bold text-slate-900 mb-4">
-            Pick the Perfect Plan for Your Family
+            Start Your Storytelling Journey Today
           </h2>
           <p className="responsive-text-base text-slate-600 max-w-2xl mx-auto">
-            Choose the magical adventure that fits your family's storytelling
-            needs
+            Create magical stories that inspire imagination and bring families
+            together
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {/* Pricing cards with improved responsive design */}
+          {/* Free tier */}
           <div
             className={`rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
               selectedPlan === 'free'
@@ -72,13 +72,13 @@ export default function PricingSection() {
                 />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">
-                Try It Out
+                Daily Stories
               </h3>
               <div className="mb-4">
                 <span className="text-3xl font-bold text-slate-900">Free</span>
               </div>
               <p className="text-slate-600 mb-4">
-                Perfect for families just beginning their storytelling journey
+                Begin your storytelling adventure with a new story every day
               </p>
             </div>
             <div className="bg-white p-6">
@@ -91,7 +91,7 @@ export default function PricingSection() {
                       aria-hidden="true"
                     />
                   </div>
-                  <span>3 stories per month</span>
+                  <span>1 story per day</span>
                 </li>
                 <li className="flex items-center text-slate-700">
                   <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center mr-3 flex-shrink-0">
@@ -101,7 +101,7 @@ export default function PricingSection() {
                       aria-hidden="true"
                     />
                   </div>
-                  <span>Basic themes</span>
+                  <span>3 story themes</span>
                 </li>
                 <li className="flex items-center text-slate-700">
                   <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center mr-3 flex-shrink-0">
@@ -111,7 +111,7 @@ export default function PricingSection() {
                       aria-hidden="true"
                     />
                   </div>
-                  <span>Simple customization</span>
+                  <span>Basic story customization</span>
                 </li>
                 <li className="flex items-center text-slate-700">
                   <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center mr-3 flex-shrink-0">
@@ -121,7 +121,7 @@ export default function PricingSection() {
                       aria-hidden="true"
                     />
                   </div>
-                  <span>Web reading</span>
+                  <span>24-hour story access</span>
                 </li>
               </ul>
               <Button
@@ -134,16 +134,18 @@ export default function PricingSection() {
           </div>
 
           <PricingCard
-            title="Unlimited Adventures"
-            price="$9.99"
+            title="Story Creator"
+            price="$4.99"
             period="per month"
-            description="Our most popular plan for endless storytelling fun"
+            description="Unlock unlimited storytelling possibilities with no restrictions"
             features={[
-              'Unlimited stories',
-              'All themes & settings',
-              'Advanced character creation',
+              'Unlimited story generation',
+              'All basic story themes',
+              'Custom character creation',
+              'Save stories forever',
               'Download as PDF',
-              'New themes monthly',
+              'Remove story time limit',
+              'Ad-free experience',
             ]}
             buttonText="Choose Plan"
             color="bg-gradient-to-br from-violet-50 to-violet-100"
@@ -155,17 +157,19 @@ export default function PricingSection() {
           />
 
           <PricingCard
-            title="Storytime for Everyone"
-            price="$14.99"
+            title="Family Premium"
+            price="$9.99"
             period="per month"
-            description="The ultimate family storytelling experience"
+            description="The ultimate storytelling experience for the whole family"
             features={[
-              'Everything in Unlimited',
-              'Up to 5 family profiles',
-              'Audio narration',
-              'Print-ready illustrations',
-              'Priority new features',
-              'Exclusive themes',
+              'Everything in Story Creator',
+              'Up to 5 child profiles',
+              'Premium story themes',
+              'Personalized story collections',
+              'Family character library',
+              'Story recommendations',
+              'Priority story generation',
+              'Premium support',
             ]}
             buttonText="Choose Family Plan"
             color="bg-gradient-to-br from-amber-50 to-amber-100"
