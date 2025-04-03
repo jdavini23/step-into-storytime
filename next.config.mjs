@@ -56,9 +56,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  env: {
+  // Environment variables configuration
+  serverRuntimeConfig: {
     VAR_ORIGINAL_PATHNAME: '/',
-    NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
+  },
+  publicRuntimeConfig: {
+    VAR_ORIGINAL_PATHNAME: '/',
   },
 };
 
