@@ -10,7 +10,6 @@ const nextConfig = {
         'localhost:3003',
       ],
     },
-    templateRewrite: true,
   },
   compiler: {
     emotion: {
@@ -45,8 +44,14 @@ const nextConfig = {
     return {
       beforeFiles: [
         {
-          source: '/api/:path*',
-          destination: '/api/:path*',
+          source: '/:path*',
+          has: [
+            {
+              type: 'query',
+              key: 'VAR_ORIGINAL_PATHNAME',
+            },
+          ],
+          destination: '/:path*',
         },
       ],
     };
