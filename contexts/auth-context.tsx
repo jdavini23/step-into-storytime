@@ -560,6 +560,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
+      console.log('[DEBUG-AUTH] Starting signup process with email:', email);
+
       // Attempt signup
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -572,13 +574,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
 
       if (error) {
-        console.error('Signup error:', error);
+        console.error('[DEBUG-AUTH] Signup error:', error);
         throw error;
       }
 
       if (!data.user) {
+        console.error('[DEBUG-AUTH] No user data received');
         throw new Error('Signup successful but no user data received');
       }
+
+      console.log('[DEBUG-AUTH] Signup successful, user:', data.user.id);
 
       // Show success message
       toast({
@@ -586,10 +591,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         description: 'Please check your email to confirm your account',
       });
 
-      // Redirect to email confirmation page
-      router.push('/auth/confirm-email');
+      // Fix: Use a route that exists in the app folder structure
+      const confirmPath = '/auth/confirm-email';
+      console.log('[DEBUG-AUTH] Will redirect to:', confirmPath);
+
+      // Wait a moment before redirecting to ensure state changes are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      router.push(confirmPath);
+      console.log('[DEBUG-AUTH] Router.push executed');
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('[DEBUG-AUTH] Signup error caught:', error);
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -602,6 +614,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
+      console.log('[DEBUG-AUTH] Signup process completed');
     }
   };
 
