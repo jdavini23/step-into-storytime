@@ -558,7 +558,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const signup = async (name: string, email: string, password: string) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
 
+      // Attempt signup
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -569,37 +571,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       });
 
-      if (error) throw error;
-
-      if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').insert([
-          {
-            id: data.user.id,
-            name,
-            email: email.trim().toLowerCase(),
-          },
-        ]);
-
-        if (profileError) throw profileError;
+      if (error) {
+        console.error('Signup error:', error);
+        throw error;
       }
 
+      if (!data.user) {
+        throw new Error('Signup successful but no user data received');
+      }
+
+      // Show success message
       toast({
         title: 'Success',
-        description: 'Please check your email to verify your account',
+        description: 'Please check your email to confirm your account',
       });
 
-      router.push('/auth/verify');
+      // Redirect to email confirmation page
+      router.push('/auth/confirm-email');
     } catch (error) {
       console.error('Signup error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to sign up',
-      });
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'An error occurred during signup';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
       toast({
         title: 'Error',
-        description: (error as Error).message || 'Failed to sign up',
+        description: errorMessage,
         variant: 'destructive',
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
