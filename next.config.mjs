@@ -41,20 +41,7 @@ const nextConfig = {
   generateEtags: true,
   // Add middleware configuration
   async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: '/:path*',
-          has: [
-            {
-              type: 'query',
-              key: 'VAR_ORIGINAL_PATHNAME',
-            },
-          ],
-          destination: '/:path*',
-        },
-      ],
-    };
+    return [];
   },
   typescript: {
     ignoreBuildErrors: true,
