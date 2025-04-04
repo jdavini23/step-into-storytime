@@ -5,28 +5,32 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: [
         'localhost:3000',
-        'localhost:8888',
-        'localhost',
-        '*.netlify.app',
+        'localhost:3001',
+        'localhost:3002',
+        'localhost:3003',
       ],
     },
   },
   compiler: {
     emotion: {
-      sourceMap: process.env.NODE_ENV === 'development',
+      // eslint-disable-next-line no-undef
+      sourceMap:
+        typeof process !== 'undefined' &&
+        process.env.NODE_ENV === 'development',
       autoLabel: 'dev-only',
       labelFormat: '[local]',
     },
   },
   images: {
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**',
       },
     ],
-    dangerouslyAllowSVG: true,
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   sassOptions: {
     includePaths: ['./styles'],
@@ -35,7 +39,6 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   generateEtags: true,
-  swcMinify: true,
   // Add middleware configuration
   async rewrites() {
     return [];
@@ -50,30 +53,6 @@ const nextConfig = {
   env: {
     VAR_ORIGINAL_PATHNAME: '/',
     NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
-  },
-  // Service worker configuration
-  webpack: (config, { dev, isServer }) => {
-    if (!isServer && !dev) {
-      config.devtool = 'source-map';
-    }
-    return config;
-  },
-  async headers() {
-    return [
-      {
-        source: '/cnm-sw.js',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
-          },
-          {
-            key: 'Service-Worker-Allowed',
-            value: '/',
-          },
-        ],
-      },
-    ];
   },
 };
 

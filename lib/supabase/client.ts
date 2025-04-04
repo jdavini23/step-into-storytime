@@ -1,6 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
-import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 
 // Type for Supabase instance with all tables
 export type TypedSupabaseClient = ReturnType<
@@ -29,61 +29,64 @@ try {
 }
 
 export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
-  const client: SupabaseClient<Database> = createBrowserClient<Database>(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      auth: {
-        flowType: 'pkce',
-        detectSessionInUrl: true,
-        persistSession: true,
-        autoRefreshToken: true,
-        storage:
-          typeof window !== 'undefined' ? window.localStorage : undefined,
-        storageKey: 'sb-auth-token',
-        debug: process.env.NODE_ENV === 'development',
+  const client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: 'sb-auth-token',
+      flowType: 'pkce',
+      debug: process.env.NODE_ENV === 'development',
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'supabase-js-web/2.38.4',
+        apikey: supabaseAnonKey,
       },
-      global: {
-        headers: {
-          'X-Client-Info': 'supabase-js-web/2.38.4',
-        },
-        fetch: async (
-          url: RequestInfo | URL,
-          options: RequestInit = {}
-        ): Promise<Response> => {
+      fetch: (
+        url: RequestInfo | URL,
+        options: RequestInit = {}
+      ): Promise<Response> => {
+        const fetchWithRetry = async (retries = 3): Promise<Response> => {
           try {
             // Get the current session
             const {
               data: { session },
-            }: { data: { session: Session | null } } =
-              await client.auth.getSession();
-
+            } = await client.auth.getSession();
             const response: Response = await fetch(url, {
               ...options,
-              credentials: 'include',
+              credentials: 'omit',
               headers: {
                 ...options.headers,
+                apikey: supabaseAnonKey,
                 Authorization: session
                   ? `Bearer ${session.access_token}`
                   : `Bearer ${supabaseAnonKey}`,
-                apikey: supabaseAnonKey,
+                Origin: window.location.origin,
                 'Content-Type': 'application/json',
               },
             });
-
-            if (!response.ok) {
+            if (!response.ok && retries > 0) {
+              console.error('[DEBUG] Fetch error:', {
+                status: response.status,
+                url: url.toString(),
+                retries,
+              });
               throw new Error(`HTTP error! status: ${response.status}`);
             }
-
             return response;
           } catch (error) {
-            console.error('[DEBUG] Fetch error:', error);
+            if (retries > 0) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              return fetchWithRetry(retries - 1);
+            }
             throw error;
           }
-        },
+        };
+        return fetchWithRetry();
       },
-    }
-  );
+    },
+  });
 
   return client;
 };

@@ -114,39 +114,93 @@ export default function EnhancedSignInForm() {
 
   const handlePasswordSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!validatePasswordForm()) return;
+
+    if (!validatePasswordForm()) {
+      return;
+    }
 
     setIsLoading(true);
     setErrors({ ...errors, general: '' });
 
     try {
-      await login(formData.email, formData.password);
-      // Login successful - the auth context will handle the redirect
-    } catch (error) {
-      console.error('Login error:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to sign in';
-      setErrors({
-        ...errors,
-        general: errorMessage,
+      // Add delay to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      console.log('[DEBUG] Form data before submission:', {
+        email: formData.email,
+        password: formData.password ? '********' : 'not set',
+        rememberMe: formData.rememberMe,
       });
+
+      console.log('[DEBUG] Attempting login with email:', formData.email);
+
+      await login(formData.email, formData.password);
+
+      // Show success toast
+      toast({
+        title: 'Success!',
+        description: 'Logging you in...',
+        variant: 'default',
+        duration: 3000,
+      });
+
+      // Add delay before completing to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } catch (error: unknown) {
+      console.error('[DEBUG] Login error details:', {
+        type: error instanceof Error ? 'Error' : typeof error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'An unknown error occurred';
+
+      // Handle specific error cases
+      if (errorMessage.includes('verify your email')) {
+        setErrors({
+          ...errors,
+          general:
+            'Please check your email and verify your account before logging in.',
+        });
+      } else if (errorMessage.includes('Invalid email or password')) {
+        setErrors({
+          ...errors,
+          general: 'Invalid email or password. Please try again.',
+        });
+      } else if (errorMessage.includes('connect to authentication')) {
+        setErrors({
+          ...errors,
+          general:
+            'Connection error. Please check your internet and try again.',
+        });
+      } else {
+        setErrors({
+          ...errors,
+          general:
+            errorMessage ||
+            'An error occurred while logging in. Please try again.',
+        });
+      }
+
       toast({
         title: 'Error',
-        description: errorMessage,
+        description: errorMessage || 'Failed to log in. Please try again.',
         variant: 'destructive',
+        duration: 5000,
       });
+
+      // Add delay to ensure error state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleMagicLinkSubmit = async (e: FormEvent) => {
+  const handlePasswordlessSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.email.trim()) {
-      setErrors({
-        ...errors,
-        email: 'Email is required',
-      });
+
+    if (!validatePasswordlessForm()) {
       return;
     }
 
@@ -156,24 +210,14 @@ export default function EnhancedSignInForm() {
     try {
       await sendMagicLink(formData.email);
       setMagicLinkSent(true);
-      toast({
-        title: 'Success',
-        description: 'Check your email for the magic link',
-      });
+      setIsLoading(false);
     } catch (error) {
-      console.error('Magic link error:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to send magic link';
       setErrors({
         ...errors,
-        general: errorMessage,
+        general:
+          (error as Error).message ||
+          'Failed to send magic link. Please try again.',
       });
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -379,7 +423,7 @@ export default function EnhancedSignInForm() {
             </Button>
           </div>
         ) : (
-          <form onSubmit={handleMagicLinkSubmit} className="space-y-6">
+          <form onSubmit={handlePasswordlessSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700">
                 Email Address

@@ -558,11 +558,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const signup = async (name: string, email: string, password: string) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      dispatch({ type: 'SET_ERROR', payload: null });
 
-      console.log('[DEBUG-AUTH] Starting signup process with email:', email);
-
-      // Attempt signup
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -573,48 +569,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       });
 
-      if (error) {
-        console.error('[DEBUG-AUTH] Signup error:', error);
-        throw error;
+      if (error) throw error;
+
+      if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert([
+          {
+            id: data.user.id,
+            name,
+            email: email.trim().toLowerCase(),
+          },
+        ]);
+
+        if (profileError) throw profileError;
       }
 
-      if (!data.user) {
-        console.error('[DEBUG-AUTH] No user data received');
-        throw new Error('Signup successful but no user data received');
-      }
-
-      console.log('[DEBUG-AUTH] Signup successful, user:', data.user.id);
-
-      // Show success message
       toast({
         title: 'Success',
-        description: 'Please check your email to confirm your account',
+        description: 'Please check your email to verify your account',
       });
 
-      // Fix: Use a route that exists in the app folder structure
-      const confirmPath = '/auth/confirm-email';
-      console.log('[DEBUG-AUTH] Will redirect to:', confirmPath);
-
-      // Wait a moment before redirecting to ensure state changes are processed
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      router.push(confirmPath);
-      console.log('[DEBUG-AUTH] Router.push executed');
+      router.push('/auth/verify');
     } catch (error) {
-      console.error('[DEBUG-AUTH] Signup error caught:', error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'An error occurred during signup';
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      console.error('Signup error:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: (error as Error).message || 'Failed to sign up',
+      });
       toast({
         title: 'Error',
-        description: errorMessage,
+        description: (error as Error).message || 'Failed to sign up',
         variant: 'destructive',
       });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      console.log('[DEBUG-AUTH] Signup process completed');
     }
   };
 
