@@ -19,4 +19,16 @@
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable" 
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[context.production.environment]
+  NEXT_PUBLIC_SITE_URL = "https://stepintostorytime.netlify.app"
+
+[context.deploy-preview.environment]
+  NEXT_PUBLIC_SITE_URL = "https://deploy-preview-${REVIEW_ID}--stepintostorytime.netlify.app"
+
+[context.branch-deploy.environment]
+  NEXT_PUBLIC_SITE_URL = "https://${BRANCH}--stepintostorytime.netlify.app"
+
+[functions]
+  external_node_modules = ["@supabase/supabase-js"] 
