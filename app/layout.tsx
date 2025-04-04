@@ -8,6 +8,7 @@ import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
+import { ServiceWorkerRegistration } from '@/components/service-worker';
 
 // Initialize font
 const inter = Inter({
@@ -45,12 +46,12 @@ export const metadata: Metadata = {
 // Define viewport
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+    { media: '(prefers-color-scheme: light)', color: 'white' },
+    { media: '(prefers-color-scheme: dark)', color: 'black' },
   ],
   width: 'device-width',
   initialScale: 1,
-  minimumScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -71,6 +72,7 @@ export default function RootLayout({
             <AuthProvider>
               <SubscriptionProvider>
                 <StoryProvider>
+                  <ServiceWorkerRegistration />
                   {children}
                   <Toaster />
                 </StoryProvider>
