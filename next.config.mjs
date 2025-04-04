@@ -8,6 +8,7 @@ const nextConfig = {
         'localhost:3001',
         'localhost:3002',
         'localhost:3003',
+        '*.netlify.app',
       ],
     },
   },
@@ -39,6 +40,7 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   generateEtags: true,
+  swcMinify: true,
   // Add middleware configuration
   async rewrites() {
     return {
@@ -66,6 +68,14 @@ const nextConfig = {
   env: {
     VAR_ORIGINAL_PATHNAME: '/',
     NEXT_PUBLIC_VAR_ORIGINAL_PATHNAME: '/',
+  },
+  // Disable service worker in development
+  webpack: (config, { dev, isServer }) => {
+    if (!dev && !isServer) {
+      // Disable service worker registration in development
+      config.devtool = 'source-map';
+    }
+    return config;
   },
 };
 
