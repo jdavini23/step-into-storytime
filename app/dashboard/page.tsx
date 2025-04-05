@@ -23,27 +23,48 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[DEBUG] Dashboard useEffect:', {
+      authLoading: authState.isLoading,
+      authInitialized: authState.isInitialized,
+      authAuthenticated: authState.isAuthenticated,
+      storyLoading: storyState.loading,
+      storiesCount: storyState.stories.length,
+      isLoading,
+    });
+
     // Check if user is authenticated
-    if (!authState.isAuthenticated && !authState.isLoading) {
+    if (!authState.isLoading && !authState.isAuthenticated) {
+      console.log('[DEBUG] User not authenticated, redirecting to sign-in');
       router.push('/sign-in');
+      return;
     }
 
     // Fetch stories
     const loadStories = async () => {
       try {
+        console.log('[DEBUG] Loading stories...');
         setIsLoading(true);
         await fetchStories();
+        console.log('[DEBUG] Stories loaded successfully');
       } catch (error) {
-        console.error('Error fetching stories:', error);
+        console.error('[DEBUG] Error fetching stories:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (authState.isAuthenticated) {
+    if (authState.isAuthenticated && !storyState.loading) {
       loadStories();
+    } else if (!authState.isLoading && !authState.isAuthenticated) {
+      setIsLoading(false);
     }
-  }, [authState.isAuthenticated, authState.isLoading, router, fetchStories]);
+  }, [
+    authState.isAuthenticated,
+    authState.isLoading,
+    router,
+    fetchStories,
+    storyState.loading,
+  ]);
 
   const handleLogout = async () => {
     try {
@@ -64,7 +85,20 @@ export default function DashboardPage() {
     }
   };
 
-  if (!authState.isAuthenticated && !authState.isLoading) {
+  if (authState.isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mx-auto animate-pulse">
+            <BookOpen className="h-4 w-4 text-white" />
+          </div>
+          <p className="mt-4 text-slate-600">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authState.isAuthenticated) {
     return null; // Will redirect in useEffect
   }
 
@@ -150,55 +184,56 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {Array.isArray(storyState.stories) && storyState.stories.map((story) => (
-              <Card
-                key={story.id}
-                className="border-0 shadow-md hover:shadow-lg transition-shadow"
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{story.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-slate-600 text-sm mb-2">
-                    {story.mainCharacter?.name}'s adventure in {story.setting}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Created:{' '}
-                    {new Date(
-                      story.createdAt || Date.now()
-                    ).toLocaleDateString()}
-                  </p>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-slate-600"
-                    onClick={() => router.push(`/story/${story.id}`)}
-                  >
-                    Read
-                  </Button>
-                  <div className="flex gap-2">
+            {Array.isArray(storyState.stories) &&
+              storyState.stories.map((story) => (
+                <Card
+                  key={story.id}
+                  className="border-0 shadow-md hover:shadow-lg transition-shadow"
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">{story.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600">
+                      {story.character?.name}'s adventure in {story.setting}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Created{' '}
+                      {story.created_at
+                        ? new Date(story.created_at).toLocaleDateString()
+                        : 'recently'}
+                    </p>
+                  </CardContent>
+                  <CardFooter className="flex justify-between">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       className="text-slate-600"
-                      onClick={() => router.push(`/edit/${story.id}`)}
+                      onClick={() => router.push(`/story/${story.id}`)}
                     >
-                      <Edit className="h-4 w-4" />
+                      Read
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDeleteStory(story.id || '')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-600"
+                        onClick={() => router.push(`/stories/${story.id}/edit`)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteStory(story.id || '')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
           </div>
         )}
       </main>

@@ -1,23 +1,23 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { StoryData } from './common/types';
+import { Story } from './common/types';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreVertical, Edit, Trash, Share, Star } from 'lucide-react';
 
 interface StoryListProps {
-  stories: StoryData[];
-  onEdit: (story: StoryData) => void;
+  stories: Story[];
+  onEdit: (story: Story) => void;
   onDelete: (storyId: string) => void;
-  onShare: (story: StoryData) => void;
+  onShare: (story: Story) => void;
   onFavorite: (storyId: string, isFavorite: boolean) => void;
-  onSelect: (story: StoryData) => void;
+  onSelect: (story: Story) => void;
 }
 
 // Helper function to format date safely
@@ -63,7 +63,9 @@ export function StoryList({
         <h2 className="text-2xl font-bold">Your Stories</h2>
         <Button
           variant="outline"
-          onClick={() => (window.location.href = '/create')}
+          onClick={() => {
+            window.location.href = '/create';
+          }}
         >
           Create New Story
         </Button>
@@ -84,10 +86,10 @@ export function StoryList({
                 </p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>Created {formatDate(story.created_at)}</span>
-                  {story.main_character?.age && (
+                  {story.character?.age && (
                     <>
                       <span>•</span>
-                      <span>Age {story.main_character.age}</span>
+                      <span>Age {story.character.age}</span>
                     </>
                   )}
                   {story.theme && (
@@ -97,13 +99,18 @@ export function StoryList({
                     </>
                   )}
                 </div>
+                {story.character?.name && (
+                  <p className="text-sm text-gray-600">
+                    Character: {story.character.name}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                     e.stopPropagation();
                     story.id && toggleFavorite(story.id);
                   }}
@@ -122,14 +129,16 @@ export function StoryList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
+                        e.stopPropagation()
+                      }
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         onEdit(story);
                       }}
@@ -138,7 +147,7 @@ export function StoryList({
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         onShare(story);
                       }}
@@ -148,7 +157,7 @@ export function StoryList({
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         story.id && onDelete(story.id);
                       }}

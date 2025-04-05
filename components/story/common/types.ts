@@ -1,3 +1,5 @@
+import { ReactNode } from 'react';
+
 export type ParagraphType = 'paragraph' | 'heading1' | 'heading2' | 'heading3';
 export type FontSize = 'small' | 'medium' | 'large';
 
@@ -29,27 +31,34 @@ export interface AccessibilitySettings {
   lineHeight: number;
 }
 
-export interface StoryData {
-  description: ReactNode;
-  id?: string;
-  user_id: string;
-  title: string;
-  content: string | null;
-  main_character: {
-    name: string;
-    age: string;
-    traits: string[];
-  } | null;
-  setting: string | null;
-  theme: string | null;
-  plot_elements: string[] | null;
-  is_published: boolean;
-  thumbnail_url: string | null;
-  created_at?: string;
-  updated_at?: string;
-}
+type ReadingLevel = 'beginner' | 'intermediate' | 'advanced';
 
-export type Story = StoryData;
+export interface Story {
+  author: string;
+  createdAt: number;
+  illustrations: { url: string; scene: string }[] | undefined;
+  prompt(prompt: any): unknown;
+  id: string;
+  title: string;
+  description?: string;
+  content: {
+    en: string[];
+    es: string[];
+  };
+  character: {
+    name: string;
+    age?: string;
+    traits?: string[];
+  };
+  setting: string;
+  theme: string;
+  plot_elements?: string[];
+  is_published: boolean;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  thumbnail_url?: string | null;
+}
 
 export interface StoryParagraph {
   content: string;

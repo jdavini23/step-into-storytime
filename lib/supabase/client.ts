@@ -1,135 +1,141 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
 // Type for Supabase instance with all tables
-export type TypedSupabaseClient = ReturnType<typeof createBrowserClient<Database>>;
+export type TypedSupabaseClient = ReturnType<
+  typeof createBrowserClient<Database>
+>;
 
 // Environment variables for Supabase connection
-const supabaseUrl =
-  process.env.STEP_NEXT_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  '';
-const supabaseAnonKey =
-  process.env.STEP_NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  '';
-
-// Debug logging for environment variables
-console.log('[DEBUG] Supabase Environment Variables:', {
-  url: supabaseUrl ? 'Set (length: ' + supabaseUrl.length + ')' : 'Missing',
-  anonKey: supabaseAnonKey
-    ? 'Set (length: ' + supabaseAnonKey.length + ')'
-    : 'Missing',
-  isDevelopment: process.env.NODE_ENV === 'development',
-  isClient: typeof window !== 'undefined',
-});
-
-// Create a singleton instance of the Supabase client
-let supabase = createBrowserClient<Database>(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    auth: {
-      detectSessionInUrl: false,
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-    global: {
-      headers: {
-        'Cache-Control': 'no-store',
-      },
-    },
-  }
-);
-
-// Determine if we're in a browser environment
-const isBrowser = typeof window !== 'undefined';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    '[ERROR] Missing Supabase environment variables. Authentication and database features will not work.',
-    'Required variables:',
-    {
-      NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set ✓' : 'Missing ✗',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey ? 'Set ✓' : 'Missing ✗',
-    }
+  throw new Error(
+    'Missing required Supabase environment variables. Please check your .env.local file.'
   );
-
-  // In development, throw an error to make it obvious
-  if (process.env.NODE_ENV === 'development') {
-    throw new Error('Missing required Supabase environment variables');
-  }
-
-  // In production, create a dummy client that will fail gracefully
-  // This prevents the app from crashing completely
-  const dummyClient = {
-    auth: {
-      getSession: () =>
-        Promise.resolve({
-          data: { session: null },
-          error: new Error('No Supabase credentials'),
-        }),
-      getUser: () =>
-        Promise.resolve({
-          data: { user: null },
-          error: new Error('No Supabase credentials'),
-        }),
-      onAuthStateChange: () => ({
-        data: { subscription: { unsubscribe: () => {} } },
-      }),
-      signInWithPassword: () =>
-        Promise.resolve({
-          data: null,
-          error: new Error('No Supabase credentials'),
-        }),
-      signInWithOAuth: () =>
-        Promise.resolve({
-          data: null,
-          error: new Error('No Supabase credentials'),
-        }),
-      signOut: () => Promise.resolve({ error: null }),
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: () =>
-            Promise.resolve({
-              data: null,
-              error: new Error('No Supabase credentials'),
-            }),
-        }),
-      }),
-      insert: () =>
-        Promise.resolve({
-          data: null,
-          error: new Error('No Supabase credentials'),
-        }),
-      update: () =>
-        Promise.resolve({
-          data: null,
-          error: new Error('No Supabase credentials'),
-        }),
-    }),
-  } as unknown as ReturnType<typeof createBrowserClient<Database>>;
-
-  console.warn(
-    '[WARN] Using fallback Supabase client that will fail gracefully'
-  );
-  supabase = dummyClient;
-} else {
-  // Validate URL format
-  try {
-    new URL(supabaseUrl);
-  } catch (error) {
-    console.error('[ERROR] Invalid Supabase URL format:', supabaseUrl);
-
-    if (process.env.NODE_ENV === 'development') {
-      throw new Error('Invalid Supabase URL format');
-    }
-  }
-
-  // No need for additional options with createBrowserClient
 }
 
-export { supabase };
+// Validate URL format
+try {
+  new URL(supabaseUrl);
+} catch (error) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error(
+    'Invalid Supabase URL format. Please check your NEXT_PUBLIC_SUPABASE_URL.'
+  );
+}
+
+export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
+  const instance = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: 'sb-auth-token',
+      flowType: 'pkce',
+      debug: process.env.NODE_ENV === 'development',
+      storage: {
+        getItem: (key: string): string | null => {
+          try {
+            return localStorage.getItem(key);
+          } catch (error) {
+            console.error('Error reading from localStorage:', error);
+            return null;
+          }
+        },
+        setItem: (key: string, value: string): void => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (error) {
+            console.error('Error writing to localStorage:', error);
+          }
+        },
+        removeItem: (key: string): void => {
+          try {
+            localStorage.removeItem(key);
+          } catch (error) {
+            console.error('Error removing from localStorage:', error);
+          }
+        },
+      },
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'supabase-js-web/2.38.4',
+      },
+      fetch: async (
+        url: RequestInfo | URL,
+        options: RequestInit = {}
+      ): Promise<Response> => {
+        try {
+          // Get the current session
+          const {
+            data: { session: currentSession },
+            error: sessionError,
+          } = await instance.auth.getSession();
+
+          if (sessionError) {
+            console.error('Session error:', sessionError);
+            throw sessionError;
+          }
+
+          // Check if session needs refresh
+          let session = currentSession;
+          if (session?.expires_at) {
+            const expiresAt = session.expires_at * 1000;
+            const isExpired = expiresAt < Date.now();
+            const isCloseToExpiring = expiresAt - Date.now() < 5 * 60 * 1000; // 5 minutes
+
+            if (isExpired || isCloseToExpiring) {
+              console.log('Session needs refresh, attempting to refresh...');
+              const { data: refreshData, error: refreshError } =
+                await instance.auth.refreshSession();
+
+              if (refreshError) {
+                console.error('Session refresh error:', refreshError);
+                throw refreshError;
+              }
+
+              if (!refreshData.session) {
+                throw new Error('Session refresh failed - no session returned');
+              }
+
+              session = refreshData.session;
+            }
+          }
+
+          // Add authorization header if we have a session
+          if (session?.access_token) {
+            options.headers = {
+              ...options.headers,
+              Authorization: `Bearer ${session.access_token}`,
+            };
+          }
+
+          // Make the actual request
+          const response = await fetch(url, {
+            ...options,
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          return response;
+        } catch (error) {
+          console.error('Fetch error:', error);
+          throw error;
+        }
+      },
+    },
+  });
+
+  return instance;
+};
+
+// Export a singleton instance for use in client components
+export const supabase: TypedSupabaseClient = createBrowserSupabaseClient();

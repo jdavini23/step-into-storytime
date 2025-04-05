@@ -122,30 +122,35 @@ export default function EnhancedSignInForm() {
     setIsLoading(true);
     setErrors({ ...errors, general: '' });
 
-    // DEBUG: Log form data before submission
-    console.log('[DEBUG] Form data before submission:', {
-      email: formData.email,
-      password: formData.password ? '********' : 'not set',
-      rememberMe: formData.rememberMe,
-    });
-
     try {
-      // DEBUG: Log the email being sent to login
+      // Add delay to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      console.log('[DEBUG] Form data before submission:', {
+        email: formData.email,
+        password: formData.password ? '********' : 'not set',
+        rememberMe: formData.rememberMe,
+      });
+
       console.log('[DEBUG] Attempting login with email:', formData.email);
 
       await login(formData.email, formData.password);
+
+      // Show success toast
       toast({
         title: 'Success!',
         description: 'Logging you in...',
         variant: 'default',
         duration: 3000,
       });
-      // Redirect handled by auth context
-      router.push('/dashboard');
+
+      // Add delay before completing to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } catch (error: unknown) {
       console.error('[DEBUG] Login error details:', {
         type: error instanceof Error ? 'Error' : typeof error,
         message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       });
 
       const errorMessage =
@@ -184,6 +189,10 @@ export default function EnhancedSignInForm() {
         variant: 'destructive',
         duration: 5000,
       });
+
+      // Add delay to ensure error state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } finally {
       setIsLoading(false);
     }
   };

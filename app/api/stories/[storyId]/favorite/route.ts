@@ -4,9 +4,13 @@ import { NextRequest } from 'next/server';
 // TODO: Replace with database storage
 const favoriteStories = new Set<string>();
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ storyId: string }> }
+) {
   try {
-    const storyId = request.nextUrl.pathname.split('/').pop();
+    const params = await context.params;
+    const storyId = params.storyId;
     if (!storyId) {
       return new Response(JSON.stringify({ error: 'Story ID is required' }), {
         status: 400,
@@ -29,9 +33,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ storyId: string }> }
+) {
   try {
-    const storyId = request.nextUrl.pathname.split('/').pop();
+    const params = await context.params;
+    const storyId = params.storyId;
     if (!storyId) {
       return new Response(JSON.stringify({ error: 'Story ID is required' }), {
         status: 400,

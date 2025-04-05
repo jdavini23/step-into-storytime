@@ -12,10 +12,13 @@ import type { AuthState } from '@/contexts/auth-context';
 export type SubscriptionTier = 'free' | 'basic' | 'premium';
 
 export type SubscriptionStatus =
-  | 'active'
   | 'trialing'
+  | 'active'
   | 'canceled'
-  | 'past_due';
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'past_due'
+  | 'unpaid';
 
 export interface SubscriptionFeature {
   id: string;
@@ -26,15 +29,16 @@ export interface SubscriptionFeature {
 
 export interface Subscription {
   id: string;
+  created_at: string;
+  updated_at: string;
   user_id: string;
   status: SubscriptionStatus;
-  tier: SubscriptionTier;
-  subscription_start: string;
-  subscription_end: string;
-  trial_end?: string;
-  payment_provider?: string;
   plan_id: string;
-  features?: SubscriptionFeature[];
+  subscription_start: string | null;
+  subscription_end: string | null;
+  trial_end: string | null;
+  payment_provider: 'stripe' | 'paypal' | null;
+  payment_provider_id: string | null;
 }
 
 export interface SubscriptionPlan {
@@ -195,31 +199,64 @@ export function SubscriptionProvider({
 
   // Initialize subscription
   useEffect(() => {
+    console.log('[DEBUG] SubscriptionContext useEffect:', {
+      authInitialized: auth.state.isInitialized,
+      authLoading: auth.state.isLoading,
+      userId: auth.state.user?.id,
+      subscriptionInitialized: state.isInitialized,
+      subscriptionLoading: state.isLoading,
+      hasAuthUser: !!auth.state.user,
+      isAuthenticated: auth.state.isAuthenticated,
+    });
+
+    // Wait for auth to be initialized
     if (!auth.state.isInitialized) {
+      console.log('[DEBUG] Auth not initialized yet, waiting...');
       return;
     }
 
+    // If auth is initialized but no user, initialize with default plans
+    if (!auth.state.user?.id) {
+      console.log(
+        '[DEBUG] Auth initialized but no user, setting default state'
+      );
+      dispatch({
+        type: 'INITIALIZE',
+        payload: {
+          subscription: null,
+          plans: defaultPlans,
+        },
+      });
+      return;
+    }
+
+    const userId = auth.state.user.id;
+
     const fetchSubscriptionData = async () => {
-      if (!auth.state.user?.id) return;
-
       try {
-        // First check if user has a subscription
-        const { data: subscription, error } = await supabase
-          .from('subscriptions')
-          .select()
-          .match({ user_id: auth.state.user.id })
-          .maybeSingle();
+        console.log('[DEBUG] Starting subscription fetch for user:', userId);
+        dispatch({ type: 'SET_LOADING', payload: true });
 
-        if (error) {
-          console.error('Error fetching subscription:', error);
-          dispatch({
-            type: 'SET_ERROR',
-            payload: 'Failed to fetch subscription',
+        const response = await fetch('/api/subscriptions', {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('[DEBUG] Subscription fetch failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
           });
-          return;
+          throw new Error(errorData.error || 'Failed to fetch subscription');
         }
 
-        // Initialize with subscription (or null) and default plans
+        const subscription = await response.json();
+        console.log(
+          '[DEBUG] Subscription data fetched successfully:',
+          subscription
+        );
+
         dispatch({
           type: 'INITIALIZE',
           payload: {
@@ -228,16 +265,31 @@ export function SubscriptionProvider({
           },
         });
       } catch (error) {
-        console.error('Error in subscription fetch:', error);
+        console.error('[DEBUG] Error in subscription fetch:', {
+          error,
+          userId,
+          context: 'fetchSubscriptionData',
+        });
         dispatch({
           type: 'SET_ERROR',
-          payload: 'Failed to initialize subscription',
+          payload: error instanceof Error ? error.message : 'Unknown error',
         });
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
 
-    fetchSubscriptionData();
-  }, [auth.state.isInitialized, auth.state.user?.id]);
+    if (!state.isInitialized || !state.subscription) {
+      console.log(
+        '[DEBUG] Fetching subscription data - not initialized or no subscription'
+      );
+      fetchSubscriptionData();
+    }
+  }, [
+    auth.state.isInitialized,
+    auth.state.user?.id,
+    auth.state.isAuthenticated,
+  ]);
 
   const fetchSubscription = async () => {
     const userId = auth.state.user?.id;
@@ -251,31 +303,44 @@ export function SubscriptionProvider({
     }
 
     try {
+      console.log('[DEBUG] Fetching subscription from API');
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      const { data, error } = (await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .single()) as unknown as { data: Subscription | null; error: any };
+      const response = await fetch('/api/subscriptions', {
+        credentials: 'include',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch subscription');
+      }
+
+      const data = await response.json();
+      console.log('[DEBUG] Subscription API response:', data);
 
       dispatch({
         type: 'SET_SUBSCRIPTION',
         payload: data,
       });
     } catch (error) {
-      console.error('Error fetching subscription', error);
+      console.error('[DEBUG] Error fetching subscription:', error);
       dispatch({
         type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to fetch subscription',
+        payload:
+          error instanceof Error
+            ? error.message
+            : 'Failed to fetch subscription',
       });
       toast({
         title: 'Error',
-        description: (error as Error).message || 'Failed to fetch subscription',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to fetch subscription',
         variant: 'destructive',
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -292,26 +357,29 @@ export function SubscriptionProvider({
     }
 
     try {
+      console.log('[DEBUG] Creating subscription via API:', { tier });
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      const { data, error } = (await supabase.from('subscriptions').insert([
-        {
-          user_id: userId,
-          tier,
-          status: 'active',
-          subscription_start: new Date().toISOString(),
-          subscription_end: new Date(
-            Date.now() + 30 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          plan_id: tier === 'premium' ? '1' : '2',
+      const response = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      ])) as unknown as { data: Subscription[] | null; error: any };
+        credentials: 'include',
+        body: JSON.stringify({ tier }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create subscription');
+      }
+
+      const data = await response.json();
+      console.log('[DEBUG] Subscription created:', data);
 
       dispatch({
         type: 'SET_SUBSCRIPTION',
-        payload: data?.[0] ?? null,
+        payload: data,
       });
 
       toast({
@@ -321,17 +389,24 @@ export function SubscriptionProvider({
 
       router.push('/dashboard');
     } catch (error) {
-      console.error('Error creating subscription', error);
+      console.error('[DEBUG] Error creating subscription:', error);
       dispatch({
         type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to create subscription',
+        payload:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create subscription',
       });
       toast({
         title: 'Error',
         description:
-          (error as Error).message || 'Failed to create subscription',
+          error instanceof Error
+            ? error.message
+            : 'Failed to create subscription',
         variant: 'destructive',
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -348,19 +423,30 @@ export function SubscriptionProvider({
     }
 
     try {
+      console.log('[DEBUG] Canceling subscription via API');
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      const { error } = await supabase
-        .from('subscriptions')
-        .update({
-          status: 'canceled',
-          subscription_end: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
+      const response = await fetch('/api/subscriptions', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'canceled' }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to cancel subscription');
+      }
 
-      dispatch({ type: 'CLEAR_SUBSCRIPTION' });
+      const data = await response.json();
+      console.log('[DEBUG] Subscription canceled:', data);
+
+      dispatch({
+        type: 'SET_SUBSCRIPTION',
+        payload: data,
+      });
 
       toast({
         title: 'Success',
@@ -369,17 +455,24 @@ export function SubscriptionProvider({
 
       router.push('/dashboard');
     } catch (error) {
-      console.error('Error canceling subscription', error);
+      console.error('[DEBUG] Error canceling subscription:', error);
       dispatch({
         type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to cancel subscription',
+        payload:
+          error instanceof Error
+            ? error.message
+            : 'Failed to cancel subscription',
       });
       toast({
         title: 'Error',
         description:
-          (error as Error).message || 'Failed to cancel subscription',
+          error instanceof Error
+            ? error.message
+            : 'Failed to cancel subscription',
         variant: 'destructive',
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -439,8 +532,7 @@ export function SubscriptionProvider({
 
   const getSubscriptionTier = (): SubscriptionTier => {
     if (!state.subscription) return 'free';
-    if (state.subscription.status !== 'active') return 'free';
-    return state.subscription.tier;
+    return state.subscription.plan_id === '1' ? 'premium' : 'basic';
   };
 
   const hasFeature = (feature: string): boolean => {
@@ -451,13 +543,14 @@ export function SubscriptionProvider({
   };
 
   const getRemainingDays = (): number | null => {
-    if (!state.subscription) return null;
-    if (state.subscription.status !== 'active') return null;
+    if (!state.subscription?.subscription_end) return null;
 
-    const end = new Date(state.subscription.subscription_end);
+    const endDate = new Date(state.subscription.subscription_end);
     const now = new Date();
-    const diff = end.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    const diffTime = endDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return diffDays > 0 ? diffDays : 0;
   };
 
   return (

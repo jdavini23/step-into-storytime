@@ -1,7 +1,11 @@
-import { Message, ConversationState, StoryDataState } from '@/components/chat/types';
+import {
+  Message,
+  ConversationState,
+  StoryDataState,
+} from '@/components/chat/types';
 import { SETTINGS, THEMES, LENGTH_OPTIONS } from './story-options';
 
-export type ConversationStep = 
+export type ConversationStep =
   | 'name'
   | 'age'
   | 'traits'
@@ -12,7 +16,7 @@ export type ConversationStep =
 
 export function determineNextStep(state: ConversationState): ConversationStep {
   const { storyData } = state;
-  
+
   if (!storyData.character?.name) return 'name';
   if (!storyData.character?.age) return 'age';
   if (!storyData.character?.traits?.length) return 'traits';
@@ -22,65 +26,115 @@ export function determineNextStep(state: ConversationState): ConversationStep {
   return 'confirm';
 }
 
-export function generateResponse(step: ConversationStep, state: ConversationState): Message {
+export function generateResponse(
+  step: ConversationStep,
+  state: ConversationState
+): Message {
   const baseMessage: Partial<Message> = {
-    id: Date.now().toString(),
+    id: crypto.randomUUID(),
     type: 'ai',
     timestamp: Date.now(),
   };
+
+  const hasExistingMessage = state.messages.some(
+    (msg) => msg.type === 'ai' && msg.content?.includes(getStepIdentifier(step))
+  );
+
+  if (hasExistingMessage) {
+    return {
+      ...baseMessage,
+      content: "I'm waiting for your response!",
+      isRepeat: true,
+    } as Message;
+  }
 
   switch (step) {
     case 'name':
       return {
         ...baseMessage,
-        content: "Hi! I'm excited to help you create a story. What's the name of our main character?",
+        content:
+          "✨ Let's begin our magical adventure! First, tell me the name of our story's hero - who will be starring in this tale?",
       } as Message;
-    
+
     case 'age':
       return {
         ...baseMessage,
-        content: `Nice to meet ${state.storyData.character?.name}! How old are they?`,
+        content: `🎂 And how many birthdays has our wonderful friend ${state.storyData.character?.name} celebrated?`,
       } as Message;
-    
+
     case 'traits':
       return {
         ...baseMessage,
-        content: "What are three words that best describe their personality?",
+        content:
+          '🌟 What makes our hero special? Pick the magical qualities that make them shine! (Choose as many as you like)',
       } as Message;
-    
+
     case 'setting':
-      const settingOptions = SETTINGS.map(s => s.title).join(', ');
+      const settingOptions = SETTINGS.map((s) => `🌈 ${s.title}`).join(', ');
       return {
         ...baseMessage,
-        content: `Where should our story take place? Choose from: ${settingOptions}`,
+        content: `🗺️ Now, let's pick a magical place where our story will unfold! Where shall we go? Choose from: ${settingOptions}`,
       } as Message;
-    
+
     case 'theme':
-      const themeOptions = THEMES.map(t => t.title).join(', ');
+      const themeOptions = THEMES.map((t) => `✨ ${t.title}`).join(', ');
       return {
         ...baseMessage,
-        content: `What kind of story should it be? Choose from: ${themeOptions}`,
+        content: `💫 Every great story has a special message! Which magical theme speaks to your heart? Choose from: ${themeOptions}`,
       } as Message;
-    
+
     case 'length':
-      const lengthOptions = LENGTH_OPTIONS.map(l => `${l.title} (${l.description})`).join(', ');
+      const lengthOptions = LENGTH_OPTIONS.map(
+        (l) => `📚 ${l.title} (${l.description})`
+      ).join(', ');
       return {
         ...baseMessage,
-        content: `How long should the story be? ${lengthOptions}`,
+        content: `📖 How long shall our magical tale be? ${lengthOptions}`,
       } as Message;
-    
+
     case 'confirm':
       const { character, setting, theme, length } = state.storyData;
+      const selectedSetting = SETTINGS.find((s) => s.id === setting)?.title;
+      const selectedTheme = THEMES.find((t) => t.id === theme)?.title;
+
       return {
         ...baseMessage,
-        content: `Great! I'll create a ${length} story about ${character?.name}, age ${character?.age}, who is ${character?.traits?.join(', ')}. The story will take place in ${setting} and focus on ${theme}. Should I generate the story now?`,
+        content: `✨ Wonderful! I'll weave a ${length} tale about ${
+          character?.name
+        }, our ${character?.age}-year-old hero who is ${character?.traits?.join(
+          ', '
+        )}. Our adventure will take place in ${selectedSetting} and celebrate the power of ${selectedTheme}. 
+        
+        🪄 Shall I wave my magic wand and bring this story to life?`,
       } as Message;
-    
+
     default:
       return {
         ...baseMessage,
-        content: "I'm not sure what to ask next. Let's start over?",
+        content:
+          "🎭 Oh my! I seem to have lost my place in the story. Let's start our magical journey again!",
       } as Message;
+  }
+}
+
+function getStepIdentifier(step: ConversationStep): string {
+  switch (step) {
+    case 'name':
+      return "Let's begin our magical adventure";
+    case 'age':
+      return 'how many birthdays';
+    case 'traits':
+      return 'What makes our hero special';
+    case 'setting':
+      return 'pick a magical place';
+    case 'theme':
+      return 'special message';
+    case 'length':
+      return 'How long shall our magical tale be';
+    case 'confirm':
+      return 'Shall I wave my magic wand';
+    default:
+      return '';
   }
 }
 
@@ -91,52 +145,98 @@ export function processUserInput(
 ): { storyData: StoryDataState } {
   const newStoryData: StoryDataState = {
     ...state.storyData,
-    character: state.storyData.character || { name: '', age: '', traits: [] }
+    character: state.storyData.character || { name: '', age: '', traits: [] },
   };
-  
+
+  if (!input.trim()) {
+    return { storyData: newStoryData };
+  }
+
   switch (currentStep) {
     case 'name':
-      newStoryData.character = {
-        ...newStoryData.character!,
-        name: input
-      };
+      if (!newStoryData.character?.name) {
+        newStoryData.character = {
+          ...newStoryData.character!,
+          name: input,
+        };
+      }
       break;
-    
+
     case 'age':
-      newStoryData.character = {
-        ...newStoryData.character!,
-        age: input
-      };
+      if (!newStoryData.character?.age) {
+        newStoryData.character = {
+          ...newStoryData.character!,
+          age: input,
+        };
+      }
       break;
-    
+
     case 'traits':
-      newStoryData.character = {
-        ...newStoryData.character!,
-        traits: input.split(/[,\s]+/).filter(Boolean).slice(0, 3)
-      };
+      if (!newStoryData.character?.traits?.length) {
+        newStoryData.character = {
+          ...newStoryData.character!,
+          traits: input
+            .split(/[,\s]+/)
+            .filter(Boolean)
+            .slice(0, 3),
+        };
+      }
       break;
-    
+
     case 'setting':
-      const setting = SETTINGS.find(
-        s => s.title.toLowerCase() === input.toLowerCase()
-      );
-      if (setting) newStoryData.setting = setting.id;
+      // First try exact match with the setting ID
+      let setting = SETTINGS.find((s) => s.id === input);
+
+      // If no exact match, try matching by title (case-insensitive)
+      if (!setting) {
+        setting = SETTINGS.find(
+          (s) =>
+            s.title.toLowerCase() === input.toLowerCase() ||
+            input.toLowerCase().includes(s.title.toLowerCase()) ||
+            s.title.toLowerCase().includes(input.toLowerCase())
+        );
+      }
+
+      if (setting) {
+        newStoryData.setting = setting.id;
+      }
       break;
-    
+
     case 'theme':
-      const theme = THEMES.find(
-        t => t.title.toLowerCase() === input.toLowerCase()
-      );
-      if (theme) newStoryData.theme = theme.id;
+      // First try exact match with the theme ID
+      let theme = THEMES.find((t) => t.id === input);
+
+      // If no exact match, try matching by title (case-insensitive)
+      if (!theme) {
+        theme = THEMES.find(
+          (t) =>
+            t.title.toLowerCase() === input.toLowerCase() ||
+            input.toLowerCase().includes(t.title.toLowerCase()) ||
+            t.title.toLowerCase().includes(input.toLowerCase())
+        );
+      }
+
+      if (theme) {
+        newStoryData.theme = theme.id;
+      }
       break;
-    
+
     case 'length':
-      const length = LENGTH_OPTIONS.find(
-        l => l.title.toLowerCase() === input.toLowerCase()
-      );
-      if (length) newStoryData.length = length.id as 'short' | 'medium' | 'long';
+      // First try exact match with the length ID
+      let length = LENGTH_OPTIONS.find((l) => l.id === input);
+
+      // If no exact match, try matching by title (case-insensitive)
+      if (!length) {
+        length = LENGTH_OPTIONS.find(
+          (l) => l.title.toLowerCase() === input.toLowerCase()
+        );
+      }
+
+      if (length) {
+        newStoryData.length = length.id as 'short' | 'medium' | 'long';
+      }
       break;
   }
-  
+
   return { storyData: newStoryData };
 }

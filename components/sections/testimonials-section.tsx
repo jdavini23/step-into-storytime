@@ -24,21 +24,21 @@ export default function TestimonialsSection() {
             quote="My daughter asks for her personalized unicorn story every night! It's become our special bedtime ritual."
             name="Sarah M."
             role="Mom of 2"
-            image="/placeholder.svg?height=80&width=80"
+            image="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop"
           />
 
           <TestimonialCard
             quote="I love that I'm the hero in my own space adventure! The aliens are funny and the stories are always different."
             name="Ethan, age 7"
             role="Junior Astronaut"
-            image="/placeholder.svg?height=80&width=80"
+            image="https://images.unsplash.com/photo-1513959663939-eb7424f0e121?w=150&h=150&fit=crop"
           />
 
           <TestimonialCard
             quote="As a busy dad, I appreciate how quick it is to create a new story. My son's face lights up every time!"
             name="Michael T."
             role="Father of a superhero fan"
-            image="/placeholder.svg?height=80&width=80"
+            image="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop"
           />
         </div>
       </div>
@@ -59,13 +59,13 @@ function TestimonialCard({ quote, name, role, image }: TestimonialCardProps) {
       <CardContent className="pt-6">
         <div className="flex items-center mb-4">
           <div className="mr-4">
-            <div className="h-12 w-12 rounded-full overflow-hidden">
+            <div className="h-12 w-12 rounded-full overflow-hidden bg-white ring-4 ring-white">
               <Image
-                src={image || '/placeholder.svg'}
-                alt={name}
-                width={48}
-                height={48}
-                className="object-cover"
+                src={image}
+                alt={`${name}'s profile picture`}
+                width={150}
+                height={150}
+                className="object-cover w-full h-full"
               />
             </div>
           </div>

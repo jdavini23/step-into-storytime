@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/eslintrc",
+  "root": true,
+  "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "globals": {
+    "process": "readonly"
+  },
+  "rules": {
+    "@next/next/no-html-link-for-pages": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }]
+  },
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  }
+}

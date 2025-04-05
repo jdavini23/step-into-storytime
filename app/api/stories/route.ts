@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { StoryData } from '@/components/story/common/types';
 import type { Story } from '@/contexts/story-context';
 import { createClient } from '@/utils/supabase/server';
 import { generateStory } from '@/utils/ai/story-generator';
 import type { Database } from '@/types/supabase';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
 // In-memory storage for demo purposes
 // TODO: Replace with database storage
+// Consider using a more robust storage solution like a database
 let stories: Story[] = [];
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error: authError,
-    } = await (await supabase).auth.getUser();
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -26,7 +25,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: stories, error } = await (await supabase)
+    const { data: stories, error } = await supabase
       .from('stories')
       .select('*')
       .eq('user_id', user.id)
@@ -73,58 +72,45 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Generate the story using AI with optimized settings
-      const generatedStory = await generateStory({
-        character: json.character,
-        theme: json.theme,
-        setting: json.setting,
-        targetAge: parseInt(json.character.age) || 6,
-        readingLevel: json.readingLevel || 'beginner',
-        language: json.language || 'en',
-        style: json.style,
-        educationalFocus: json.educationalFocus,
-      });
-
       // Format story data to match database schema
       const storyData = {
-        id: uuidv4(), // Generate a UUID for the story
-        title: generatedStory.title || 'Untitled Story',
-        content: generatedStory.content,
-        main_character: {
-          name: json.character.name,
-          age: json.character.age,
-          traits: json.character.traits || [],
-        },
+        id: json.id || crypto.randomUUID(),
+        title: json.title || 'Untitled Story',
+        content: typeof json.content === 'string' ? json.content : JSON.stringify(json.content),
+        character: json.character,
         setting: json.setting,
         theme: json.theme,
-        plot_elements: [],
+        plot_elements: json.plot_elements || [],
         is_published: false,
         user_id: user.id,
+        thumbnail_url: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      // Use upsert for better performance
+      console.log('Creating story with data:', storyData);
+
+      // Use insert instead of upsert since this is a new story
       const { data: story, error } = await supabase
         .from('stories')
-        .upsert([storyData])
+        .insert([storyData])
         .select()
         .single();
 
       if (error) {
         console.error('Error saving story:', error);
         return NextResponse.json(
-          { error: 'Failed to save story' },
+          { error: 'Failed to save story', details: error.message },
           { status: 500 }
         );
       }
 
       return NextResponse.json(story);
     } catch (error: any) {
-      console.error('Error generating story:', error);
+      console.error('Error saving story:', error);
       return NextResponse.json(
         {
-          error: 'Failed to generate story',
+          error: 'Failed to save story',
           details: error.message,
         },
         { status: 500 }
@@ -133,7 +119,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error in story creation endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal Server Error' },
+      { error: 'Internal Server Error', details: error.message },
       { status: 500 }
     );
   }
@@ -141,7 +127,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { storyId: string } }
+  context: { params: Promise<{ storyId: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -159,11 +145,15 @@ export async function PUT(
     const body = await request.json();
     const { id, ...updateData } = body;
 
+    // Get storyId from params if available
+    const params = await context.params;
+    const storyId = params?.storyId || id;
+
     // Verify story ownership
     const { data: existingStory } = await supabase
       .from('stories')
       .select('user_id')
-      .eq('id', id)
+      .eq('id', storyId)
       .single();
 
     if (!existingStory || existingStory.user_id !== user.id) {
@@ -176,7 +166,7 @@ export async function PUT(
     const { data: story, error } = await supabase
       .from('stories')
       .update(updateData)
-      .eq('id', id)
+      .eq('id', storyId)
       .select()
       .single();
 
@@ -200,7 +190,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { storyId: string } }
+  context: { params: Promise<{ storyId: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -215,7 +205,17 @@ export async function DELETE(
       );
     }
 
-    const storyId = params.storyId;
+    // Get storyId from params if available
+    const params = await context.params;
+    const storyId =
+      params?.storyId || request.nextUrl.pathname.split('/').pop();
+
+    if (!storyId) {
+      return NextResponse.json(
+        { error: 'Story ID is required' },
+        { status: 400 }
+      );
+    }
 
     // Verify story ownership
     const { data: existingStory } = await supabase

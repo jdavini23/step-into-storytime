@@ -1,15 +1,27 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+interface StoryParams {
+  storyId: string;
+}
+
+interface RouteContext {
+  params: Promise<{ storyId: string }>;
+}
+
 export async function GET(
-  request: Request,
-  { params }: { params: { storyId: string } }
-) {
+  request: NextRequest,
+  context: { params: Promise<{ storyId: string }> }
+): Promise<NextResponse> {
   try {
     const supabase = await createClient();
-
-    // Get the story ID from the URL params
+    const params = await context.params;
     const storyId = params.storyId;
+
     if (!storyId) {
       return NextResponse.json(
         { error: 'Story ID is required' },
@@ -72,9 +84,9 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { storyId: string } }
-) {
+  request: NextRequest,
+  context: { params: Promise<{ storyId: string }> }
+): Promise<NextResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -89,6 +101,7 @@ export async function PUT(
       );
     }
 
+    const params = await context.params;
     const storyId = params.storyId;
     const body = await request.json();
 
@@ -107,10 +120,34 @@ export async function PUT(
       );
     }
 
+    // Validate content structure
+    if (!body.content || typeof body.content !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid content format - content must be an object' },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(body.content.en) || !Array.isArray(body.content.es)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid content format - content must have en and es arrays',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Format the update data
+    const updateData = {
+      ...body,
+      content: JSON.stringify(body.content), // Stringify for database storage
+      updated_at: new Date().toISOString(),
+    };
+
     // Update the story
     const { data: story, error } = await supabase
       .from('stories')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', storyId)
       .eq('user_id', user.id)
       .select()
@@ -135,9 +172,9 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { storyId: string } }
-) {
+  request: NextRequest,
+  context: { params: Promise<{ storyId: string }> }
+): Promise<NextResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -152,7 +189,9 @@ export async function DELETE(
       );
     }
 
+    const params = await context.params;
     const storyId = params.storyId;
+
     if (!storyId) {
       return NextResponse.json(
         { error: 'Story ID is required' },

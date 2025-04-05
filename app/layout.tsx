@@ -6,10 +6,8 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { AuthProvider } from '@/contexts/auth-context';
 import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
-// Import the consolidated CSS file
 import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
-import { Metadata as NextMetadata } from 'next';
 
 // Initialize font
 const inter = Inter({
@@ -20,13 +18,22 @@ const inter = Inter({
 
 // Define metadata
 export const metadata: Metadata = {
-  title: 'Step Into Storytime',
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
+  ),
+  title: {
+    default: 'Step Into Storytime',
+    template: '%s | Step Into Storytime',
+  },
   description: 'An interactive storytelling experience for children',
-  metadataBase: new URL('http://localhost:3002'),
   openGraph: {
-    title: 'Step Into Storytime',
+    title: {
+      default: 'Step Into Storytime',
+      template: '%s | Step Into Storytime',
+    },
     description: 'Create magical, personalized bedtime stories for children',
     type: 'website',
+    siteName: 'Step Into Storytime',
   },
   twitter: {
     card: 'summary_large_image',
@@ -53,16 +60,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
-      <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, minimum-scale=1"
-        />
-      </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ErrorBoundary>
           <ThemeProvider
-            attribute={['class']}
+            attribute="class"
             defaultTheme="light"
             enableSystem
             disableTransitionOnChange

@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mic, Send, Plus } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
+import { QuickReply } from './QuickReply';
 import type {
   Message,
   ConversationState,
@@ -15,13 +16,14 @@ import type {
   StoryDataState,
 } from './types';
 import {
-  ConversationStep,
   determineNextStep,
   generateResponse,
   processUserInput,
 } from '@/lib/conversation-manager';
+import type { ConversationStep } from '@/lib/conversation-manager';
 import { SETTINGS, THEMES, LENGTH_OPTIONS } from '../../lib/story-options';
 import { useAuth } from '@/contexts/auth-context';
+import { cn } from '@/lib/utils';
 
 const handleError = (
   error: any,
@@ -36,7 +38,6 @@ const handleError = (
     errorMessage = error.message;
   }
 
-  // Add error message to chat using the correct Message type
   setState((prev) => ({
     ...prev,
     messages: [
@@ -52,7 +53,6 @@ const handleError = (
     ],
   }));
 
-  // Also call the error handler prop
   onError(errorMessage);
 };
 
@@ -66,8 +66,12 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
   });
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [currentStep, setCurrentStep] = useState<ConversationStep>('name');
+  const inputRef = useRef<HTMLInputElement>(null);
+  let nextStep: ConversationStep;
+  let previousStep: ConversationStep;
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -79,7 +83,6 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
   };
 
   useEffect(() => {
-    // Only scroll if we're near the bottom already or if we're typing
     const container = messagesEndRef.current?.parentElement;
     if (container) {
       const isNearBottom =
@@ -91,7 +94,6 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
     }
   }, [state.messages, state.isTyping]);
 
-  // Initial greeting
   useEffect(() => {
     const initialMessage = generateResponse('name', state);
     setState((prev) => ({
@@ -101,51 +103,67 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
   }, []);
 
   const handleSend = async (e?: React.FormEvent) => {
-    e?.preventDefault(); // Prevent form submission
+    e?.preventDefault();
     if (!input.trim() && !state.editingMessageId) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       type: 'user',
       content: input,
       timestamp: Date.now(),
+      status: 'sent',
     };
 
-    setState((prev) => ({
-      ...prev,
-      messages: [...prev.messages, userMessage],
-      isTyping: true,
-    }));
+    // Check if this is a duplicate message within 5 seconds
+    const isDuplicate = state.messages.some(
+      (message) =>
+        message.type === 'user' &&
+        message.content.toLowerCase() === input.toLowerCase() &&
+        Date.now() - message.timestamp < 5000
+    );
 
-    setInput('');
-
-    // Process user input
-    const updates = processUserInput(input, currentStep, state);
-    const newState = {
-      ...state,
-      ...updates,
-    };
-
-    // Determine next step
-    const nextStep = determineNextStep(newState);
-    setCurrentStep(nextStep);
-
-    // If we've reached confirm and user says yes, generate the story
-    if (currentStep === 'confirm' && input.toLowerCase().includes('yes')) {
-      await generateStory(newState);
-      return;
-    }
-
-    // Generate AI response for the next step
-    setTimeout(() => {
-      const aiResponse = generateResponse(nextStep, newState);
+    if (!isDuplicate) {
       setState((prev) => ({
         ...prev,
-        ...updates,
-        messages: [...prev.messages, aiResponse],
-        isTyping: false,
+        messages: [...prev.messages, userMessage],
+        isTyping: true,
       }));
-    }, 1000);
+
+      setInput('');
+
+      const updates = processUserInput(input, currentStep, state);
+      const newState = {
+        ...state,
+        ...updates,
+      };
+
+      // Determine the next step based on the updated state
+      const nextStepToUse = determineNextStep(newState);
+
+      // Only update the current step if it's different
+      if (nextStepToUse !== currentStep) {
+        setCurrentStep(nextStepToUse);
+      }
+
+      if (currentStep === 'confirm' && input.toLowerCase().includes('yes')) {
+        await generateStory(newState);
+        return;
+      }
+
+      // Add delay for natural conversation flow
+      setTimeout(() => {
+        const aiResponse = generateResponse(nextStepToUse, newState);
+
+        setState((prev) => ({
+          ...prev,
+          ...updates,
+          messages: [...prev.messages, aiResponse],
+          isTyping: false,
+        }));
+      }, 1000);
+    } else {
+      setInput('');
+    }
   };
 
   const generateStory = async (currentState: ConversationState) => {
@@ -166,14 +184,13 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         title: `${storyData.character?.name}'s ${
           SETTINGS.find((s) => s.id === storyData.setting)?.title || 'Adventure'
         }`,
-        mainCharacter: {
+        character: {
           name: storyData.character?.name || '',
           age: storyData.character?.age || '',
           traits: storyData.character?.traits || [],
         },
-        setting:
-          SETTINGS.find((s) => s.id === storyData.setting)?.description || '',
-        theme: THEMES.find((t) => t.id === storyData.theme)?.description || '',
+        setting: SETTINGS.find((s) => s.id === storyData.setting)?.id || '',
+        theme: THEMES.find((t) => t.id === storyData.theme)?.id || '',
         plotElements: [],
       };
 
@@ -189,42 +206,64 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
       }
 
       const data = await response.json();
-      const initialContent = data.content;
 
       // Create story in Supabase
+      const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
+      const selectedTheme = THEMES.find((t) => t.id === storyData.theme);
+
+      const storyPayload = {
+        id: crypto.randomUUID(),
+        title: `${storyData.character?.name}'s ${
+          selectedSetting?.title || 'Adventure'
+        }`,
+        content: JSON.stringify(data.content),
+        character: {
+          name: storyData.character?.name || '',
+          age: storyData.character?.age || '',
+          traits: storyData.character?.traits || [],
+        },
+        setting: selectedSetting?.id,
+        theme: selectedTheme?.id,
+        plot_elements: [],
+        is_published: false,
+        user_id: authState.user?.id,
+        thumbnail_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const storyResponse = await fetch('/api/stories', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title: payload.title,
-          description: `A story about ${storyData.character?.name} in ${
-            SETTINGS.find((s) => s.id === storyData.setting)?.title ||
-            'a magical place'
-          }`,
-          content: initialContent,
-          character: {
-            name: storyData.character?.name || '',
-            age: storyData.character?.age || '',
-            traits: storyData.character?.traits || [],
-          },
-          theme: storyData.theme || '',
-          setting: storyData.setting || '',
-          readingLevel: 'beginner',
-          language: 'en',
-          style: 'adventure',
-          targetAge: parseInt(storyData.character?.age || '6'),
-        }),
+        body: JSON.stringify(storyPayload),
       });
 
       if (!storyResponse.ok) {
         const errorData = await storyResponse.json();
-        throw new Error(errorData.error || 'Failed to save story');
+        throw new Error(
+          errorData.error || `Failed to save story: ${storyResponse.status}`
+        );
       }
 
       const story = await storyResponse.json();
+
+      setState((prev) => ({
+        ...prev,
+        messages: [
+          ...prev.messages,
+          {
+            id: Date.now().toString(),
+            type: 'ai',
+            content:
+              '✨ Story created successfully! Redirecting you to your story...',
+            timestamp: Date.now(),
+          },
+        ],
+      }));
+
       onComplete(story);
     } catch (error: any) {
       console.error('Story generation error:', error);
@@ -234,85 +273,107 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
     }
   };
 
+  const handleReact = (messageId: string, reaction: string) => {
+    setState((prev) => ({
+      ...prev,
+      messages: prev.messages.map((msg) =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              reactions: [...(msg.reactions || []), reaction],
+            }
+          : msg
+      ),
+    }));
+  };
+
   const getQuickReplies = () => {
     switch (currentStep) {
       case 'setting':
-        return SETTINGS.map((s) => s.title);
+        return SETTINGS.map((setting) => ({
+          label: `🌈 ${setting.title}`,
+          value: setting.id,
+        }));
       case 'theme':
-        return THEMES.map((t) => t.title);
+        return THEMES.map((theme) => ({
+          label: `✨ ${theme.title}`,
+          value: theme.id,
+        }));
       case 'length':
-        return LENGTH_OPTIONS.map((l) => l.title);
+        return LENGTH_OPTIONS.map((option) => ({
+          label: `📚 ${option.title}`,
+          value: option.id,
+        }));
       case 'confirm':
-        return ['Yes, generate story!', 'No, let me change something'];
+        return [
+          { label: '✨ Yes, generate story!', value: 'yes' },
+          { label: '🔄 No, let me change something', value: 'no' },
+        ];
       default:
         return [];
     }
   };
 
+  const quickReplies = getQuickReplies();
+
   return (
-    <Card className="w-full max-w-2xl mx-auto p-4 h-[600px] flex flex-col">
-      <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-        <AnimatePresence mode="popLayout">
+    <Card className="flex flex-col h-full overflow-hidden rounded-xl border shadow-lg">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <AnimatePresence initial={false}>
           {state.messages.map((message) => (
-            <motion.div
+            <MessageBubble
               key={message.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-            >
-              <MessageBubble
-                message={message}
-                onEdit={() =>
-                  setState((prev) => ({
-                    ...prev,
-                    editingMessageId: message.id,
-                  }))
-                }
-              />
-            </motion.div>
+              message={message}
+              onReact={
+                message.type === 'ai'
+                  ? (reaction) => handleReact(message.id, reaction)
+                  : undefined
+              }
+            />
           ))}
-          {state.isTyping && <TypingIndicator />}
         </AnimatePresence>
+        {state.isTyping && <TypingIndicator />}
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSend} className="flex gap-2 mt-auto">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your response..."
-          disabled={isGenerating}
-          className="flex-1"
-        />
-        <Button type="submit" disabled={isGenerating}>
-          {isGenerating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            'Send'
-          )}
-        </Button>
-      </form>
-
-      {/* Quick replies */}
-      <div className="flex flex-wrap gap-2 mt-2">
-        {getQuickReplies().map((reply) => (
-          <Button
-            key={reply}
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setInput(reply);
+      {quickReplies.length > 0 && (
+        <div className="px-4 py-2 border-t">
+          <QuickReply
+            options={quickReplies}
+            onSelect={(value) => {
+              setInput(value);
               handleSend();
             }}
+            variant="ghost"
+          />
+        </div>
+      )}
+
+      <form
+        onSubmit={handleSend}
+        className="p-4 border-t flex items-center gap-2"
+      >
+        <div className="relative flex-1">
+          <Input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            className="pr-10"
             disabled={isGenerating}
-          >
-            {reply}
-          </Button>
-        ))}
-      </div>
+          />
+          {input.trim() && (
+            <Button
+              type="submit"
+              size="icon"
+              variant="ghost"
+              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            >
+              <Send className="h-5 w-5" />
+            </Button>
+          )}
+        </div>
+      </form>
     </Card>
   );
 }

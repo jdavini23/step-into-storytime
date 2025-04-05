@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function POST(request: Request) {
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function POST(request: NextRequest) {
   try {
     const { prompt } = await request.json();
 
@@ -26,10 +30,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      url: response.data[0].url,
+      success: true,
+      imageUrl: response.data[0].url,
     });
   } catch (error) {
-    console.error('Error generating image:', error);
+    console.error('Image generation error:', error);
     return NextResponse.json(
       { error: 'Failed to generate image' },
       { status: 500 }

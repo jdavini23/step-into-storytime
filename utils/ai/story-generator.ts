@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import { StoryData } from '@/components/story/common/types';
 import type { Database } from '@/types/supabase';
 
 const openai = new OpenAI({
@@ -94,7 +93,7 @@ ${
     return {
       title: title || `${prompt.character.name}'s Adventure`,
       content: paragraphs.join('\n\n'),
-      main_character: {
+      character: {
         name: prompt.character.name,
         age: prompt.character.age,
         traits: prompt.character.traits,

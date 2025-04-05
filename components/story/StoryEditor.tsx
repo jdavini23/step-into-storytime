@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StoryData } from './common/types';
 import { toast } from 'sonner';
 
 interface StoryEditorProps {
@@ -24,7 +23,7 @@ type ReadingLevel = 'beginner' | 'intermediate' | 'advanced';
 export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [story, setStory] = useState<StoryData | null>(null);
+  const [story, setStory] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchStory = async () => {
@@ -34,8 +33,23 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
           throw new Error('Failed to fetch story');
         }
         const data = await response.json();
+
+        // Parse the content if it's a string
+        if (typeof data.content === 'string') {
+          try {
+            data.content = JSON.parse(data.content);
+          } catch (e) {
+            // If parsing fails, set default structure
+            data.content = {
+              en: [data.content || ''],
+              es: [''],
+            };
+          }
+        }
+
         setStory(data);
       } catch (error) {
+        console.error('Error loading story:', error);
         toast.error('Failed to load story');
       } finally {
         setIsLoading(false);
@@ -51,22 +65,36 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
 
     setIsSaving(true);
     try {
+      // Ensure content has the correct structure
+      const formattedStory = {
+        ...story,
+        content: {
+          en: Array.isArray(story.content?.en) ? story.content.en : [],
+          es: Array.isArray(story.content?.es) ? story.content.es : [],
+        },
+        updated_at: new Date().toISOString(),
+      };
+
       const response = await fetch(`/api/stories/${storyId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(story),
+        body: JSON.stringify(formattedStory),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update story');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update story');
       }
 
       toast.success('Story updated successfully');
       onSave();
     } catch (error) {
-      toast.error('Failed to update story');
+      console.error('Error updating story:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update story'
+      );
     } finally {
       setIsSaving(false);
     }
@@ -99,7 +127,7 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
           </label>
           <Input
             id="title"
-            value={story.title}
+            value={story.title || ''}
             onChange={(e) => setStory({ ...story, title: e.target.value })}
             required
           />
@@ -111,7 +139,7 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
           </label>
           <Textarea
             id="description"
-            value={story.description}
+            value={story.description || ''}
             onChange={(e) =>
               setStory({ ...story, description: e.target.value })
             }
@@ -129,7 +157,7 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
               type="number"
               min={1}
               max={12}
-              value={story.targetAge}
+              value={story.targetAge || ''}
               onChange={(e) =>
                 setStory({ ...story, targetAge: parseInt(e.target.value) || 6 })
               }
@@ -142,7 +170,7 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
               Reading Level
             </label>
             <Select
-              value={story.readingLevel as ReadingLevel}
+              value={story.readingLevel || 'beginner'}
               onValueChange={(value: ReadingLevel) =>
                 setStory({ ...story, readingLevel: value })
               }
@@ -162,42 +190,46 @@ export function StoryEditor({ storyId, onSave, onCancel }: StoryEditorProps) {
         <div className="space-y-2">
           <label className="text-sm font-medium">Story Content (English)</label>
           <div className="space-y-4">
-            {story.content.en.map((paragraph, index) => (
-              <Textarea
-                key={index}
-                value={paragraph}
-                onChange={(e) => {
-                  const newContent = [...story.content.en];
-                  newContent[index] = e.target.value;
-                  setStory({
-                    ...story,
-                    content: { ...story.content, en: newContent },
-                  });
-                }}
-                className="min-h-[100px]"
-              />
-            ))}
+            {(story.content.en || []).map(
+              (paragraph: string, index: number) => (
+                <Textarea
+                  key={index}
+                  value={paragraph}
+                  onChange={(e) => {
+                    const newContent = [...(story.content.en || [])];
+                    newContent[index] = e.target.value;
+                    setStory({
+                      ...story,
+                      content: { ...story.content, en: newContent },
+                    });
+                  }}
+                  className="min-h-[100px]"
+                />
+              )
+            )}
           </div>
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Story Content (Spanish)</label>
           <div className="space-y-4">
-            {story.content.es.map((paragraph, index) => (
-              <Textarea
-                key={index}
-                value={paragraph}
-                onChange={(e) => {
-                  const newContent = [...story.content.es];
-                  newContent[index] = e.target.value;
-                  setStory({
-                    ...story,
-                    content: { ...story.content, es: newContent },
-                  });
-                }}
-                className="min-h-[100px]"
-              />
-            ))}
+            {(story.content.es || []).map(
+              (paragraph: string, index: number) => (
+                <Textarea
+                  key={index}
+                  value={paragraph}
+                  onChange={(e) => {
+                    const newContent = [...(story.content.es || [])];
+                    newContent[index] = e.target.value;
+                    setStory({
+                      ...story,
+                      content: { ...story.content, es: newContent },
+                    });
+                  }}
+                  className="min-h-[100px]"
+                />
+              )
+            )}
           </div>
         </div>
 

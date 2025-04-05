@@ -1,24 +1,22 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { StoryEditor } from '@/components/story/StoryEditor';
+import { StoryEditorWrapper } from '../../../../components/story/StoryEditorWrapper';
+import { notFound } from 'next/navigation';
 
 interface EditStoryPageProps {
   params: {
     storyId: string;
   };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-export default function EditStoryPage({ params }: EditStoryPageProps) {
-  const router = useRouter();
+export default async function EditStoryPage({
+  params,
+  searchParams,
+}: EditStoryPageProps) {
+  const storyId = await Promise.resolve(params.storyId);
 
-  const handleSave = () => {
-    router.push('/stories');
-  };
-
-  const handleCancel = () => {
-    router.back();
-  };
+  if (!storyId) {
+    return notFound();
+  }
 
   return (
     <div className="container mx-auto py-8">
@@ -29,11 +27,7 @@ export default function EditStoryPage({ params }: EditStoryPageProps) {
         </p>
       </div>
 
-      <StoryEditor
-        storyId={params.storyId}
-        onSave={handleSave}
-        onCancel={handleCancel}
-      />
+      <StoryEditorWrapper storyId={storyId} />
     </div>
   );
 }
