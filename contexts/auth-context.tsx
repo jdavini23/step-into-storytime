@@ -233,79 +233,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Initialize auth state
   const initializeAuth = useCallback(async () => {
-    // No SET_LOADING/SET_INITIALIZING here, handled by listener/direct calls
+    console.log('Starting auth initialization');
     try {
-      console.log('Starting auth initialization');
-      // dispatch({ type: 'SET_LOADING', payload: true });        // Removed
-      // dispatch({ type: 'SET_INITIALIZING', payload: true }); // Removed
-
-      // Remove delay: await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
+      // Get current session
+      let {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
       if (sessionError) {
-        console.error('Session error during init:', sessionError);
+        console.error('Session error:', sessionError);
         throw sessionError;
       }
 
-      const session = sessionData?.session;
-
       if (!session) {
-        console.log('No active session found during init.');
+        console.log('No session found, dispatching INITIALIZE with null user');
         dispatch({
           type: 'INITIALIZE',
           payload: { user: null, profile: null },
         });
-        return; // Exit early if no session
+        return;
       }
 
-      // Remove delay: await new Promise((resolve) => setTimeout(resolve, 100));
+      // Try to refresh the session if it's expired or close to expiring
+      const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+      const isExpired = expiresAt < Date.now();
+      const isCloseToExpiring = expiresAt - Date.now() < 5 * 60 * 1000; // 5 minutes
 
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser();
+      if (isExpired || isCloseToExpiring) {
+        console.log('Session needs refresh');
+        const {
+          data: { session: refreshedSession },
+          error: refreshError,
+        } = await supabase.auth.refreshSession();
 
-      if (userError) {
-        console.error('User error during init:', userError);
-        // If user fetch fails despite session, treat as logged out
-        throw userError;
+        if (refreshError) {
+          console.error('Session refresh error:', refreshError);
+          throw refreshError;
+        }
+
+        if (!refreshedSession) {
+          console.log(
+            'No refreshed session, dispatching INITIALIZE with null user'
+          );
+          dispatch({
+            type: 'INITIALIZE',
+            payload: { user: null, profile: null },
+          });
+          return;
+        }
+
+        session = refreshedSession;
       }
 
-      if (!userData?.user) {
-        console.error('No user data found despite active session.');
-        // This case might indicate an inconsistent state, treat as logged out
-        throw new Error('No user data available despite session');
-      }
+      // Get user profile
+      const profile = await fetchOrCreateUserProfile(session.user);
 
-      const user = userData.user as User; // Cast User type
-
-      // Remove delay: await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Use the helper function to get/create profile
-      const profile = await fetchOrCreateUserProfile(user);
-
-      // Remove delays and previous profile logic block
-
-      // Dispatch success with user and profile (profile might be null if helper failed)
-      console.log('Initialization complete. Dispatching INITIALIZE.');
+      console.log('Auth initialized successfully');
       dispatch({
         type: 'INITIALIZE',
-        payload: { user, profile },
+        payload: { user: session.user, profile },
       });
     } catch (error) {
       console.error('Auth initialization error:', error);
-      // Ensure state is reset on any initialization error
       dispatch({
         type: 'INITIALIZE',
         payload: { user: null, profile: null },
       });
-      // Optionally dispatch SET_ERROR if specific error feedback is needed
-      // dispatch({ type: 'SET_ERROR', payload: 'Initialization failed' });
     }
-    // No finally block needed as INITIALIZE sets loading/initializing states
-    // Remove delays: await new Promise((resolve) => setTimeout(resolve, 100));
-    // dispatch({ type: 'SET_LOADING', payload: false }); // Removed
-  }, [dispatch]); // Added dispatch to dependency array
+  }, [dispatch, fetchOrCreateUserProfile]);
 
   // Set up auth listener
   useEffect(() => {
@@ -334,19 +330,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             return;
           }
 
-          // Call initializeAuth on SIGNED_IN, USER_UPDATED, or TOKEN_REFRESHED
-          // INITIALIZE action within initializeAuth will set loading/initializing to false
-          if (
-            event === 'SIGNED_IN' ||
-            event === 'USER_UPDATED' ||
-            event === 'TOKEN_REFRESHED'
-          ) {
-            await initializeAuth();
-          } else {
-            // For other events or if initializeAuth isn't called, ensure loading states are reset
-            dispatch({ type: 'SET_LOADING', payload: false });
-            dispatch({ type: 'SET_INITIALIZING', payload: false });
-          }
+          // Call initializeAuth on any auth state change
+          await initializeAuth();
         });
 
         authListener = subscription.unsubscribe;
@@ -359,8 +344,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     // Initial setup call
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_INITIALIZING', payload: true });
     setupAuthListener().then(() => {
       initializeAuth(); // Initial check on mount
     });
@@ -371,7 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         authListener();
       }
     };
-  }, [initializeAuth, dispatch]); // Added dispatch
+  }, [initializeAuth]);
 
   const login = async (email: string, password: string) => {
     // Set loading state at the beginning

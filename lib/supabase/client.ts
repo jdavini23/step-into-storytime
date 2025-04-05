@@ -1,6 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
 // Type for Supabase instance with all tables
 export type TypedSupabaseClient = ReturnType<
@@ -29,7 +29,7 @@ try {
 }
 
 export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
-  const client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+  const instance = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       detectSessionInUrl: true,
       persistSession: true,
@@ -37,58 +37,104 @@ export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
       storageKey: 'sb-auth-token',
       flowType: 'pkce',
       debug: process.env.NODE_ENV === 'development',
+      storage: {
+        getItem: (key: string): string | null => {
+          try {
+            return localStorage.getItem(key);
+          } catch (error) {
+            console.error('Error reading from localStorage:', error);
+            return null;
+          }
+        },
+        setItem: (key: string, value: string): void => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (error) {
+            console.error('Error writing to localStorage:', error);
+          }
+        },
+        removeItem: (key: string): void => {
+          try {
+            localStorage.removeItem(key);
+          } catch (error) {
+            console.error('Error removing from localStorage:', error);
+          }
+        },
+      },
     },
     global: {
       headers: {
         'X-Client-Info': 'supabase-js-web/2.38.4',
-        apikey: supabaseAnonKey,
       },
-      fetch: (
+      fetch: async (
         url: RequestInfo | URL,
         options: RequestInit = {}
       ): Promise<Response> => {
-        const fetchWithRetry = async (retries = 3): Promise<Response> => {
-          try {
-            // Get the current session
-            const {
-              data: { session },
-            } = await client.auth.getSession();
-            const response: Response = await fetch(url, {
-              ...options,
-              credentials: 'omit',
-              headers: {
-                ...options.headers,
-                apikey: supabaseAnonKey,
-                Authorization: session
-                  ? `Bearer ${session.access_token}`
-                  : `Bearer ${supabaseAnonKey}`,
-                Origin: window.location.origin,
-                'Content-Type': 'application/json',
-              },
-            });
-            if (!response.ok && retries > 0) {
-              console.error('[DEBUG] Fetch error:', {
-                status: response.status,
-                url: url.toString(),
-                retries,
-              });
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response;
-          } catch (error) {
-            if (retries > 0) {
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              return fetchWithRetry(retries - 1);
-            }
-            throw error;
+        try {
+          // Get the current session
+          const {
+            data: { session: currentSession },
+            error: sessionError,
+          } = await instance.auth.getSession();
+
+          if (sessionError) {
+            console.error('Session error:', sessionError);
+            throw sessionError;
           }
-        };
-        return fetchWithRetry();
+
+          // Check if session needs refresh
+          let session = currentSession;
+          if (session?.expires_at) {
+            const expiresAt = session.expires_at * 1000;
+            const isExpired = expiresAt < Date.now();
+            const isCloseToExpiring = expiresAt - Date.now() < 5 * 60 * 1000; // 5 minutes
+
+            if (isExpired || isCloseToExpiring) {
+              console.log('Session needs refresh, attempting to refresh...');
+              const { data: refreshData, error: refreshError } =
+                await instance.auth.refreshSession();
+
+              if (refreshError) {
+                console.error('Session refresh error:', refreshError);
+                throw refreshError;
+              }
+
+              if (!refreshData.session) {
+                throw new Error('Session refresh failed - no session returned');
+              }
+
+              session = refreshData.session;
+            }
+          }
+
+          // Add authorization header if we have a session
+          if (session?.access_token) {
+            options.headers = {
+              ...options.headers,
+              Authorization: `Bearer ${session.access_token}`,
+            };
+          }
+
+          // Make the actual request
+          const response = await fetch(url, {
+            ...options,
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          return response;
+        } catch (error) {
+          console.error('Fetch error:', error);
+          throw error;
+        }
       },
     },
   });
 
-  return client;
+  return instance;
 };
 
 // Export a singleton instance for use in client components

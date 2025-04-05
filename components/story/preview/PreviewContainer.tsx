@@ -4,7 +4,7 @@
 import { useReducer, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { StoryData, ThemeColors, FontSize } from '../common/types';
+import { FontSize, ThemeColors } from '../common/types';
 import StoryHeader from '../common/StoryHeader';
 import StoryText from '../common/StoryText';
 import AudioControls from '../common/AudioControls';

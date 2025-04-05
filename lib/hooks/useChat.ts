@@ -1,11 +1,17 @@
 import { useReducer, useCallback } from 'react';
-import type { Message, ChatState } from '@/components/chat/types';
+import type { Message } from '@/components/chat/types';
 
 type ChatAction =
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'ADD_REACTION'; payload: { messageId: string; reaction: string } };
+
+export interface ChatState {
+  messages: Message[];
+  isLoading: boolean;
+  error: string | null;
+}
 
 const initialState: ChatState = {
   messages: [],
