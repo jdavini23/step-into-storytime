@@ -26,8 +26,11 @@ interface FormErrors {
 
 export default function EnhancedSignInForm() {
   const router = useRouter();
-  const { login, loginWithGoogle, loginWithFacebook, sendMagicLink } =
-    useAuth();
+  const auth = useAuth();
+  const login = auth?.login;
+  const loginWithGoogle = auth?.loginWithGoogle;
+  const loginWithFacebook = auth?.loginWithFacebook;
+  const sendMagicLink = auth?.sendMagicLink;
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
@@ -137,24 +140,37 @@ export default function EnhancedSignInForm() {
       await login(formData.email, formData.password);
 
       // Show success toast
-      toast({
-        title: 'Success!',
-        description: 'Logging you in...',
-        variant: 'default',
-        duration: 3000,
-      });
+      toast &&
+        toast({
+          title: 'Success!',
+          description: 'Logging you in...',
+          variant: 'default',
+          duration: 3000,
+        });
 
       // Add delay before completing to ensure state updates are processed
       await new Promise((resolve) => setTimeout(resolve, 100));
     } catch (error: unknown) {
       console.error('[DEBUG] Login error details:', {
+        error,
         type: error instanceof Error ? 'Error' : typeof error,
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : 'Unknown',
+        code: (error as any)?.code,
+        status: (error as any)?.status,
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      const errorMessage =
-        error instanceof Error ? error.message : 'An unknown error occurred';
+      let errorMessage: string;
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage =
+          (error as { message?: string }).message || JSON.stringify(error);
+      } else {
+        errorMessage = String(error);
+      }
 
       // Handle specific error cases
       if (errorMessage.includes('verify your email')) {
@@ -225,10 +241,12 @@ export default function EnhancedSignInForm() {
   const handleSocialLogin = async (provider: 'google' | 'facebook') => {
     setIsLoading(true);
     try {
-      if (provider === 'google') {
+      if (provider === 'google' && loginWithGoogle) {
         await loginWithGoogle();
-      } else {
+      } else if (provider === 'facebook' && loginWithFacebook) {
         await loginWithFacebook();
+      } else {
+        throw new Error(`Login with ${provider} is not available.`);
       }
     } catch (error) {
       setErrors({

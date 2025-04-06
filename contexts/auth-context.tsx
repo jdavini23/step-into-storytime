@@ -1,70 +1,52 @@
 'use client';
 
-import type React from 'react';
-
-import {
+import React, {
   createContext,
   useContext,
   useReducer,
   useEffect,
   useCallback,
-  useState,
+  useMemo,
+  Dispatch,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase/client';
-import { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { AuthError, PostgrestError, Provider } from '@supabase/supabase-js';
 
-// Define types
-export type UserRole = 'user' | 'admin';
+// Use types from central file
+import {
+  User,
+  UserProfile,
+  AuthAction,
+  AuthState,
+  UserRole,
+} from '@/types/auth';
 
-export interface UserProfile {
-  id: string;
-  name: string | null;
-  email: string;
-  avatar_url: string | null;
-  subscription_tier: 'free' | 'basic' | 'premium' | null;
-  created_at: string;
-  updated_at: string;
-}
+// Import functions from authService
+import {
+  signInWithPassword,
+  signInWithOAuth,
+  signInWithOtp,
+  signOut,
+  signUp,
+  getSupabaseSession,
+  refreshSupabaseSession,
+  getSupabaseUser,
+  getUserProfile,
+  createUserProfile,
+  updateUserProfileData,
+} from '@/services/authService';
 
-export interface User {
-  id: string;
-  email?: string;
-  user_metadata: {
-    name?: string;
-    avatar_url?: string;
-  };
-}
+// Import the custom hook
+import { useAuthListener } from '@/hooks/useAuthListener';
 
-export interface AuthState {
-  user: User | null;
-  profile: UserProfile | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-  isInitialized: boolean;
-  isInitializing: boolean;
-}
+// Remove local type definitions
+// export type UserRole = 'user' | 'admin';
+// export interface AuthState { ... }
+// export type AuthAction = ...
 
-type AuthAction =
-  | {
-      type: 'INITIALIZE';
-      payload: { user: User | null; profile: UserProfile | null };
-    }
-  | {
-      type: 'LOGIN_SUCCESS';
-      payload: { user: User; profile: UserProfile | null };
-    }
-  | { type: 'PROFILE_LOADED'; payload: UserProfile }
-  | { type: 'LOGOUT' }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'UPDATE_PROFILE'; payload: Partial<UserProfile> }
-  | { type: 'UPDATE_USER'; payload: { user: User } }
-  | { type: 'SET_INITIALIZING'; payload: boolean };
-
-// Create initial state
+// --- Initial State (Define type explicitly) ---
 const initialState: AuthState = {
   user: null,
   profile: null,
@@ -75,7 +57,7 @@ const initialState: AuthState = {
   isInitializing: true,
 };
 
-// Create reducer
+// --- Reducer (Define types explicitly) ---
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   switch (action.type) {
     case 'INITIALIZE':
@@ -97,6 +79,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
         error: null,
         isInitializing: false,
+        isInitialized: true,
       };
     case 'PROFILE_LOADED':
       return {
@@ -104,17 +87,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         profile: action.payload,
         isLoading: false,
         error: null,
-        isInitializing: false,
       };
     case 'LOGOUT':
       return {
-        ...state,
-        user: null,
-        profile: null,
-        isAuthenticated: false,
+        ...initialState,
         isLoading: false,
-        error: null,
-        isInitialized: false,
+        isInitialized: true,
         isInitializing: false,
       };
     case 'SET_LOADING':
@@ -126,11 +104,6 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
         isInitializing: false,
       };
-    case 'UPDATE_PROFILE':
-      return {
-        ...state,
-        profile: state.profile ? { ...state.profile, ...action.payload } : null,
-      };
     case 'UPDATE_USER':
       return { ...state, user: action.payload.user };
     case 'SET_INITIALIZING':
@@ -140,10 +113,13 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   }
 };
 
-// Create context
+// --- Context Definition (Define type explicitly) ---
 interface AuthContextType {
   state: AuthState;
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ user: User | null; error: AuthError | null }>;
   loginWithGoogle: () => Promise<void>;
   loginWithFacebook: () => Promise<void>;
   sendMagicLink: (email: string) => Promise<void>;
@@ -153,526 +129,296 @@ interface AuthContextType {
   refreshSession: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-// Create provider
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+// --- Error Mapping Utility (Refine error type) ---
+function mapSupabaseErrorToMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const err = error as { message: string; status?: number; code?: string };
+    const message =
+      typeof err.message === 'string' ? err.message.toLowerCase() : '';
+
+    if (message.includes('invalid login credentials')) {
+      return 'Invalid email or password.';
+    }
+    if (message.includes('email not confirmed')) {
+      return 'Please verify your email before logging in.';
+    }
+    if (
+      message.includes('user already registered') ||
+      message.includes('unique constraint') ||
+      err.code === '23505'
+    ) {
+      return 'This email is already registered. Please log in.';
+    }
+    if (message.includes('password should be at least 6 characters')) {
+      return 'Password should be at least 6 characters.';
+    }
+    if (message.includes('too many requests') || err.status === 429) {
+      return 'Too many attempts. Please try again later.';
+    }
+    if (
+      message.includes('network error') ||
+      message.includes('failed to fetch')
+    ) {
+      return 'Network error. Please check your connection and try again.';
+    }
+    return err.message || 'An unexpected error occurred.';
+  } else if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'An unknown error occurred.';
+}
+
+type AuthResult<T> = {
+  data?: T | null;
+  error: AuthError | null;
+};
+
+interface HandleAuthCallOptions {
+  successMessage?: string;
+  errorMessage?: string;
+}
+
+// --- Provider Component ---
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const router = useRouter();
 
-  // Debug logging for auth context
-  useEffect(() => {
-    console.log('AuthContext state update:', {
-      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      isClient: typeof window !== 'undefined',
-      state: {
-        isAuthenticated: state.isAuthenticated,
-        isLoading: state.isLoading,
-        isInitialized: state.isInitialized,
-        isInitializing: state.isInitializing,
-        hasUser: !!state.user,
-        hasProfile: !!state.profile,
-      },
-    });
-  }, [state]);
+  useAuthListener(dispatch, state.isInitialized);
 
-  // Helper function to fetch or create user profile
-  const fetchOrCreateUserProfile = async (
-    user: User
-  ): Promise<UserProfile | null> => {
-    try {
-      // Get profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) {
-        if (profileError.code === 'PGRST116') {
-          // Profile not found, create it
-          console.log(`Profile not found for ${user.id}. Creating...`);
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              name:
-                user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-              email: user.email || '',
-              avatar_url: user.user_metadata?.avatar_url || null,
-              subscription_tier: 'free',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('Profile creation error:', createError);
-            throw createError; // Re-throw to be caught by initializeAuth
-          }
-          console.log(`Profile created for ${user.id}`);
-          return newProfile as UserProfile;
-        } else {
-          console.error('Profile fetch error:', profileError);
-          throw profileError; // Re-throw other profile errors
-        }
-      } else {
-        console.log(`Profile fetched for ${user.id}`);
-        return profile as UserProfile;
-      }
-    } catch (error) {
-      console.error('Profile operation error in helper:', error);
-      // Return null if profile cannot be fetched or created, let initializeAuth handle state
-      return null;
-    }
-  };
-
-  // Initialize auth state
-  const initializeAuth = useCallback(async () => {
-    console.log('Starting auth initialization');
-    try {
-      // Get current session
-      let {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-        throw sessionError;
-      }
-
-      if (!session) {
-        console.log('No session found, dispatching INITIALIZE with null user');
-        dispatch({
-          type: 'INITIALIZE',
-          payload: { user: null, profile: null },
-        });
-        return;
-      }
-
-      // Try to refresh the session if it's expired or close to expiring
-      const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
-      const isExpired = expiresAt < Date.now();
-      const isCloseToExpiring = expiresAt - Date.now() < 5 * 60 * 1000; // 5 minutes
-
-      if (isExpired || isCloseToExpiring) {
-        console.log('Session needs refresh');
-        const {
-          data: { session: refreshedSession },
-          error: refreshError,
-        } = await supabase.auth.refreshSession();
-
-        if (refreshError) {
-          console.error('Session refresh error:', refreshError);
-          throw refreshError;
-        }
-
-        if (!refreshedSession) {
-          console.log(
-            'No refreshed session, dispatching INITIALIZE with null user'
-          );
-          dispatch({
-            type: 'INITIALIZE',
-            payload: { user: null, profile: null },
-          });
-          return;
-        }
-
-        session = refreshedSession;
-      }
-
-      // Get user profile
-      const profile = await fetchOrCreateUserProfile(session.user);
-
-      console.log('Auth initialized successfully');
-      dispatch({
-        type: 'INITIALIZE',
-        payload: { user: session.user, profile },
+  const handleAuthCall = useCallback(
+    async <T,>(
+      serviceCall: () => Promise<AuthResult<T>>,
+      options: HandleAuthCallOptions = {}
+    ): Promise<AuthResult<T>> => {
+      const startTime = Date.now();
+      console.log('[DEBUG] handleAuthCall - Starting service call...', {
+        timestamp: new Date().toISOString(),
+        options,
       });
-    } catch (error) {
-      console.error('Auth initialization error:', error);
-      dispatch({
-        type: 'INITIALIZE',
-        payload: { user: null, profile: null },
-      });
-    }
-  }, [dispatch, fetchOrCreateUserProfile]);
 
-  // Set up auth listener
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    console.log('Setting up auth listener');
-
-    let authListener: (() => void) | null = null;
-
-    const setupAuthListener = async () => {
       try {
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state changed:', {
-            event,
-            hasSession: !!session,
-          });
+        // Add connection status check
+        if (!navigator.onLine) {
+          throw new Error('No internet connection available');
+        }
 
-          // Reset loading/initializing state before handling change
-          dispatch({ type: 'SET_LOADING', payload: true });
-          dispatch({ type: 'SET_INITIALIZING', payload: true });
-
-          if (!session) {
-            dispatch({ type: 'LOGOUT' }); // LOGOUT now also sets loading/initializing to false
-            return;
-          }
-
-          // Call initializeAuth on any auth state change
-          await initializeAuth();
+        console.log('[DEBUG] handleAuthCall - Network status:', {
+          online: navigator.onLine,
+          type: (navigator as any).connection?.type,
+          effectiveType: (navigator as any).connection?.effectiveType,
+          timestamp: new Date().toISOString(),
         });
 
-        authListener = subscription.unsubscribe;
+        console.log('[DEBUG] handleAuthCall - Executing service call...');
+        const result = await serviceCall();
+
+        const endTime = Date.now();
+        console.log('[DEBUG] handleAuthCall - Service call completed', {
+          duration: endTime - startTime,
+          timestamp: new Date().toISOString(),
+        });
+
+        return result;
       } catch (error) {
-        console.error('Auth listener setup error:', error);
-        // Ensure loading state is reset if listener setup fails
-        dispatch({ type: 'SET_LOADING', payload: false });
-        dispatch({ type: 'SET_INITIALIZING', payload: false });
-      }
-    };
-
-    // Initial setup call
-    setupAuthListener().then(() => {
-      initializeAuth(); // Initial check on mount
-    });
-
-    return () => {
-      if (authListener) {
-        console.log('Cleaning up auth listener');
-        authListener();
-      }
-    };
-  }, [initializeAuth]);
-
-  const login = async (email: string, password: string) => {
-    // Set loading state at the beginning
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_INITIALIZING', payload: true }); // Consider if needed, listener handles post-login init
-    dispatch({ type: 'SET_ERROR', payload: null });
-
-    try {
-      console.log('Starting login process');
-
-      // Removed delay: await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Attempt login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-
-      if (error) {
-        console.error('Login error from Supabase:', error);
+        const endTime = Date.now();
+        console.error('[DEBUG] handleAuthCall - Error in service call', {
+          error,
+          duration: endTime - startTime,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+        });
         throw error;
       }
-
-      if (!data.user) {
-        console.error('No user data returned from signInWithPassword');
-        throw new Error('Login successful but no user data received');
-      }
-
-      // Login successful
-      console.log('signInWithPassword successful. User:', data.user.id);
-
-      // Removed profile fetch logic - handled by initializeAuth via listener
-
-      // Removed wait loop: while (!state.isInitialized && attempts < maxAttempts)
-      // Rely on the onAuthStateChange listener to trigger initializeAuth and update state.
-      // The UI should show a loading state until the context updates.
-
-      console.log(
-        'Login successful, navigating to dashboard. Listener will handle state update.'
-      );
-      router.push('/dashboard');
-
-      // Note: State update (user, profile, isAuthenticated) happens asynchronously via the listener.
-      // SET_LOADING/SET_INITIALIZING will be set to false by the INITIALIZE action in initializeAuth.
-    } catch (error) {
-      console.error('Login error caught:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      dispatch({
-        type: 'SET_ERROR',
-        payload: error instanceof Error ? error.message : 'Failed to login',
-      });
-
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to login',
-        variant: 'destructive',
-      });
-
-      // Re-throw the error if needed by the caller
-      // throw error;
-    } finally {
-      // Ensure loading/initializing flags are reset if login fails before listener runs
-      // If login succeeded, the listener -> initializeAuth -> INITIALIZE will handle resetting these.
-      // However, setting them here covers immediate signInWithPassword errors.
-      // Consider if this introduces race conditions with the listener.
-      // A safer approach might be to only dispatch SET_LOADING/INITIALIZING false within the catch block.
-      // For now, keeping it in finally for broad coverage.
-      dispatch({ type: 'SET_LOADING', payload: false });
-      dispatch({ type: 'SET_INITIALIZING', payload: false });
-    }
-  };
-
-  const loginWithGoogle = async () => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Google login error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to login with Google',
-      });
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Failed to login with Google',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const loginWithFacebook = async () => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Facebook login error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to login with Facebook',
-      });
-      toast({
-        title: 'Error',
-        description:
-          (error as Error).message || 'Failed to login with Facebook',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const sendMagicLink = async (email: string) => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Magic link sent to your email',
-      });
-    } catch (error) {
-      console.error('Magic link error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to send magic link',
-      });
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Failed to send magic link',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const logout = async () => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      dispatch({ type: 'LOGOUT' });
-      router.push('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to logout',
-      });
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Failed to logout',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const signup = async (name: string, email: string, password: string) => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: {
-            name,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').insert([
-          {
-            id: data.user.id,
-            name,
-            email: email.trim().toLowerCase(),
-          },
-        ]);
-
-        if (profileError) throw profileError;
-      }
-
-      toast({
-        title: 'Success',
-        description: 'Please check your email to verify your account',
-      });
-
-      router.push('/auth/verify');
-    } catch (error) {
-      console.error('Signup error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to sign up',
-      });
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Failed to sign up',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const updateProfile = async (data: Partial<UserProfile>) => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      if (!state.user) throw new Error('No user found');
-
-      const { error } = await supabase
-        .from('profiles')
-        .update(data)
-        .eq('id', state.user.id);
-
-      if (error) throw error;
-
-      dispatch({ type: 'UPDATE_PROFILE', payload: data });
-
-      toast({
-        title: 'Success',
-        description: 'Profile updated successfully',
-      });
-    } catch (error) {
-      console.error('Profile update error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to update profile',
-      });
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Failed to update profile',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const refreshSession = async () => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session found');
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: {
-          user: user as User,
-          profile: profile as UserProfile | null,
-        },
-      });
-    } catch (error) {
-      console.error('Session refresh error:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to refresh session',
-      });
-    }
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        state,
-        login,
-        loginWithGoogle,
-        loginWithFacebook,
-        sendMagicLink,
-        logout,
-        signup,
-        updateProfile,
-        refreshSession,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+    },
+    []
   );
-};
+
+  const login = useCallback(
+    async (
+      email: string,
+      password: string
+    ): Promise<{ user: User | null; error: AuthError | null }> => {
+      console.log('[DEBUG] Starting login process in auth context...');
+
+      try {
+        // Check Supabase client initialization
+        if (!supabase.auth) {
+          console.error('[DEBUG] Supabase client not properly initialized');
+          throw new Error('Authentication service not available');
+        }
+
+        const result = await handleAuthCall<User>(
+          () => signInWithPassword(email, password),
+          {
+            successMessage: 'Successfully logged in',
+            errorMessage: 'Failed to log in',
+          }
+        );
+
+        if (result.error) {
+          console.error('[DEBUG] Login error:', {
+            error: result.error,
+            timestamp: new Date().toISOString(),
+          });
+          throw result.error;
+        }
+
+        if (!result.data) {
+          console.error('[DEBUG] No user returned from login');
+          throw new Error('No user returned from authentication service');
+        }
+
+        return { user: result.data, error: null };
+      } catch (error) {
+        console.error('[DEBUG] Login process failed:', {
+          error,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+        });
+        if (error instanceof AuthError) {
+          return { user: null, error };
+        }
+        return {
+          user: null,
+          error: new Error('An unexpected error occurred') as AuthError,
+        };
+      }
+    },
+    [handleAuthCall]
+  );
+
+  const signup = useCallback(
+    async (name: string, email: string, password: string): Promise<void> => {
+      const result = await handleAuthCall<{ user: User | null }>(
+        () => signUp(name, email.trim().toLowerCase(), password),
+        { errorMessage: 'Failed to sign up' }
+      );
+      if (result.error) throw result.error;
+    },
+    [handleAuthCall]
+  );
+
+  const updateProfile = useCallback(
+    async (data: Partial<UserProfile>) => {
+      if (!state.user?.id) return;
+      const result = await handleAuthCall<UserProfile>(
+        async () => {
+          const { profile, error } = await updateUserProfileData(
+            state.user!.id,
+            data
+          );
+          if (error) throw error;
+          return { data: profile, error: null };
+        },
+        { errorMessage: 'Failed to update profile' }
+      );
+      if (result.data) {
+        dispatch({ type: 'PROFILE_LOADED', payload: result.data });
+        toast({
+          title: 'Success',
+          description: 'Profile updated successfully',
+          variant: 'default',
+        });
+      }
+    },
+    [state.user?.id, handleAuthCall]
+  );
+
+  const loginWithGoogle = useCallback(async () => {
+    await handleAuthCall<void>(() => signInWithOAuth('google'), {
+      errorMessage: 'Failed to login with Google',
+    });
+  }, [handleAuthCall]);
+
+  const loginWithGithub = useCallback(async () => {
+    await handleAuthCall<void>(() => signInWithOAuth('github'), {
+      errorMessage: 'Failed to login with GitHub',
+    });
+  }, [handleAuthCall]);
+
+  const loginWithOtp = useCallback(
+    async (email: string) => {
+      await handleAuthCall<void>(
+        () => signInWithOtp(email.trim().toLowerCase()),
+        { errorMessage: 'Failed to login with OTP' }
+      );
+    },
+    [handleAuthCall]
+  );
+
+  const loginWithFacebook = useCallback(async () => {
+    await handleAuthCall<void>(() => signInWithOAuth('facebook'), {
+      errorMessage: 'Failed to login with Facebook',
+    });
+  }, [handleAuthCall]);
+
+  const loginWithMagicLink = useCallback(
+    async (email: string) => {
+      await handleAuthCall<void>(
+        () => signInWithOtp(email.trim().toLowerCase()),
+        { errorMessage: 'Failed to send magic link' }
+      );
+    },
+    [handleAuthCall]
+  );
+
+  const sendMagicLink = useCallback(
+    async (email: string) => {
+      await handleAuthCall<void>(
+        () => signInWithOtp(email.trim().toLowerCase()),
+        { errorMessage: 'Failed to send magic link' }
+      );
+    },
+    [handleAuthCall]
+  );
+
+  const logout = useCallback(async () => {
+    await handleAuthCall<void>(() => signOut(), {
+      errorMessage: 'Failed to logout',
+    });
+  }, [handleAuthCall]);
+
+  const refreshSession = useCallback(async () => {
+    console.warn('Attempting to refresh session manually...');
+    await handleAuthCall<void>(
+      async () => {
+        const { error } = await supabase.auth.refreshSession();
+        return { error, data: undefined };
+      },
+      { errorMessage: 'Failed to refresh session' }
+    );
+  }, [handleAuthCall]);
+
+  const value = useMemo(
+    () => ({
+      state,
+      login,
+      loginWithGoogle,
+      loginWithFacebook,
+      sendMagicLink,
+      logout,
+      signup,
+      updateProfile,
+      refreshSession,
+    }),
+    [
+      state,
+      login,
+      loginWithGoogle,
+      loginWithFacebook,
+      sendMagicLink,
+      logout,
+      signup,
+      updateProfile,
+      refreshSession,
+    ]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
 // Create hook for using the context
 export const useAuth = () => {
