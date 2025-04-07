@@ -1,18 +1,20 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { CookieOptions } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
+import type { CookieOptions } from '@supabase/ssr';
 import type { RequestCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 
 // Environment variables for Supabase connection
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing required Supabase environment variables. Please check your .env.local file.'
-  );
+if (!supabaseUrl) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+}
+
+if (!supabaseAnonKey) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
 }
 
 // Validate URL format
@@ -25,87 +27,125 @@ try {
   );
 }
 
-export async function createClient() {
+export const createServerSupabaseClient = async () => {
+  const cookieStore = await Promise.resolve(cookies());
+
   console.log('[DEBUG] Creating server Supabase client...', {
     hasUrl: !!supabaseUrl,
     hasAnonKey: !!supabaseAnonKey,
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
   });
 
-  const cookieStore = cookies();
-  const cookiesList = (await cookieStore).getAll();
-  console.log('[DEBUG] Available cookies:', {
-    count: cookiesList.length,
-    names: cookiesList.map((c) => c.name),
+  const allCookies = await Promise.resolve(cookieStore.getAll());
+  const authToken = await Promise.resolve(cookieStore.get('sb-auth-token'));
+
+  console.log('[DEBUG] Server cookie check:', {
+    cookieCount: allCookies.length,
+    hasAuthToken: !!authToken,
+    authTokenLength: authToken?.value?.length,
   });
 
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      async get(name: string) {
-        try {
-          console.log('[DEBUG] Reading cookie:', { name });
-          const cookie = (await cookieStore).get(name);
-          console.log('[DEBUG] Cookie value:', {
-            name,
-            hasValue: !!cookie?.value,
-            value: cookie?.value ? `${cookie.value.substring(0, 10)}...` : null,
-          });
-          return cookie?.value ?? '';
-        } catch (error) {
-          console.error('[DEBUG] Error reading cookie:', { name, error });
-          return '';
-        }
+      get(name: string) {
+        const cookie = cookieStore.get(name);
+        console.log('[DEBUG] Reading server cookie:', {
+          name,
+          hasCookie: !!cookie,
+          valueLength: cookie?.value?.length,
+        });
+        return cookie?.value;
       },
-      async set(name: string, value: string, options: CookieOptions) {
+      set(name: string, value: string, options: CookieOptions) {
         try {
-          console.log('[DEBUG] Setting cookie:', {
+          console.log('[DEBUG] Setting server cookie:', {
             name,
             hasValue: !!value,
-            options,
+            valueLength: value?.length,
           });
-          const cookieOptions = {
-            ...options,
-            sameSite: 'lax' as const,
-            secure: process.env.NODE_ENV === 'production',
-            path: '/',
-            httpOnly: true,
-            priority: 'high' as const,
-          };
-          (await cookieStore).set({
+          cookieStore.set({
             name,
             value,
-            ...cookieOptions,
-          });
-        } catch (error) {
-          console.error('[DEBUG] Error setting cookie:', { name, error });
-        }
-      },
-      async remove(name: string, options: CookieOptions) {
-        try {
-          console.log('[DEBUG] Removing cookie:', { name, options });
-          (await cookieStore).delete({
-            name,
             ...options,
+            sameSite: 'lax',
             path: '/',
           });
         } catch (error) {
-          console.error('[DEBUG] Error removing cookie:', { name, error });
+          console.error('[DEBUG] Error setting server cookie:', {
+            name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
         }
       },
-    },
-    auth: {
-      detectSessionInUrl: false,
-      persistSession: true,
-      autoRefreshToken: true,
-      flowType: 'pkce',
-      debug: process.env.NODE_ENV === 'development',
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'supabase-js-web/2.38.4',
-        'Cache-Control': 'no-store',
+      remove(name: string, options: CookieOptions) {
+        try {
+          console.log('[DEBUG] Removing server cookie:', { name });
+          cookieStore.set({
+            name,
+            value: '',
+            ...options,
+            expires: new Date(0),
+            path: '/',
+          });
+        } catch (error) {
+          console.error('[DEBUG] Error removing server cookie:', {
+            name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
       },
     },
   });
+
+  return supabase;
+};
+
+// Export a function to get the session on the server side
+export async function getServerSession() {
+  const supabase = await createServerSupabaseClient();
+  try {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    console.log('[DEBUG] Server session check:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      error: error?.message,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error('[DEBUG] Server session error:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+      });
+      return null;
+    }
+
+    return session;
+  } catch (error) {
+    console.error('[DEBUG] Unexpected server session error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    });
+    return null;
+  }
 }
+
+// Export a function to get the authenticated user on the server side
+export async function getServerUser() {
+  const session = await getServerSession();
+  return session?.user || null;
+}
+
+// Export a function to check if a user is authenticated on the server side
+export async function isAuthenticated() {
+  const session = await getServerSession();
+  return !!session?.user;
+}
+
+// Export the server client creation function
+export default createServerSupabaseClient;

@@ -1,6 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
-import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
 // Type for Supabase instance with all tables
 export type TypedSupabaseClient = ReturnType<
@@ -52,7 +51,7 @@ try {
 // Singleton instance
 let supabaseInstance: TypedSupabaseClient | null = null;
 
-export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
+const createBrowserSupabaseClient = () => {
   if (supabaseInstance) {
     console.log('[DEBUG] Returning existing Supabase client instance');
     return supabaseInstance;
@@ -71,99 +70,52 @@ export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
       detectSessionInUrl: true,
       persistSession: true,
       autoRefreshToken: true,
-      storageKey: 'sb-auth-token',
       flowType: 'pkce',
       debug: process.env.NODE_ENV === 'development',
+      storageKey: 'sb-auth-token',
       storage: {
-        getItem: (key: string): string | null => {
+        getItem: (key) => {
           try {
-            console.log('[DEBUG] Reading from localStorage:', { key });
-            const value = localStorage.getItem(key);
-            console.log('[DEBUG] localStorage value:', {
-              key,
-              hasValue: !!value,
-              value: value ? `${value.substring(0, 10)}...` : null,
-            });
-            return value;
+            const item = localStorage.getItem(key);
+            console.log('[DEBUG] Storage getItem:', { key, hasValue: !!item });
+            return item;
           } catch (error) {
-            console.error('[DEBUG] Error reading from localStorage:', {
-              key,
-              error,
-            });
+            console.error('[DEBUG] Storage getItem error:', { key, error });
             return null;
           }
         },
-        setItem: (key: string, value: string): void => {
+        setItem: (key, value) => {
           try {
-            console.log('[DEBUG] Writing to localStorage:', {
-              key,
-              hasValue: !!value,
-              value: value ? `${value.substring(0, 10)}...` : null,
-            });
             localStorage.setItem(key, value);
+            console.log('[DEBUG] Storage setItem:', { key, hasValue: !!value });
           } catch (error) {
-            console.error('[DEBUG] Error writing to localStorage:', {
-              key,
-              error,
-            });
+            console.error('[DEBUG] Storage setItem error:', { key, error });
           }
         },
-        removeItem: (key: string): void => {
+        removeItem: (key) => {
           try {
-            console.log('[DEBUG] Removing from localStorage:', { key });
             localStorage.removeItem(key);
+            console.log('[DEBUG] Storage removeItem:', { key });
           } catch (error) {
-            console.error('[DEBUG] Error removing from localStorage:', {
-              key,
-              error,
-            });
+            console.error('[DEBUG] Storage removeItem error:', { key, error });
           }
         },
       },
     },
     global: {
       headers: {
-        'X-Client-Info': 'supabase-js-web/2.38.4',
-        'Cache-Control': 'no-store',
-      },
-      fetch: async (url, options = {}) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          console.error('[DEBUG] Request timeout:', {
-            url,
-            timeout: 30000,
-          });
-        }, 30000);
-
-        try {
-          console.log('[DEBUG] Making request:', {
-            url,
-            method: options.method || 'GET',
-            hasBody: !!options.body,
-          });
-
-          const siteUrl =
-            process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-          const response = await fetch(url, {
-            ...options,
-            credentials: 'include',
-            signal: controller.signal,
-            headers: {
-              ...options.headers,
-              'Cache-Control': 'no-store',
-              Origin: siteUrl,
-            },
-          });
-
-          clearTimeout(timeoutId);
-          return response;
-        } catch (error) {
-          clearTimeout(timeoutId);
-          throw error;
-        }
+        'X-Client-Info': '@supabase/ssr',
       },
     },
+  });
+
+  // Add debug listeners
+  instance.auth.onAuthStateChange((event, session) => {
+    console.log('[DEBUG] Auth state change:', {
+      event,
+      hasSession: !!session,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   supabaseInstance = instance;

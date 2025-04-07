@@ -12,13 +12,15 @@ import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase/client';
 import { AuthError, User } from '@supabase/supabase-js';
+import { error } from 'console';
 
 // Types
-type AuthState = {
+export type AuthState = {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isInitialized: boolean;
 };
 
 type AuthContextType = {
@@ -37,6 +39,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: true,
   error: null,
+  isInitialized: false,
 };
 
 // Create context
@@ -57,13 +60,14 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         user: action.payload,
         isAuthenticated: !!action.payload,
         isLoading: false,
+        isInitialized: true,
       };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_ERROR':
       return { ...state, error: action.payload, isLoading: false };
     case 'CLEAR_STATE':
-      return { ...initialState, isLoading: false };
+      return { ...initialState, isLoading: false, isInitialized: true };
     default:
       return state;
   }
@@ -76,39 +80,164 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle auth state changes
   useEffect(() => {
+    let isSubscribed = true;
     dispatch({ type: 'SET_LOADING', payload: true });
 
+    // Function to update auth state
+    const updateAuthState = async (user: User | null) => {
+      if (!isSubscribed) return;
+
+      try {
+        if (!user) {
+          dispatch({ type: 'SET_USER', payload: null });
+          return;
+        }
+
+        // Verify the session is still valid
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error || !session) {
+          console.error('[DEBUG] Session verification failed:', {
+            error: error?.message,
+            hasSession: !!session,
+            timestamp: new Date().toISOString(),
+          });
+          dispatch({ type: 'SET_USER', payload: null });
+          return;
+        }
+
+        dispatch({ type: 'SET_USER', payload: user });
+      } catch (error) {
+        console.error('[DEBUG] Error updating auth state:', {
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString(),
+        });
+        dispatch({ type: 'SET_USER', payload: null });
+      }
+    };
+
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      dispatch({ type: 'SET_USER', payload: session?.user || null });
-    });
+    const initializeAuth = async () => {
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (!isSubscribed) return;
+
+        if (sessionError) {
+          console.error('[DEBUG] Error getting session:', {
+            error: sessionError.message,
+            timestamp: new Date().toISOString(),
+          });
+          dispatch({
+            type: 'SET_ERROR',
+            payload: sessionError?.message || 'An error occurred',
+          });
+          return;
+        }
+
+        console.log('[DEBUG] Session check:', {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          isInitialized: true,
+          timestamp: new Date().toISOString(),
+        });
+
+        await updateAuthState(session?.user || null);
+      } catch (error) {
+        console.error('[DEBUG] Error during auth initialization:', {
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString(),
+        });
+        dispatch({ type: 'SET_USER', payload: null });
+      } finally {
+        if (isSubscribed) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      }
+    };
+
+    // Initialize auth
+    initializeAuth();
 
     // Subscribe to auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      dispatch({ type: 'SET_USER', payload: session?.user || null });
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isSubscribed) return;
+
+      console.log('[DEBUG] Auth state change:', {
+        event: _event,
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        timestamp: new Date().toISOString(),
+      });
+
+      await updateAuthState(session?.user || null);
     });
 
     return () => {
+      isSubscribed = false;
       subscription.unsubscribe();
     };
   }, []);
 
   // Error handler
-  const handleError = useCallback((error: AuthError | null) => {
-    if (error) {
-      const message = error.message || 'An error occurred';
-      dispatch({ type: 'SET_ERROR', payload: message });
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      });
-      return true;
-    }
-    return false;
-  }, []);
+  const handleError = useCallback(
+    (error: AuthError | null, clearState = false) => {
+      if (error) {
+        console.error('[DEBUG] Auth error:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          timestamp: new Date().toISOString(),
+        });
+
+        let userMessage = 'An error occurred during authentication';
+
+        // Handle specific error cases
+        switch (error.status) {
+          case 400:
+            userMessage = 'Invalid email or password';
+            break;
+          case 401:
+            userMessage = 'Your session has expired. Please sign in again.';
+            if (clearState) {
+              dispatch({ type: 'CLEAR_STATE' });
+              router.push('/sign-in');
+            }
+            break;
+          case 422:
+            userMessage =
+              'Invalid input provided. Please check your information.';
+            break;
+          case 429:
+            userMessage = 'Too many attempts. Please try again later.';
+            break;
+          default:
+            if (error.message?.includes('Failed to fetch')) {
+              userMessage =
+                'Network error. Please check your internet connection.';
+            }
+        }
+
+        dispatch({ type: 'SET_ERROR', payload: userMessage });
+        toast({
+          title: 'Error',
+          description: userMessage,
+          variant: 'destructive',
+        });
+        return true;
+      }
+      return false;
+    },
+    [router]
+  );
 
   // Auth methods
   const login = useCallback(
@@ -118,69 +247,116 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SET_ERROR', payload: null });
 
         console.log('[DEBUG] Login attempt:', {
+          emailProvided: !!email,
           emailLength: email?.length,
-          hasPassword: !!password,
+          passwordProvided: !!password,
+          passwordLength: password?.length,
           timestamp: new Date().toISOString(),
         });
+
+        if (!email || !password) {
+          throw new Error('Email and password are required');
+        }
 
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
           password,
         });
 
+        console.log('[DEBUG] Supabase response:', {
+          hasData: !!data,
+          hasError: !!error,
+          errorMessage: error?.message,
+          errorStatus: error?.status,
+          timestamp: new Date().toISOString(),
+        });
+
         if (error) {
-          console.error('[DEBUG] Login error details:', {
-            errorMessage: error.message,
-            errorStatus: error.status,
-            errorName: error.name,
+          console.error('[DEBUG] Login error:', {
+            message: error.message,
+            status: error.status,
+            name: error.name,
+            details: error,
             timestamp: new Date().toISOString(),
           });
-          handleError(error);
-          return;
+          throw error;
         }
 
-        if (!data.session) {
+        if (!data?.session) {
+          const noSessionError = new Error(
+            'No session data received from authentication service'
+          );
           console.error('[DEBUG] No session after login:', {
-            hasData: !!data,
-            hasUser: !!data?.user,
+            error: noSessionError.message,
+            data,
             timestamp: new Date().toISOString(),
           });
-          dispatch({
-            type: 'SET_ERROR',
-            payload: 'No session after login. Please try again.',
-          });
-          return;
+          throw noSessionError;
         }
 
         console.log('[DEBUG] Login successful:', {
           hasSession: !!data.session,
           hasUser: !!data.session?.user,
+          userId: data.session?.user?.id,
           timestamp: new Date().toISOString(),
         });
 
+        // Set session data in localStorage and cookie
+        const storageKey = 'sb-auth-token';
+        const maxAge = 60 * 60 * 24 * 7;
+        try {
+          localStorage.setItem(storageKey, data.session.access_token);
+          document.cookie = `${storageKey}=${data.session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+        } catch (storageError: unknown) {
+          console.error('[DEBUG] Error storing session:', {
+            error:
+              storageError instanceof Error
+                ? storageError.message
+                : 'Unknown error',
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        dispatch({ type: 'SET_USER', payload: data.session.user });
         toast({
           title: 'Success',
           description: 'Logged in successfully',
         });
 
-        dispatch({ type: 'SET_USER', payload: data.session.user });
+        // Small delay to ensure state is updated
         await new Promise((resolve) => setTimeout(resolve, 100));
         router.push('/dashboard');
-      } catch (error) {
-        console.error('[DEBUG] Unexpected login error:', {
-          error: error instanceof Error ? error.message : 'Unknown error',
+      } catch (error: unknown) {
+        console.error('[DEBUG] Login error:', {
+          error: error instanceof Error ? error.message : JSON.stringify(error),
+          type: error instanceof Error ? error.constructor.name : typeof error,
+          stack: error instanceof Error ? error.stack : undefined,
           timestamp: new Date().toISOString(),
         });
-        handleError(error as AuthError);
+
+        // Let the form handle the error display
+        throw error;
       } finally {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
-    [handleError, router]
+    [router]
   );
 
   const signup = useCallback(
     async (email: string, password: string, name: string) => {
+      // Basic email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        console.error('[DEBUG] Invalid email format provided:', { email });
+        handleError({
+          name: 'Validation Error',
+          message: 'Invalid email format. Please enter a valid email address.',
+        } as AuthError); // Cast to AuthError for consistency, though it's a client-side error
+        dispatch({ type: 'SET_LOADING', payload: false }); // Ensure loading stops
+        return; // Prevent Supabase call
+      }
+
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
 
@@ -198,7 +374,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: 'Success',
           description: 'Please check your email to confirm your account',
         });
-        router.push('/auth/verify');
+        router.push('/verify');
       } catch (error) {
         handleError(error as AuthError);
       }
@@ -267,7 +443,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/callback`,
         },
       });
 
@@ -284,7 +460,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/callback`,
         },
       });
 
@@ -300,7 +476,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SET_LOADING', payload: true });
 
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/update-password`,
+          redirectTo: `${window.location.origin}/update-password`,
         });
 
         if (handleError(error)) return;

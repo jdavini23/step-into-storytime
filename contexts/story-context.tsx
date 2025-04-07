@@ -170,38 +170,59 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
         credentials: 'include',
         headers: {
           'Cache-Control': 'no-store',
+          'Content-Type': 'application/json',
         },
       });
 
       console.log('[DEBUG] Stories API response:', {
         status: response.status,
+        statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
       });
 
       if (response.status === 401) {
+        console.error('[DEBUG] Authentication error in fetchStories');
         dispatch({ type: 'SET_STORIES', payload: [] });
         throw new Error('Authentication required');
       }
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[DEBUG] Error response from stories API:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
         throw new Error(
-          `Failed to fetch stories: ${response.status} ${response.statusText}`
+          errorData.error ||
+            `Failed to fetch stories: ${response.status} ${response.statusText}`
         );
       }
 
       const data = await response.json();
       console.log('[DEBUG] Stories data:', {
         count: data.stories?.length || 0,
+        firstStoryId: data.stories?.[0]?.id,
       });
 
       dispatch({ type: 'SET_STORIES', payload: data.stories || [] });
     } catch (error) {
-      console.error('[DEBUG] Error fetching stories:', error);
+      console.error('[DEBUG] Error fetching stories:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
       dispatch({
         type: 'SET_ERROR',
         payload:
           error instanceof Error ? error.message : 'Failed to fetch stories',
       });
+      // If unauthorized, let the dashboard handle the redirect
+      if (
+        error instanceof Error &&
+        error.message === 'Authentication required'
+      ) {
+        throw error;
+      }
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }

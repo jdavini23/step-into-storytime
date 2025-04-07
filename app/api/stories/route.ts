@@ -1,81 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Story } from '@/contexts/story-context';
-import { createClient } from '@/utils/supabase/server';
+import { createServerSupabaseClient } from '@/utils/supabase/server';
 import { generateStory } from '@/utils/ai/story-generator';
 import type { Database } from '@/types/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { cookies } from 'next/headers';
+import type { RequestCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 
 // In-memory storage for demo purposes
 // TODO: Replace with database storage
 // Consider using a more robust storage solution like a database
 let stories: Story[] = [];
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    console.log('[DEBUG] GET /api/stories - Start');
-    const supabase = await createClient();
+    console.log('[DEBUG] Starting GET /api/stories request');
+    const supabase = await createServerSupabaseClient();
 
-    // Get user session
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    console.log('[DEBUG] Auth check result:', {
-      hasUser: !!user,
-      userId: user?.id,
-      hasError: !!authError,
-      errorMessage: authError?.message,
-      cookies: request.headers.get('cookie'),
-      headers: Object.fromEntries(request.headers.entries()),
-    });
-
-    if (authError) {
-      console.error('[DEBUG] Authentication error:', {
-        error: authError,
-        message: authError.message,
-        status: authError.status,
+    if (sessionError) {
+      console.error('[DEBUG] Session error:', {
+        error: sessionError.message,
+        timestamp: new Date().toISOString(),
       });
       return NextResponse.json(
-        { error: `Authentication failed: ${authError.message}` },
+        { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    if (!user) {
-      console.error('[DEBUG] No user found in session');
+    if (!session) {
+      console.log('[DEBUG] No session found');
       return NextResponse.json(
-        { error: 'Unauthorized - No user session found' },
+        { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    // Get stories for user
-    console.log('[DEBUG] Fetching stories for user:', user.id);
-    const { data: stories, error } = await supabase
+    console.log('[DEBUG] Session found:', {
+      userId: session.user.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    const { data: stories, error: storiesError } = await supabase
       .from('stories')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
 
-    if (error) {
+    if (storiesError) {
       console.error('[DEBUG] Error fetching stories:', {
-        error,
-        userId: user.id,
+        error: storiesError.message,
+        userId: session.user.id,
+        timestamp: new Date().toISOString(),
       });
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch stories' },
+        { status: 500 }
+      );
     }
 
-    console.log('[DEBUG] Stories fetched successfully:', {
-      count: stories?.length ?? 0,
-      userId: user.id,
+    console.log('[DEBUG] Successfully fetched stories:', {
+      count: stories.length,
+      userId: session.user.id,
+      timestamp: new Date().toISOString(),
     });
 
-    return NextResponse.json(stories);
+    return NextResponse.json({ stories });
   } catch (error) {
-    console.error('[DEBUG] Unexpected error in GET /api/stories:', error);
+    console.error('[DEBUG] Unexpected error in GET /api/stories:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    });
     return NextResponse.json(
-      { error: 'Internal Server Error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
     const {
       data: { user },
       error: authError,
@@ -168,7 +170,7 @@ export async function PUT(
   context: { params: Promise<{ storyId: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -231,7 +233,7 @@ export async function DELETE(
   context: { params: Promise<{ storyId: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

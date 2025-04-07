@@ -147,7 +147,7 @@ export default function SignUpPage() {
         duration: 10000, // 10 seconds
       });
 
-      await signup(formData.name, formData.email, formData.password);
+      await signup(formData.email, formData.password, formData.name);
 
       // Clear the loading toast
       loadingToast.dismiss();

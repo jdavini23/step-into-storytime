@@ -1,35 +1,95 @@
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import type { Database } from '@/types/supabase';
 
-export function middleware(request: NextRequest) {
-  // Get the original pathname
-  const pathname = request.nextUrl.pathname;
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
+  const supabase = createMiddlewareClient<Database>({ req, res });
 
-  // Create a new response
-  const response = NextResponse.next();
+  console.log('[DEBUG] Middleware executing for path:', req.nextUrl.pathname);
 
-  // Set template variables in response headers
-  response.headers.set('x-var-original-pathname', pathname);
+  try {
+    // Refresh session if needed
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
 
-  // Create a new URL for rewriting if needed
-  const url = request.nextUrl.clone();
-  url.searchParams.set('VAR_ORIGINAL_PATHNAME', pathname);
+    console.log('[DEBUG] Session check in middleware:', {
+      hasSession: !!session,
+      path: req.nextUrl.pathname,
+      timestamp: new Date().toISOString(),
+    });
 
-  // Return the response with rewritten URL and headers
-  return NextResponse.rewrite(url, {
-    headers: response.headers,
-  });
+    if (error) {
+      console.error('[DEBUG] Session error in middleware:', {
+        error: error.message,
+        status: error.status,
+        path: req.nextUrl.pathname,
+      });
+    }
+
+    // Protected API routes
+    if (req.nextUrl.pathname.startsWith('/api/')) {
+      if (!session) {
+        console.log('[DEBUG] Unauthorized API access attempt:', {
+          path: req.nextUrl.pathname,
+          timestamp: new Date().toISOString(),
+        });
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+    }
+
+    // Protected pages
+    if (
+      req.nextUrl.pathname.startsWith('/dashboard') ||
+      req.nextUrl.pathname.startsWith('/profile')
+    ) {
+      if (!session) {
+        console.log(
+          '[DEBUG] Redirecting unauthenticated user from protected page:',
+          {
+            path: req.nextUrl.pathname,
+            timestamp: new Date().toISOString(),
+          }
+        );
+        return NextResponse.redirect(new URL('/sign-in', req.url));
+      }
+    }
+
+    // Auth pages (when already authenticated)
+    if (
+      session &&
+      (req.nextUrl.pathname === '/sign-in' ||
+        req.nextUrl.pathname === '/sign-up')
+    ) {
+      console.log('[DEBUG] Redirecting authenticated user from auth page:', {
+        path: req.nextUrl.pathname,
+        timestamp: new Date().toISOString(),
+      });
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+
+    return res;
+  } catch (error) {
+    console.error('[DEBUG] Unexpected error in middleware:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      path: req.nextUrl.pathname,
+    });
+    return res;
+  }
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - api (API routes)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|api).*)',
+    '/dashboard/:path*',
+    '/profile/:path*',
+    '/api/:path*',
+    '/sign-in',
+    '/sign-up',
   ],
 };

@@ -101,21 +101,41 @@ export default function EnhancedSignInForm() {
     setErrors({ ...errors, general: '' });
 
     try {
-      await login(formData.email, formData.password);
-
-      toast({
-        title: 'Success!',
-        description: 'Logging you in...',
-        variant: 'default',
-        duration: 3000,
+      console.log('[DEBUG] Attempting login with:', {
+        emailLength: formData.email.length,
+        timestamp: new Date().toISOString(),
       });
-    } catch (error) {
-      console.error('Login error:', error);
 
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'An error occurred while logging in';
+      await login(formData.email, formData.password);
+      // Redirect is handled by auth context
+    } catch (error) {
+      console.error('[DEBUG] Form login error:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.constructor.name : typeof error,
+        timestamp: new Date().toISOString(),
+      });
+
+      let errorMessage = 'An error occurred while signing in';
+
+      if (error instanceof Error) {
+        // Handle specific error messages
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please verify your email address before signing in';
+        } else if (error.message.includes('rate limit')) {
+          errorMessage = 'Too many sign in attempts. Please try again later';
+        } else if (error.message.includes('required')) {
+          errorMessage = 'Please fill in all required fields';
+        } else if (
+          error.message.includes('network') ||
+          error.message.includes('fetch')
+        ) {
+          errorMessage = 'Network error. Please check your internet connection';
+        } else {
+          errorMessage = error.message;
+        }
+      }
 
       setErrors({
         ...errors,

@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { useStory } from '@/contexts/story-context';
 import { SubscriptionStatus } from '@/components/subscription/subscription-status';
+import { toast } from '@/components/ui/use-toast';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function DashboardPage() {
       storyLoading: storyState.loading,
       storiesCount: storyState.stories.length,
       isLoading,
+      authUser: authState.user?.id,
     });
 
     // Check if auth is still initializing
@@ -38,7 +40,7 @@ export default function DashboardPage() {
     }
 
     // Check if user is authenticated
-    if (!authState.isAuthenticated) {
+    if (!authState.isAuthenticated || !authState.user) {
       console.log('[DEBUG] User not authenticated, redirecting to sign-in');
       router.push('/sign-in');
       return;
@@ -52,11 +54,34 @@ export default function DashboardPage() {
         await fetchStories();
         console.log('[DEBUG] Stories loaded successfully');
       } catch (error) {
-        console.error('[DEBUG] Error fetching stories:', error);
-        // If unauthorized, redirect to sign-in
-        if (error instanceof Error && error.message.includes('Unauthorized')) {
+        console.error('[DEBUG] Error fetching stories:', {
+          error,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+
+        // Handle authentication errors
+        if (
+          error instanceof Error &&
+          (error.message.includes('Authentication required') ||
+            error.message.includes('Unauthorized'))
+        ) {
+          console.log('[DEBUG] Authentication error, logging out...');
+          try {
+            await logout();
+          } catch (logoutError) {
+            console.error('[DEBUG] Error during logout:', logoutError);
+          }
           router.push('/sign-in');
+          return;
         }
+
+        // Show error toast for other errors
+        toast({
+          title: 'Error',
+          description:
+            error instanceof Error ? error.message : 'Failed to load stories',
+          variant: 'destructive',
+        });
       } finally {
         setIsLoading(false);
       }
@@ -68,17 +93,25 @@ export default function DashboardPage() {
   }, [
     authState.isAuthenticated,
     authState.isLoading,
+    authState.user,
     router,
     fetchStories,
     storyState.loading,
+    logout,
   ]);
 
   const handleLogout = async () => {
     try {
+      console.log('[DEBUG] Logging out...');
       await logout();
       router.push('/');
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('[DEBUG] Logout failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to log out. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 

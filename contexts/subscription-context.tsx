@@ -199,97 +199,120 @@ export function SubscriptionProvider({
 
   // Initialize subscription
   useEffect(() => {
-    console.log('[DEBUG] SubscriptionContext useEffect:', {
-      authInitialized: auth.state.isInitialized,
-      authLoading: auth.state.isLoading,
-      userId: auth.state.user?.id,
-      subscriptionInitialized: state.isInitialized,
-      subscriptionLoading: state.isLoading,
-      hasAuthUser: !!auth.state.user,
-      isAuthenticated: auth.state.isAuthenticated,
-    });
+    const initializeSubscription = async () => {
+      const debugState = {
+        authInitialized: auth.state.isInitialized,
+        authLoading: auth.state.isLoading,
+        userId: auth.state.user?.id,
+        subscriptionInitialized: state.isInitialized,
+        subscriptionLoading: state.isLoading,
+        hasAuthUser: !!auth.state.user,
+        isAuthenticated: auth.state.isAuthenticated,
+        authState: auth.state,
+        subscriptionState: state,
+        currentUserId: state.subscription?.user_id,
+        timestamp: new Date().toISOString(),
+      };
 
-    // Wait for auth to be initialized
-    if (!auth.state.isInitialized) {
-      console.log('[DEBUG] Auth not initialized yet, waiting...');
-      return;
-    }
+      console.log('[DEBUG] SubscriptionContext useEffect:', debugState);
 
-    // If auth is initialized but no user, initialize with default plans
-    if (!auth.state.user?.id) {
-      console.log(
-        '[DEBUG] Auth initialized but no user, setting default state'
-      );
-      dispatch({
-        type: 'INITIALIZE',
-        payload: {
-          subscription: null,
-          plans: defaultPlans,
-        },
-      });
-      return;
-    }
+      // Don't proceed if auth is not initialized
+      if (!auth.state.isInitialized) {
+        console.log('[DEBUG] Auth not initialized yet, waiting...', debugState);
+        return;
+      }
 
-    const userId = auth.state.user.id;
-
-    const fetchSubscriptionData = async () => {
-      try {
-        console.log('[DEBUG] Starting subscription fetch for user:', userId);
-        dispatch({ type: 'SET_LOADING', payload: true });
-
-        const response = await fetch('/api/subscriptions', {
-          credentials: 'include',
+      // If no user, initialize with default plans
+      if (!auth.state.user || !auth.state.user.id) {
+        console.log(
+          '[DEBUG] No authenticated user, setting default state',
+          debugState
+        );
+        dispatch({
+          type: 'INITIALIZE',
+          payload: {
+            subscription: null,
+            plans: defaultPlans,
+          },
         });
+        return;
+      }
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('[DEBUG] Subscription fetch failed:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorData,
+      // Check if we need to re-fetch (either not initialized or user changed)
+      const shouldFetch =
+        !state.isInitialized ||
+        !state.subscription ||
+        state.subscription.user_id !== auth.state.user.id;
+
+      if (!shouldFetch) {
+        console.log(
+          '[DEBUG] Subscription already initialized for current user, skipping fetch',
+          debugState
+        );
+        return;
+      }
+
+      // Fetch subscription data
+      try {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        const { data: subscription, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', auth.state.user.id)
+          .single();
+
+        if (error) {
+          console.error('[DEBUG] Error fetching subscription:', {
+            error: error.message,
+            userId: auth.state.user.id,
+            timestamp: new Date().toISOString(),
           });
-          throw new Error(errorData.error || 'Failed to fetch subscription');
+
+          // Initialize with default plans if no subscription found
+          dispatch({
+            type: 'INITIALIZE',
+            payload: {
+              subscription: null,
+              plans: defaultPlans,
+            },
+          });
+          return;
         }
 
-        const subscription = await response.json();
-        console.log(
-          '[DEBUG] Subscription data fetched successfully:',
-          subscription
-        );
+        console.log('[DEBUG] Subscription fetched:', {
+          hasSubscription: !!subscription,
+          userId: auth.state.user.id,
+          timestamp: new Date().toISOString(),
+        });
 
         dispatch({
           type: 'INITIALIZE',
           payload: {
-            subscription,
+            subscription: subscription || null,
             plans: defaultPlans,
           },
         });
       } catch (error) {
-        console.error('[DEBUG] Error in subscription fetch:', {
-          error,
-          userId,
-          context: 'fetchSubscriptionData',
+        console.error('[DEBUG] Unexpected error fetching subscription:', {
+          error: error instanceof Error ? error.message : String(error),
+          userId: auth.state.user.id,
+          timestamp: new Date().toISOString(),
         });
+
+        // Initialize with default plans on error
         dispatch({
-          type: 'SET_ERROR',
-          payload: error instanceof Error ? error.message : 'Unknown error',
+          type: 'INITIALIZE',
+          payload: {
+            subscription: null,
+            plans: defaultPlans,
+          },
         });
-      } finally {
-        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
 
-    if (!state.isInitialized || !state.subscription) {
-      console.log(
-        '[DEBUG] Fetching subscription data - not initialized or no subscription'
-      );
-      fetchSubscriptionData();
-    }
-  }, [
-    auth.state.isInitialized,
-    auth.state.user?.id,
-    auth.state.isAuthenticated,
-  ]);
+    // Run initialization
+    initializeSubscription();
+  }, [auth.state.isInitialized, auth.state.user?.id]);
 
   const fetchSubscription = async () => {
     const userId = auth.state.user?.id;
@@ -303,6 +326,7 @@ export function SubscriptionProvider({
     }
 
     try {
+      console.log('[DEBUG] User ID before fetching subscription:', { userId });
       console.log('[DEBUG] Fetching subscription from API');
       dispatch({ type: 'SET_LOADING', payload: true });
 
@@ -347,7 +371,16 @@ export function SubscriptionProvider({
   const createSubscription = async (tier: SubscriptionTier) => {
     const userId = auth.state.user?.id;
 
-    if (!userId) {
+    if (!userId || !auth.state.isAuthenticated) {
+      console.error(
+        '[DEBUG] Subscription creation failed - not authenticated:',
+        {
+          userId: userId,
+          isAuthenticated: auth.state.isAuthenticated,
+          authState: auth.state,
+          timestamp: new Date().toISOString(),
+        }
+      );
       toast({
         title: 'Error',
         description: 'You must be logged in to create a subscription',
@@ -357,13 +390,28 @@ export function SubscriptionProvider({
     }
 
     try {
-      console.log('[DEBUG] Creating subscription via API:', { tier });
+      console.log('[DEBUG] Creating subscription via API:', {
+        tier,
+        userId,
+        isAuthenticated: auth.state.isAuthenticated,
+        timestamp: new Date().toISOString(),
+      });
       dispatch({ type: 'SET_LOADING', payload: true });
+
+      // Get the current session
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('No active session found');
+      }
 
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
         },
         credentials: 'include',
         body: JSON.stringify({ tier }),
@@ -371,11 +419,20 @@ export function SubscriptionProvider({
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('[DEBUG] Subscription creation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error,
+          timestamp: new Date().toISOString(),
+        });
         throw new Error(error.error || 'Failed to create subscription');
       }
 
       const data = await response.json();
-      console.log('[DEBUG] Subscription created:', data);
+      console.log('[DEBUG] Subscription created:', {
+        data,
+        timestamp: new Date().toISOString(),
+      });
 
       dispatch({
         type: 'SET_SUBSCRIPTION',
@@ -389,7 +446,11 @@ export function SubscriptionProvider({
 
       router.push('/dashboard');
     } catch (error) {
-      console.error('[DEBUG] Error creating subscription:', error);
+      console.error('[DEBUG] Error creating subscription:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      });
       dispatch({
         type: 'SET_ERROR',
         payload:
