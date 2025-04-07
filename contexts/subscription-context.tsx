@@ -79,7 +79,7 @@ const initialState: SubscriptionState = {
   availablePlans: [],
   isLoading: true,
   error: null,
-};
+  };
 
 // Create reducer
 const subscriptionReducer = (
@@ -242,7 +242,7 @@ export function SubscriptionProvider({
       const shouldFetch =
         !state.isInitialized ||
         !state.subscription ||
-        state.subscription.user_id !== auth.state.user.id;
+        state.subscription?.user_id !== auth.state.user.id;
 
       if (!shouldFetch) {
         console.log(
@@ -255,11 +255,12 @@ export function SubscriptionProvider({
       // Fetch subscription data
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
-        const { data: subscription, error } = await supabase
+        console.log('[DEBUG] Fetching subscription for user ID:', auth.state.user.id);
+        const { data: subscriptions, error } = await supabase
           .from('subscriptions')
           .select('*')
-          .eq('user_id', auth.state.user.id)
-          .single();
+          .eq('user_id', auth.state.user?.id);
+        console.log('[DEBUG] Subscription query result:', { subscriptions, error });
 
         if (error) {
           console.error('[DEBUG] Error fetching subscription:', {
@@ -279,19 +280,29 @@ export function SubscriptionProvider({
           return;
         }
 
-        console.log('[DEBUG] Subscription fetched:', {
-          hasSubscription: !!subscription,
-          userId: auth.state.user.id,
-          timestamp: new Date().toISOString(),
-        });
-
-        dispatch({
-          type: 'INITIALIZE',
-          payload: {
-            subscription: subscription || null,
-            plans: defaultPlans,
-          },
-        });
+        if (subscriptions && subscriptions.length === 1) {
+          const subscription = subscriptions[0];
+          console.log('[DEBUG] Subscription fetched successfully:', {
+            userId: auth.state.user?.id,
+            hasSubscription: !!subscriptions,
+            subscriptionId: subscriptions?.[0]?.id,
+            status: subscriptions?.[0]?.status,
+          });
+          dispatch({
+            type: 'INITIALIZE',
+            payload: {
+              subscription: subscriptions?.[0] || null,
+              plans: defaultPlans,
+            },
+          });
+        } else if (subscriptions && subscriptions.length > 1) {
+          console.error('[DEBUG] Multiple subscriptions found for user:', auth.state.user.id);
+          dispatch({ type: 'SET_ERROR', payload: 'Multiple subscriptions found. Please contact support.' });
+        } else {
+          console.log('[DEBUG] No subscription found for user:', auth.state.user.id);
+          dispatch({ type: 'SET_ERROR', payload: 'No subscription found. Please subscribe to a plan.' });
+        }
+        return;
       } catch (error) {
         console.error('[DEBUG] Unexpected error fetching subscription:', {
           error: error instanceof Error ? error.message : String(error),
@@ -498,11 +509,20 @@ export function SubscriptionProvider({
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('[DEBUG] Subscription cancellation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error,
+          timestamp: new Date().toISOString(),
+        });
         throw new Error(error.error || 'Failed to cancel subscription');
       }
 
       const data = await response.json();
-      console.log('[DEBUG] Subscription canceled:', data);
+      console.log('[DEBUG] Subscription canceled:', {
+        data,
+        timestamp: new Date().toISOString(),
+      });
 
       dispatch({
         type: 'SET_SUBSCRIPTION',
@@ -516,7 +536,11 @@ export function SubscriptionProvider({
 
       router.push('/dashboard');
     } catch (error) {
-      console.error('[DEBUG] Error canceling subscription:', error);
+      console.error('[DEBUG] Error canceling subscription:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      });
       dispatch({
         type: 'SET_ERROR',
         payload:
@@ -550,20 +574,38 @@ export function SubscriptionProvider({
     }
 
     try {
+      console.log('[DEBUG] Updating subscription via API:', {
+        tier,
+        userId,
+        timestamp: new Date().toISOString(),
+      });
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      const { data, error } = (await supabase
-        .from('subscriptions')
-        .update({
-          tier,
-          plan_id: tier === 'premium' ? '1' : '2',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId)
-        .select()
-        .single()) as unknown as { data: Subscription | null; error: any };
+      const response = await fetch('/api/subscriptions', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ tier }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('[DEBUG] Subscription update failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error,
+          timestamp: new Date().toISOString(),
+        });
+        throw new Error(error.error || 'Failed to update subscription');
+      }
+
+      const data = await response.json();
+      console.log('[DEBUG] Subscription updated:', {
+        data,
+        timestamp: new Date().toISOString(),
+      });
 
       dispatch({
         type: 'SET_SUBSCRIPTION',
@@ -577,41 +619,61 @@ export function SubscriptionProvider({
 
       router.push('/dashboard');
     } catch (error) {
-      console.error('Error updating subscription', error);
+      console.error('[DEBUG] Error updating subscription:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      });
       dispatch({
         type: 'SET_ERROR',
-        payload: (error as Error).message || 'Failed to update subscription',
+        payload:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update subscription',
       });
       toast({
         title: 'Error',
         description:
-          (error as Error).message || 'Failed to update subscription',
+          error instanceof Error
+            ? error.message
+            : 'Failed to update subscription',
         variant: 'destructive',
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const getSubscriptionTier = (): SubscriptionTier => {
-    if (!state.subscription) return 'free';
-    return state.subscription.plan_id === '1' ? 'premium' : 'basic';
+    if (!state.subscription) {
+      return 'free';
+    }
+
+    return state.subscription.plan_id as SubscriptionTier;
   };
 
   const hasFeature = (feature: string): boolean => {
-    const tier = getSubscriptionTier();
-    const plan = defaultPlans.find((p) => p.tier === tier);
+    if (!state.subscription) {
+      return false;
+    }
+
+    const plan = defaultPlans.find((plan) => plan.id === state.subscription?.plan_id);
     if (!plan) return false;
+
     return plan.features.some((f) => f.name === feature);
   };
 
   const getRemainingDays = (): number | null => {
-    if (!state.subscription?.subscription_end) return null;
+    if (!state.subscription || !state.subscription.trial_end) {
+      return null;
+    }
 
-    const endDate = new Date(state.subscription.subscription_end);
+    const trialEnd = new Date(state.subscription.trial_end);
     const now = new Date();
-    const diffTime = endDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diff = trialEnd.getTime() - now.getTime();
+    const days = Math.ceil(diff / (1000 * 3600 * 24));
 
-    return diffDays > 0 ? diffDays : 0;
+    return days;
   };
 
   return (
@@ -634,7 +696,7 @@ export function SubscriptionProvider({
 
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error(
       'useSubscription must be used within a SubscriptionProvider'
     );

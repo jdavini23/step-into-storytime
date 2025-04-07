@@ -60,7 +60,6 @@ export const createServerSupabaseClient = async () => {
       headers: {
         'X-Client-Info': 'supabase-js-web/2.38.4',
         'Cache-Control': 'no-store',
-        'Content-Type': 'application/json',
         apikey: supabaseAnonKey,
       },
       fetch: async (url, options = {}) => {

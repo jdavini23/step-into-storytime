@@ -73,34 +73,34 @@ const createBrowserSupabaseClient = () => {
       flowType: 'pkce',
       debug: process.env.NODE_ENV === 'development',
       storageKey: 'sb-auth-token',
-      storage: {
-        getItem: (key) => {
-          try {
-            const item = localStorage.getItem(key);
-            console.log('[DEBUG] Storage getItem:', { key, hasValue: !!item });
-            return item;
-          } catch (error) {
-            console.error('[DEBUG] Storage getItem error:', { key, error });
-            return null;
-          }
-        },
-        setItem: (key, value) => {
-          try {
-            localStorage.setItem(key, value);
-            console.log('[DEBUG] Storage setItem:', { key, hasValue: !!value });
-          } catch (error) {
-            console.error('[DEBUG] Storage setItem error:', { key, error });
-          }
-        },
-        removeItem: (key) => {
-          try {
-            localStorage.removeItem(key);
-            console.log('[DEBUG] Storage removeItem:', { key });
-          } catch (error) {
-            console.error('[DEBUG] Storage removeItem error:', { key, error });
-          }
-        },
-      },
+      // storage: {
+      //   getItem: (key) => {
+      //     try {
+      //       const item = localStorage.getItem(key);
+      //       console.log('[DEBUG] Storage getItem:', { key, hasValue: !!item });
+      //       return item;
+      //     } catch (error) {
+      //       console.error('[DEBUG] Storage getItem error:', { key, error });
+      //       return null;
+      //     }
+      //   },
+      //   setItem: (key, value) => {
+      //     try {
+      //       localStorage.setItem(key, value);
+      //       console.log('[DEBUG] Storage setItem:', { key, hasValue: !!value });
+      //     } catch (error) {
+      //       console.error('[DEBUG] Storage setItem error:', { key, error });
+      //     }
+      //   },
+      //   removeItem: (key) => {
+      //     try {
+      //       localStorage.removeItem(key);
+      //       console.log('[DEBUG] Storage removeItem:', { key });
+      //     } catch (error) {
+      //       console.error('[DEBUG] Storage removeItem error:', { key, error });
+      //     }
+      //   },
+      // },
     },
     global: {
       headers: {

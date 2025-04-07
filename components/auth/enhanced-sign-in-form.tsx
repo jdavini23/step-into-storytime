@@ -106,10 +106,19 @@ export default function EnhancedSignInForm() {
         timestamp: new Date().toISOString(),
       });
 
-      await login(formData.email, formData.password);
+      console.log('[DEBUG] Calling login function');
+      const loginResult = await login(formData.email, formData.password);
+      console.log('[DEBUG] Login function returned');
+
+      console.log('[DEBUG] Login successful:', {
+        email: formData.email,
+        timestamp: new Date().toISOString(),
+        result: loginResult,
+      });
       // Redirect is handled by auth context
     } catch (error) {
       console.error('[DEBUG] Form login error:', {
+        email: formData.email,
         error: error instanceof Error ? error.message : 'Unknown error',
         type: error instanceof Error ? error.constructor.name : typeof error,
         timestamp: new Date().toISOString(),
@@ -258,7 +267,16 @@ export default function EnhancedSignInForm() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => loginWithGoogle()}
+          onClick={() => {
+            console.log('[DEBUG] Attempting login with Google');
+            loginWithGoogle()
+              .then((result) => {
+                console.log('[DEBUG] Google login successful:', result);
+              })
+              .catch((error) => {
+                console.error('[DEBUG] Google login error:', error);
+              });
+          }}
           disabled={isLoading}
           className="h-12"
         >
@@ -268,7 +286,16 @@ export default function EnhancedSignInForm() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => loginWithGithub()}
+          onClick={() => {
+            console.log('[DEBUG] Attempting login with Github');
+            loginWithGithub()
+              .then((result) => {
+                console.log('[DEBUG] Github login successful:', result);
+              })
+              .catch((error) => {
+                console.error('[DEBUG] Github login error:', error);
+              });
+          }}
           disabled={isLoading}
           className="h-12"
         >

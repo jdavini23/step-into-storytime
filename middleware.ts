@@ -11,37 +11,23 @@ export async function middleware(req: NextRequest) {
 
   try {
     // Refresh session if needed
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
+    console.log('[DEBUG] Middleware - Parsed Cookies:', req.cookies);
 
-    console.log('[DEBUG] Session check in middleware:', {
-      hasSession: !!session,
-      path: req.nextUrl.pathname,
-      timestamp: new Date().toISOString(),
-    });
+    const authCookie = req.cookies.get('sb-auth-token')?.value;
+    console.log('[DEBUG] Middleware - authCookie:', authCookie);
 
-    if (error) {
-      console.error('[DEBUG] Session error in middleware:', {
-        error: error.message,
-        status: error.status,
-        path: req.nextUrl.pathname,
-      });
+    if (authCookie) {
+      try {
+        const { data, error } = await supabase.auth.setSession({ access_token: authCookie, refresh_token: '' });
+        console.log('[DEBUG] Middleware - setSession data:', data);
+        console.log('[DEBUG] Middleware - setSession error:', error);
+      } catch (error) {
+        console.error('[DEBUG] Middleware - setSession error:', error);
+      }
     }
 
     // Protected API routes
     if (req.nextUrl.pathname.startsWith('/api/')) {
-      if (!session) {
-        console.log('[DEBUG] Unauthorized API access attempt:', {
-          path: req.nextUrl.pathname,
-          timestamp: new Date().toISOString(),
-        });
-        return NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
-        );
-      }
     }
 
     // Protected pages
@@ -49,17 +35,15 @@ export async function middleware(req: NextRequest) {
       req.nextUrl.pathname.startsWith('/dashboard') ||
       req.nextUrl.pathname.startsWith('/profile')
     ) {
-      if (!session) {
-        console.log(
-          '[DEBUG] Redirecting unauthenticated user from protected page:',
-          {
-            path: req.nextUrl.pathname,
-            timestamp: new Date().toISOString(),
-          }
-        );
-        return NextResponse.redirect(new URL('/sign-in', req.url));
-      }
+      
+        const redirectUrl = new URL('/sign-in', req.url);
+        console.log('[DEBUG] Redirecting to:', redirectUrl.toString());
+        return NextResponse.redirect(redirectUrl);
+      
     }
+
+    // Get session
+    const { data: { session } } = await supabase.auth.getSession();
 
     // Auth pages (when already authenticated)
     if (
@@ -86,7 +70,9 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    '/dashboard',
     '/dashboard/:path*',
+    '/profile',
     '/profile/:path*',
     '/api/:path*',
     '/sign-in',

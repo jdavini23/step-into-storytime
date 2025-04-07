@@ -23,7 +23,7 @@ export type AuthState = {
   isInitialized: boolean;
 };
 
-type AuthContextType = {
+export type AuthContextType = {
   state: AuthState;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Function to update auth state
     const updateAuthState = async (user: User | null) => {
-      if (!isSubscribed) return;
+      if (!isSubscribed || !user) return;
 
       try {
         if (!user) {
@@ -94,10 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Verify the session is still valid
+        console.log('[DEBUG] Verifying session...');
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
+        console.log('[DEBUG] getSession result:', { session, error });
 
         if (error || !session) {
           console.error('[DEBUG] Session verification failed:', {
@@ -107,6 +109,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           dispatch({ type: 'SET_USER', payload: null });
           return;
+        }
+
+        console.log('[DEBUG] User email confirmed at:', user?.email_confirmed_at);
+
+        // Fetch subscription data
+        console.log('[DEBUG] Fetching subscription data for user:', user.id);
+        const { data: subscriptions, error: subError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id);
+        console.log('[DEBUG] Subscription data result:', { subscriptions, subError });
+
+        if (subError) {
+          console.error('[DEBUG] Error fetching subscription:', {
+            error: subError?.message,
+            userId: user.id,
+            timestamp: new Date().toISOString(),
+          });
+          dispatch({ type: 'SET_ERROR', payload: 'Failed to fetch subscription data.' });
+        } else {
+          if (subscriptions && subscriptions.length === 1) {
+            const subscription = subscriptions[0];
+            console.log('[DEBUG] Subscription fetched successfully:', {
+              userId: user.id,
+              hasSubscription: !!subscription,
+              subscriptionId: subscription?.id,
+              status: subscription?.status,
+            });
+          } else if (subscriptions && subscriptions.length > 1) {
+            console.error('[DEBUG] Multiple subscriptions found for user:', user.id);
+            dispatch({ type: 'SET_ERROR', payload: 'Multiple subscriptions found. Please contact support.' });
+          } else {
+            console.log('[DEBUG] No subscription found for user:', user.id);
+            dispatch({ type: 'SET_ERROR', payload: 'No subscription found. Please subscribe to a plan.' });
+          }
         }
 
         dispatch({ type: 'SET_USER', payload: user });
@@ -122,10 +159,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check for existing session
     const initializeAuth = async () => {
       try {
+        console.log('[DEBUG] Initializing auth - getting session...');
         const {
           data: { session },
           error: sessionError,
         } = await supabase.auth.getSession();
+        console.log('[DEBUG] getSession result:', { session, sessionError });
 
         if (!isSubscribed) return;
 
@@ -148,7 +187,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           timestamp: new Date().toISOString(),
         });
 
-        await updateAuthState(session?.user || null);
+        if (session?.user) {
+          await updateAuthState(session.user);
+        }
       } catch (error) {
         console.error('[DEBUG] Error during auth initialization:', {
           error: error instanceof Error ? error.message : String(error),
@@ -163,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Initialize auth
+    console.log('[DEBUG] Calling initializeAuth()');
     initializeAuth();
 
     // Subscribe to auth changes
@@ -203,10 +245,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Handle specific error cases
         switch (error.status) {
           case 400:
-            userMessage = 'Invalid email or password';
-            break;
+            userMessage = 'Invalid email or password. Please double-check your credentials.';
           case 401:
-            userMessage = 'Your session has expired. Please sign in again.';
+            userMessage = 'Your session has expired. Please sign in again. If the problem persists, clear your browser cookies and try again.';
             if (clearState) {
               dispatch({ type: 'CLEAR_STATE' });
               router.push('/sign-in');
@@ -214,15 +255,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             break;
           case 422:
             userMessage =
-              'Invalid input provided. Please check your information.';
-            break;
+              'Invalid input provided. Please check your information. Ensure all fields are filled correctly and meet the required criteria.';
           case 429:
-            userMessage = 'Too many attempts. Please try again later.';
-            break;
+            userMessage = 'Too many attempts. Please try again later. This is a security measure to prevent abuse. Please wait a few minutes before trying again.';
           default:
             if (error.message?.includes('Failed to fetch')) {
               userMessage =
-                'Network error. Please check your internet connection.';
+                'Network error. Please check your internet connection. If the problem persists, try again later.';
+            } else {
+              userMessage = `An unexpected error occurred: ${error.message}. Please try again later. If the problem persists, contact support.`;
             }
         }
 
@@ -258,10 +299,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Email and password are required');
         }
 
+        console.log('[DEBUG] Calling supabase.auth.signInWithPassword with email:', email.toLowerCase().trim());
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
           password,
         });
+        console.log('[DEBUG] supabase.auth.signInWithPassword returned', { data, error });
 
         console.log('[DEBUG] Supabase response:', {
           hasData: !!data,
@@ -302,20 +345,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         // Set session data in localStorage and cookie
-        const storageKey = 'sb-auth-token';
-        const maxAge = 60 * 60 * 24 * 7;
-        try {
-          localStorage.setItem(storageKey, data.session.access_token);
-          document.cookie = `${storageKey}=${data.session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`;
-        } catch (storageError: unknown) {
-          console.error('[DEBUG] Error storing session:', {
-            error:
-              storageError instanceof Error
-                ? storageError.message
-                : 'Unknown error',
-            timestamp: new Date().toISOString(),
-          });
-        }
+        // const storageKey = 'sb-auth-token';
+        // const maxAge = 60 * 60 * 24 * 7;
+        // try {
+        //   localStorage.setItem(storageKey, data.session.access_token);
+        //   document.cookie = `${storageKey}=${data.session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+        // } catch (storageError: unknown) {
+        //   console.error('[DEBUG] Error storing session:', {
+        //     error:
+        //       storageError instanceof Error
+        //         ? storageError.message
+        //         : 'Unknown error',
+        //     timestamp: new Date().toISOString(),
+        //   });
+        // }
 
         dispatch({ type: 'SET_USER', payload: data.session.user });
         toast({
@@ -325,7 +368,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Small delay to ensure state is updated
         await new Promise((resolve) => setTimeout(resolve, 100));
-        router.push('/dashboard');
+        console.log('[DEBUG] Redirecting to dashboard');
+        window.location.href = '/dashboard';
       } catch (error: unknown) {
         console.error('[DEBUG] Login error:', {
           error: error instanceof Error ? error.message : JSON.stringify(error),
@@ -360,6 +404,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
 
+        console.log('[DEBUG] Calling supabase.auth.signUp with email:', email.toLowerCase().trim());
         const { error } = await supabase.auth.signUp({
           email: email.toLowerCase().trim(),
           password,
@@ -367,6 +412,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             data: { name },
           },
         });
+        console.log('[DEBUG] supabase.auth.signUp returned', { error });
 
         if (handleError(error)) return;
 
@@ -431,121 +477,121 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         type: error instanceof Error ? error.name : 'Unknown type',
       });
       // Don't throw the error, ensure we complete the logout process
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  }, [router]);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    }, [router]);
 
-  const loginWithGoogle = useCallback(async () => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/callback`,
-        },
-      });
-
-      if (handleError(error)) return;
-    } catch (error) {
-      handleError(error as AuthError);
-    }
-  }, [handleError]);
-
-  const loginWithGithub = useCallback(async () => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/callback`,
-        },
-      });
-
-      if (handleError(error)) return;
-    } catch (error) {
-      handleError(error as AuthError);
-    }
-  }, [handleError]);
-
-  const resetPassword = useCallback(
-    async (email: string) => {
+    const loginWithGoogle = useCallback(async () => {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/update-password`,
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/callback`,
+          },
         });
 
         if (handleError(error)) return;
-
-        toast({
-          title: 'Success',
-          description: 'Password reset instructions sent to your email',
-        });
       } catch (error) {
         handleError(error as AuthError);
       }
-    },
-    [handleError]
-  );
+    }, [handleError]);
 
-  const updatePassword = useCallback(
-    async (newPassword: string) => {
+    const loginWithGithub = useCallback(async () => {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
 
-        const { error } = await supabase.auth.updateUser({
-          password: newPassword,
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'github',
+          options: {
+            redirectTo: `${window.location.origin}/callback`,
+          },
         });
 
         if (handleError(error)) return;
-
-        toast({
-          title: 'Success',
-          description: 'Password updated successfully',
-        });
-        router.push('/dashboard');
       } catch (error) {
         handleError(error as AuthError);
       }
-    },
-    [handleError, router]
-  );
+    }, [handleError]);
 
-  const value = useMemo(
-    () => ({
-      state,
-      login,
-      signup,
-      logout,
-      loginWithGoogle,
-      loginWithGithub,
-      resetPassword,
-      updatePassword,
-    }),
-    [
-      state,
-      login,
-      signup,
-      logout,
-      loginWithGoogle,
-      loginWithGithub,
-      resetPassword,
-      updatePassword,
-    ]
-  );
+    const resetPassword = useCallback(
+      async (email: string) => {
+        try {
+          dispatch({ type: 'SET_LOADING', payload: true });
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/update-password`,
+          });
 
-// Hook
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+          if (handleError(error)) return;
+
+          toast({
+            title: 'Success',
+            description: 'Password reset instructions sent to your email',
+          });
+        } catch (error) {
+          handleError(error as AuthError);
+        }
+      },
+      [handleError]
+    );
+
+    const updatePassword = useCallback(
+      async (newPassword: string) => {
+        try {
+          dispatch({ type: 'SET_LOADING', payload: true });
+
+          const { error } = await supabase.auth.updateUser({
+            password: newPassword,
+          });
+
+          if (handleError(error)) return;
+
+          toast({
+            title: 'Success',
+            description: 'Password updated successfully',
+          });
+          router.push('/dashboard');
+        } catch (error) {
+          handleError(error as AuthError);
+        }
+      },
+      [handleError, router]
+    );
+
+    const value = useMemo(
+      () => ({
+        state,
+        login,
+        signup,
+        logout,
+        loginWithGoogle,
+        loginWithGithub,
+        resetPassword,
+        updatePassword,
+      }),
+      [
+        state,
+        login,
+        signup,
+        logout,
+        loginWithGoogle,
+        loginWithGithub,
+        resetPassword,
+        updatePassword,
+      ]
+    );
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
   }
-  return context;
-}
+
+  // Hook
+  export function useAuth() {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+      throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+  }
