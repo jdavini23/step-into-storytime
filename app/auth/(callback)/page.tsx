@@ -1,3 +1,4 @@
+// This file will be moved to app/auth/(callback)/page.tsx
 'use client';
 
 import { useEffect } from 'react';
