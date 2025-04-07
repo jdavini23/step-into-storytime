@@ -11,8 +11,22 @@ export type TypedSupabaseClient = ReturnType<
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Debug logging for environment variables
+console.log('[DEBUG] Supabase Environment Variables:', {
+  hasUrl: !!supabaseUrl,
+  urlLength: supabaseUrl?.length,
+  hasAnonKey: !!supabaseAnonKey,
+  anonKeyLength: supabaseAnonKey?.length,
+  environment: process.env.NODE_ENV,
+  isClient: typeof window !== 'undefined',
+});
+
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('[DEBUG] Missing Supabase environment variables:', {
+    supabaseUrl: !!supabaseUrl,
+    supabaseAnonKey: !!supabaseAnonKey,
+  });
   throw new Error(
     'Missing required Supabase environment variables. Please check your .env.local file.'
   );
