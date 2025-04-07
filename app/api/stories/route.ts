@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Story } from '@/contexts/story-context';
-import { createServerSupabaseClient } from '@/utils/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateStory } from '@/utils/ai/story-generator';
 import type { Database } from '@/types/supabase';
 import { v4 as uuidv4 } from 'uuid';

@@ -1,6 +1,5 @@
+// Refactored Supabase client initialization
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
 
 // Type for Supabase instance with all tables
@@ -10,36 +9,26 @@ export type TypedSupabaseClient = SupabaseClient<Database>;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Debug logging for environment variables
-console.log('[DEBUG] Supabase Environment Variables:', {
-  url: supabaseUrl ? 'Set (length: ' + supabaseUrl.length + ')' : 'Missing',
-  anonKey: supabaseAnonKey
-    ? 'Set (length: ' + supabaseAnonKey.length + ')'
-    : 'Missing',
-  isDevelopment: process.env.NODE_ENV === 'development',
-  isClient: typeof window !== 'undefined',
-});
-
-// Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    'Missing Supabase environment variables. Authentication and database features will not work.',
-    'Required variables:',
-    {
-      NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set ✓' : 'Missing ✗',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey ? 'Set ✓' : 'Missing ✗',
-    }
-  );
-  throw new Error('Missing required Supabase environment variables');
+  throw new Error('Missing required Supabase environment variables.');
 }
 
-// Validate URL format
-try {
-  new URL(supabaseUrl);
-} catch (error) {
-  console.error('Invalid Supabase URL format:', supabaseUrl);
-  throw new Error('Invalid Supabase URL format');
-}
+// Singleton instance for browser and server
+let supabaseInstance: TypedSupabaseClient | null = null;
+
+export const createSupabaseClient = (): TypedSupabaseClient => {
+  if (!supabaseInstance) {
+    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'sb-auth-token',
+      },
+    });
+  }
+  return supabaseInstance;
+};
 
 // Custom fetch with retry logic and improved error handling
 const customFetch = async (
@@ -123,43 +112,6 @@ const customFetch = async (
   throw new Error('Failed to fetch after retries');
 };
 
-// Initialize Supabase client with additional options
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'sb-auth-token',
-  },
-});
-
-// Helper function to create a Supabase client for server components
-export const createServerSupabaseClient = async () => {
-  const cookieStore = await cookies();
-
-  return createServerClient(supabaseUrl || '', supabaseAnonKey || '', {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
-      },
-      set(name: string, value: string, options: any) {
-        try {
-          cookieStore.set({ name, value, ...options });
-        } catch (error) {
-          // Handle cookie setting error
-        }
-      },
-      remove(name: string, options: any) {
-        try {
-          cookieStore.delete({ name, ...options });
-        } catch (error) {
-          // Handle cookie removal error
-        }
-      },
-    },
-  });
-};
-
 // User authentication helpers with improved error handling
 export const signInWithEmail = async (
   email: string,
@@ -189,7 +141,7 @@ export const signInWithEmail = async (
     });
 
     // Real Supabase authentication
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await createSupabaseClient().auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
@@ -286,7 +238,7 @@ export async function signUpWithEmail(
     }
 
     // Real Supabase signup
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await createSupabaseClient().auth.signUp({
       email,
       password,
       options: {
@@ -319,7 +271,7 @@ export async function signOut() {
       return true;
     }
 
-    const { error } = await supabase.auth.signOut();
+    const { error } = await createSupabaseClient().auth.signOut();
 
     if (error) {
       throw error;
@@ -363,7 +315,7 @@ export async function getSession() {
       return null;
     }
 
-    const { data, error } = await supabase.auth.getSession();
+    const { data, error } = await createSupabaseClient().auth.getSession();
 
     if (error) {
       throw error;
@@ -404,7 +356,7 @@ export async function getCurrentUser() {
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser();
+    } = await createSupabaseClient().auth.getUser();
 
     if (error) {
       throw error;
@@ -426,7 +378,7 @@ export const fetchUserProfile = async (userId: string) => {
     const {
       data: { session },
       error: sessionError,
-    } = await supabase.auth.getSession();
+    } = await createSupabaseClient().auth.getSession();
 
     if (sessionError) {
       console.error('[DEBUG] Session error:', sessionError);
@@ -439,7 +391,7 @@ export const fetchUserProfile = async (userId: string) => {
     }
 
     // First try to fetch the existing profile
-    const { data: existingProfile, error: fetchError } = await supabase
+    const { data: existingProfile, error: fetchError } = await createSupabaseClient()
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -467,7 +419,7 @@ export const fetchUserProfile = async (userId: string) => {
 
     try {
       // Attempt to create a new profile
-      const { data: newProfile, error: createError } = await supabase
+      const { data: newProfile, error: createError } = await createSupabaseClient()
         .from('profiles')
         .insert([
           {
@@ -494,7 +446,7 @@ export const fetchUserProfile = async (userId: string) => {
         console.log(
           '[DEBUG] Profile creation failed due to conflict, retrying fetch'
         );
-        const { data: retryProfile, error: retryError } = await supabase
+        const { data: retryProfile, error: retryError } = await createSupabaseClient()
           .from('profiles')
           .select('*')
           .eq('id', userId)
@@ -540,7 +492,7 @@ export async function updateUserProfile(
       };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await createSupabaseClient()
       .from('profiles')
       .update(profileData)
       .eq('id', userId)
@@ -585,7 +537,7 @@ export async function getUserSubscription(userId: string) {
       };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await createSupabaseClient()
       .from('subscriptions')
       .select('*, subscription_items(*)')
       .eq('user_id', userId)
@@ -655,7 +607,7 @@ export async function fetchStories(userId: string) {
       ];
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await createSupabaseClient()
       .from('stories')
       .select('*')
       .eq('user_id', userId)
@@ -698,7 +650,7 @@ export async function fetchStory(storyId: string, userId: string) {
       };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await createSupabaseClient()
       .from('stories')
       .select('*')
       .eq('id', storyId)
@@ -739,7 +691,7 @@ export async function createStory(
       };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await createSupabaseClient()
       .from('stories')
       .insert({
         user_id: userId,
@@ -780,7 +732,7 @@ export async function updateStory(
       };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await createSupabaseClient()
       .from('stories')
       .update(storyData)
       .eq('id', storyId)
@@ -809,7 +761,7 @@ export async function deleteStory(storyId: string, userId: string) {
       return true;
     }
 
-    const { error } = await supabase
+    const { error } = await createSupabaseClient()
       .from('stories')
       .delete()
       .eq('id', storyId)
