@@ -34,6 +34,11 @@ export async function createClient() {
   });
 
   const cookieStore = cookies();
+  const cookiesList = (await cookieStore).getAll();
+  console.log('[DEBUG] Available cookies:', {
+    count: cookiesList.length,
+    names: cookiesList.map((c) => c.name),
+  });
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -44,6 +49,7 @@ export async function createClient() {
           console.log('[DEBUG] Cookie value:', {
             name,
             hasValue: !!cookie?.value,
+            value: cookie?.value ? `${cookie.value.substring(0, 10)}...` : null,
           });
           return cookie?.value ?? '';
         } catch (error) {
@@ -53,16 +59,36 @@ export async function createClient() {
       },
       async set(name: string, value: string, options: CookieOptions) {
         try {
-          console.log('[DEBUG] Setting cookie:', { name, hasValue: !!value });
-          (await cookieStore).set({ name, value, ...options });
+          console.log('[DEBUG] Setting cookie:', {
+            name,
+            hasValue: !!value,
+            options,
+          });
+          const cookieOptions = {
+            ...options,
+            sameSite: 'lax' as const,
+            secure: process.env.NODE_ENV === 'production',
+            path: '/',
+            httpOnly: true,
+            priority: 'high' as const,
+          };
+          (await cookieStore).set({
+            name,
+            value,
+            ...cookieOptions,
+          });
         } catch (error) {
           console.error('[DEBUG] Error setting cookie:', { name, error });
         }
       },
       async remove(name: string, options: CookieOptions) {
         try {
-          console.log('[DEBUG] Removing cookie:', { name });
-          (await cookieStore).delete({ name, ...options });
+          console.log('[DEBUG] Removing cookie:', { name, options });
+          (await cookieStore).delete({
+            name,
+            ...options,
+            path: '/',
+          });
         } catch (error) {
           console.error('[DEBUG] Error removing cookie:', { name, error });
         }
@@ -72,6 +98,8 @@ export async function createClient() {
       detectSessionInUrl: false,
       persistSession: true,
       autoRefreshToken: true,
+      flowType: 'pkce',
+      debug: process.env.NODE_ENV === 'development',
     },
     global: {
       headers: {

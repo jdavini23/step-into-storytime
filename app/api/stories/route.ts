@@ -12,19 +12,46 @@ let stories: Story[] = [];
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[DEBUG] GET /api/stories - Start');
     const supabase = await createClient();
+
+    // Get user session
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
-    if (authError || !user) {
+    console.log('[DEBUG] Auth check result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      hasError: !!authError,
+      errorMessage: authError?.message,
+      cookies: request.headers.get('cookie'),
+      headers: Object.fromEntries(request.headers.entries()),
+    });
+
+    if (authError) {
+      console.error('[DEBUG] Authentication error:', {
+        error: authError,
+        message: authError.message,
+        status: authError.status,
+      });
       return NextResponse.json(
-        { error: 'Unauthorized - Please sign in' },
+        { error: `Authentication failed: ${authError.message}` },
         { status: 401 }
       );
     }
 
+    if (!user) {
+      console.error('[DEBUG] No user found in session');
+      return NextResponse.json(
+        { error: 'Unauthorized - No user session found' },
+        { status: 401 }
+      );
+    }
+
+    // Get stories for user
+    console.log('[DEBUG] Fetching stories for user:', user.id);
     const { data: stories, error } = await supabase
       .from('stories')
       .select('*')
@@ -32,13 +59,21 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching stories:', error);
+      console.error('[DEBUG] Error fetching stories:', {
+        error,
+        userId: user.id,
+      });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    console.log('[DEBUG] Stories fetched successfully:', {
+      count: stories?.length ?? 0,
+      userId: user.id,
+    });
+
     return NextResponse.json(stories);
   } catch (error) {
-    console.error('Error in stories route:', error);
+    console.error('[DEBUG] Unexpected error in GET /api/stories:', error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }
@@ -76,7 +111,10 @@ export async function POST(request: NextRequest) {
       const storyData = {
         id: json.id || crypto.randomUUID(),
         title: json.title || 'Untitled Story',
-        content: typeof json.content === 'string' ? json.content : JSON.stringify(json.content),
+        content:
+          typeof json.content === 'string'
+            ? json.content
+            : JSON.stringify(json.content),
         character: json.character,
         setting: json.setting,
         theme: json.theme,

@@ -117,20 +117,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
-        console.log('[DEBUG] Attempting login with email:', email);
+        console.log('[DEBUG] Login attempt:', {
+          emailLength: email?.length,
+          hasPassword: !!password,
+          timestamp: new Date().toISOString(),
+        });
+
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
           password,
         });
 
         if (error) {
-          console.error('[DEBUG] Login error:', error);
+          console.error('[DEBUG] Login error details:', {
+            errorMessage: error.message,
+            errorStatus: error.status,
+            errorName: error.name,
+            timestamp: new Date().toISOString(),
+          });
           handleError(error);
           return;
         }
 
         if (!data.session) {
-          console.error('[DEBUG] No session after login');
+          console.error('[DEBUG] No session after login:', {
+            hasData: !!data,
+            hasUser: !!data?.user,
+            timestamp: new Date().toISOString(),
+          });
           dispatch({
             type: 'SET_ERROR',
             payload: 'No session after login. Please try again.',
@@ -138,20 +152,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        console.log('[DEBUG] Login successful, redirecting to dashboard');
+        console.log('[DEBUG] Login successful:', {
+          hasSession: !!data.session,
+          hasUser: !!data.session?.user,
+          timestamp: new Date().toISOString(),
+        });
+
         toast({
           title: 'Success',
           description: 'Logged in successfully',
         });
 
-        // Ensure we have the user before redirecting
         dispatch({ type: 'SET_USER', payload: data.session.user });
-
-        // Small delay to ensure state updates are processed
         await new Promise((resolve) => setTimeout(resolve, 100));
         router.push('/dashboard');
       } catch (error) {
-        console.error('[DEBUG] Unexpected login error:', error);
+        console.error('[DEBUG] Unexpected login error:', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString(),
+        });
         handleError(error as AuthError);
       } finally {
         dispatch({ type: 'SET_LOADING', payload: false });
@@ -190,17 +209,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
+      console.log('[DEBUG] Starting logout process');
 
-      const { error } = await supabase.auth.signOut();
-
-      if (handleError(error)) return;
-
+      // Clear local state first to ensure UI updates immediately
       dispatch({ type: 'CLEAR_STATE' });
+
+      // Clear any stored auth data
+      try {
+        localStorage.removeItem('sb-auth-token');
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('stories');
+      } catch (storageError) {
+        console.error('[DEBUG] Error clearing local storage:', storageError);
+      }
+
+      // Attempt to sign out from Supabase
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('[DEBUG] Supabase signOut error:', {
+            error,
+            message: error.message,
+            status: error.status,
+          });
+          // Don't throw the error, just log it
+        }
+      } catch (signOutError) {
+        console.error('[DEBUG] Network error during signOut:', {
+          error:
+            signOutError instanceof Error
+              ? signOutError.message
+              : 'Unknown error',
+          type:
+            signOutError instanceof Error ? signOutError.name : 'Unknown type',
+        });
+        // Don't throw the error, continue with cleanup
+      }
+
+      // Always redirect to home page
+      console.log('[DEBUG] Redirecting to home page');
       router.push('/');
     } catch (error) {
-      handleError(error as AuthError);
+      console.error('[DEBUG] Unexpected error during logout:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.name : 'Unknown type',
+      });
+      // Don't throw the error, ensure we complete the logout process
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [handleError, router]);
+  }, [router]);
 
   const loginWithGoogle = useCallback(async () => {
     try {

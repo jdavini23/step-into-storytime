@@ -15,10 +15,14 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 console.log('[DEBUG] Supabase Environment Variables:', {
   hasUrl: !!supabaseUrl,
   urlLength: supabaseUrl?.length,
+  urlFirstChars: supabaseUrl?.substring(0, 10),
   hasAnonKey: !!supabaseAnonKey,
   anonKeyLength: supabaseAnonKey?.length,
+  anonKeyFirstChars: supabaseAnonKey?.substring(0, 10),
   environment: process.env.NODE_ENV,
   isClient: typeof window !== 'undefined',
+  windowLocation:
+    typeof window !== 'undefined' ? window.location.href : 'server',
 });
 
 // Validate environment variables
@@ -36,7 +40,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 try {
   new URL(supabaseUrl);
 } catch (error) {
-  console.error('Invalid Supabase URL format:', supabaseUrl);
+  console.error('[DEBUG] Invalid Supabase URL format:', {
+    url: supabaseUrl,
+    error: error instanceof Error ? error.message : 'Unknown error',
+  });
   throw new Error(
     'Invalid Supabase URL format. Please check your NEXT_PUBLIC_SUPABASE_URL.'
   );
@@ -75,6 +82,7 @@ export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
             console.log('[DEBUG] localStorage value:', {
               key,
               hasValue: !!value,
+              value: value ? `${value.substring(0, 10)}...` : null,
             });
             return value;
           } catch (error) {
@@ -90,6 +98,7 @@ export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
             console.log('[DEBUG] Writing to localStorage:', {
               key,
               hasValue: !!value,
+              value: value ? `${value.substring(0, 10)}...` : null,
             });
             localStorage.setItem(key, value);
           } catch (error) {
@@ -113,24 +122,46 @@ export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
       },
     },
     global: {
+      headers: {
+        'X-Client-Info': 'supabase-js-web/2.38.4',
+        'Cache-Control': 'no-store',
+      },
       fetch: async (url, options = {}) => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.error('[DEBUG] Request timeout:', {
+            url,
+            timeout: 30000,
+          });
+        }, 30000);
 
         try {
+          console.log('[DEBUG] Making request:', {
+            url,
+            method: options.method || 'GET',
+            hasBody: !!options.body,
+          });
+
+          const siteUrl =
+            process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
           const response = await fetch(url, {
             ...options,
+            credentials: 'include',
             signal: controller.signal,
+            headers: {
+              ...options.headers,
+              'Cache-Control': 'no-store',
+              Origin: siteUrl,
+            },
           });
+
           clearTimeout(timeoutId);
           return response;
         } catch (error) {
           clearTimeout(timeoutId);
           throw error;
         }
-      },
-      headers: {
-        'X-Client-Info': 'supabase-js-web/2.38.4',
       },
     },
   });

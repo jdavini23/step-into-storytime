@@ -168,6 +168,14 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
 
   const generateStory = async (currentState: ConversationState) => {
     if (!authState.isAuthenticated) {
+      console.error(
+        '[DEBUG] Story generation attempted without authentication:',
+        {
+          isAuthenticated: authState.isAuthenticated,
+          hasUser: !!authState.user,
+          userId: authState.user?.id,
+        }
+      );
       handleError(
         new Error('Please sign in to generate stories'),
         setState,
@@ -194,18 +202,60 @@ export function ChatContainer({ onComplete, onError }: ChatContainerProps) {
         plotElements: [],
       };
 
+      console.log('[DEBUG] Attempting story generation with payload:', {
+        hasCharacter: !!payload.character,
+        characterName: payload.character.name,
+        setting: payload.setting,
+        theme: payload.theme,
+        isAuthenticated: authState.isAuthenticated,
+        userId: authState.user?.id,
+      });
+
       const response = await fetch('/api/generate-story/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(payload),
       });
 
+      console.log('[DEBUG] Story generation response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        ok: response.ok,
+      });
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate story');
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: errorText };
+        }
+
+        console.error('[DEBUG] Story generation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+          headers: Object.fromEntries(response.headers.entries()),
+          responseText: errorText,
+        });
+
+        throw new Error(
+          typeof errorData === 'string'
+            ? errorData
+            : errorData.error || `Failed to generate story: ${response.status}`
+        );
       }
 
       const data = await response.json();
+      console.log('[DEBUG] Story generation successful:', {
+        hasContent: !!data.content,
+        contentLength: data.content?.en?.length,
+      });
 
       // Create story in Supabase
       const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
