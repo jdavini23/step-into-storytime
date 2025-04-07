@@ -99,144 +99,24 @@ export const createBrowserSupabaseClient = (): TypedSupabaseClient => {
       },
     },
     global: {
+      fetch: async (url, options = {}) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      },
       headers: {
         'X-Client-Info': 'supabase-js-web/2.38.4',
-      },
-      fetch: async (
-        url: RequestInfo | URL,
-        options: RequestInit = {}
-      ): Promise<Response> => {
-        const MAX_RETRIES = 2;
-        const TIMEOUT = 15000; // 15 seconds per attempt
-
-        const fetchWithRetry = async (retryCount = 0): Promise<Response> => {
-          try {
-            console.log('[DEBUG] Supabase fetch request:', {
-              url: url.toString(),
-              method: options.method,
-              hasHeaders: !!options.headers,
-              retryCount,
-              timestamp: new Date().toISOString(),
-            });
-
-            // Add timeout to fetch request
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-              controller.abort();
-              console.log('[DEBUG] Aborting fetch request due to timeout', {
-                retryCount,
-                timeout: TIMEOUT,
-              });
-            }, TIMEOUT);
-
-            try {
-              // Get the current session
-              const {
-                data: { session: currentSession },
-                error: sessionError,
-              } = await instance.auth.getSession();
-
-              if (sessionError) {
-                console.error('[DEBUG] Session error:', sessionError);
-                throw sessionError;
-              }
-
-              // Check if session needs refresh
-              let session = currentSession;
-              if (session?.expires_at) {
-                const expiresAt = session.expires_at * 1000;
-                const isExpired = expiresAt < Date.now();
-                const isCloseToExpiring =
-                  expiresAt - Date.now() < 5 * 60 * 1000; // 5 minutes
-
-                if (isExpired || isCloseToExpiring) {
-                  console.log(
-                    '[DEBUG] Session needs refresh, attempting to refresh...'
-                  );
-                  const { data: refreshData, error: refreshError } =
-                    await instance.auth.refreshSession();
-
-                  if (refreshError) {
-                    console.error(
-                      '[DEBUG] Session refresh error:',
-                      refreshError
-                    );
-                    console.log('[DEBUG] Continuing with current session');
-                  } else if (refreshData.session) {
-                    session = refreshData.session;
-                  }
-                }
-              }
-
-              // Add authorization header if we have a session
-              if (session?.access_token) {
-                options.headers = {
-                  ...options.headers,
-                  Authorization: `Bearer ${session.access_token}`,
-                };
-              }
-
-              // Make the actual request with timeout
-              console.log('[DEBUG] Making fetch request:', {
-                url: url.toString(),
-                method: options.method,
-                hasAuth: !!(options.headers as any)?.Authorization,
-                retryCount,
-                timestamp: new Date().toISOString(),
-              });
-
-              const response = await fetch(url, {
-                ...options,
-                credentials: 'include',
-                signal: controller.signal,
-                keepalive: true,
-              });
-
-              clearTimeout(timeoutId);
-
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-
-              return response;
-            } finally {
-              clearTimeout(timeoutId);
-            }
-          } catch (error) {
-            if (
-              retryCount < MAX_RETRIES &&
-              error instanceof Error &&
-              error.name === 'AbortError'
-            ) {
-              console.log('[DEBUG] Retrying failed request:', {
-                error: error.message,
-                retryCount,
-                nextRetryIn: (retryCount + 1) * 1000,
-              });
-
-              // Exponential backoff
-              await new Promise((resolve) =>
-                setTimeout(resolve, (retryCount + 1) * 1000)
-              );
-              return fetchWithRetry(retryCount + 1);
-            }
-
-            console.error('[DEBUG] Fetch error:', {
-              error,
-              url: url.toString(),
-              method: options.method,
-              retryCount,
-              timestamp: new Date().toISOString(),
-              isAbortError:
-                error instanceof Error && error.name === 'AbortError',
-              stack: error instanceof Error ? error.stack : undefined,
-            });
-
-            throw error;
-          }
-        };
-
-        return fetchWithRetry();
       },
     },
   });

@@ -7,426 +7,311 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
-  Dispatch,
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase/client';
-import { AuthError, PostgrestError, Provider } from '@supabase/supabase-js';
+import { AuthError, User } from '@supabase/supabase-js';
 
-// Use types from central file
-import {
-  User,
-  UserProfile,
-  AuthAction,
-  AuthState,
-  UserRole,
-} from '@/types/auth';
+// Types
+type AuthState = {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+};
 
-// Import functions from authService
-import {
-  signInWithPassword,
-  signInWithOAuth,
-  signInWithOtp,
-  signOut,
-  signUp,
-  getSupabaseSession,
-  refreshSupabaseSession,
-  getSupabaseUser,
-  getUserProfile,
-  createUserProfile,
-  updateUserProfileData,
-} from '@/services/authService';
+type AuthContextType = {
+  state: AuthState;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name: string) => Promise<void>;
+  logout: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  loginWithGithub: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
+};
 
-// Import the custom hook
-import { useAuthListener } from '@/hooks/useAuthListener';
-
-// Remove local type definitions
-// export type UserRole = 'user' | 'admin';
-// export interface AuthState { ... }
-// export type AuthAction = ...
-
-// --- Initial State (Define type explicitly) ---
 const initialState: AuthState = {
   user: null,
-  profile: null,
   isAuthenticated: false,
   isLoading: true,
   error: null,
-  isInitialized: false,
-  isInitializing: true,
 };
 
-// --- Reducer (Define types explicitly) ---
-const authReducer = (state: AuthState, action: AuthAction): AuthState => {
+// Create context
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Reducer
+type AuthAction =
+  | { type: 'SET_USER'; payload: User | null }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'CLEAR_STATE' };
+
+function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
-    case 'INITIALIZE':
+    case 'SET_USER':
       return {
         ...state,
-        user: action.payload.user,
-        profile: action.payload.profile,
-        isAuthenticated: !!action.payload.user,
+        user: action.payload,
+        isAuthenticated: !!action.payload,
         isLoading: false,
-        isInitialized: true,
-        isInitializing: false,
-      };
-    case 'LOGIN_SUCCESS':
-      return {
-        ...state,
-        user: action.payload.user,
-        profile: action.payload.profile,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-        isInitializing: false,
-        isInitialized: true,
-      };
-    case 'PROFILE_LOADED':
-      return {
-        ...state,
-        profile: action.payload,
-        isLoading: false,
-        error: null,
-      };
-    case 'LOGOUT':
-      return {
-        ...initialState,
-        isLoading: false,
-        isInitialized: true,
-        isInitializing: false,
       };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_ERROR':
-      return {
-        ...state,
-        error: action.payload,
-        isLoading: false,
-        isInitializing: false,
-      };
-    case 'UPDATE_USER':
-      return { ...state, user: action.payload.user };
-    case 'SET_INITIALIZING':
-      return { ...state, isInitializing: action.payload };
+      return { ...state, error: action.payload, isLoading: false };
+    case 'CLEAR_STATE':
+      return { ...initialState, isLoading: false };
     default:
       return state;
   }
-};
-
-// --- Context Definition (Define type explicitly) ---
-interface AuthContextType {
-  state: AuthState;
-  login: (
-    email: string,
-    password: string
-  ) => Promise<{ user: User | null; error: AuthError | null }>;
-  loginWithGoogle: () => Promise<void>;
-  loginWithFacebook: () => Promise<void>;
-  sendMagicLink: (email: string) => Promise<void>;
-  logout: () => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
-  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
-  refreshSession: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
-
-// --- Error Mapping Utility (Refine error type) ---
-function mapSupabaseErrorToMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'message' in error) {
-    const err = error as { message: string; status?: number; code?: string };
-    const message =
-      typeof err.message === 'string' ? err.message.toLowerCase() : '';
-
-    if (message.includes('invalid login credentials')) {
-      return 'Invalid email or password.';
-    }
-    if (message.includes('email not confirmed')) {
-      return 'Please verify your email before logging in.';
-    }
-    if (
-      message.includes('user already registered') ||
-      message.includes('unique constraint') ||
-      err.code === '23505'
-    ) {
-      return 'This email is already registered. Please log in.';
-    }
-    if (message.includes('password should be at least 6 characters')) {
-      return 'Password should be at least 6 characters.';
-    }
-    if (message.includes('too many requests') || err.status === 429) {
-      return 'Too many attempts. Please try again later.';
-    }
-    if (
-      message.includes('network error') ||
-      message.includes('failed to fetch')
-    ) {
-      return 'Network error. Please check your connection and try again.';
-    }
-    return err.message || 'An unexpected error occurred.';
-  } else if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'An unknown error occurred.';
-}
-
-type AuthResult<T> = {
-  data?: T | null;
-  error: AuthError | null;
-};
-
-interface HandleAuthCallOptions {
-  successMessage?: string;
-  errorMessage?: string;
-}
-
-// --- Provider Component ---
+// Provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const router = useRouter();
 
-  useAuthListener(dispatch, state.isInitialized);
+  // Handle auth state changes
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', payload: true });
 
-  const handleAuthCall = useCallback(
-    async <T,>(
-      serviceCall: () => Promise<AuthResult<T>>,
-      options: HandleAuthCallOptions = {}
-    ): Promise<AuthResult<T>> => {
-      const startTime = Date.now();
-      console.log('[DEBUG] handleAuthCall - Starting service call...', {
-        timestamp: new Date().toISOString(),
-        options,
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      dispatch({ type: 'SET_USER', payload: session?.user || null });
+    });
+
+    // Subscribe to auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      dispatch({ type: 'SET_USER', payload: session?.user || null });
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Error handler
+  const handleError = useCallback((error: AuthError | null) => {
+    if (error) {
+      const message = error.message || 'An error occurred';
+      dispatch({ type: 'SET_ERROR', payload: message });
+      toast({
+        title: 'Error',
+        description: message,
+        variant: 'destructive',
       });
+      return true;
+    }
+    return false;
+  }, []);
 
-      try {
-        // Add connection status check
-        if (!navigator.onLine) {
-          throw new Error('No internet connection available');
-        }
-
-        console.log('[DEBUG] handleAuthCall - Network status:', {
-          online: navigator.onLine,
-          type: (navigator as any).connection?.type,
-          effectiveType: (navigator as any).connection?.effectiveType,
-          timestamp: new Date().toISOString(),
-        });
-
-        console.log('[DEBUG] handleAuthCall - Executing service call...');
-        const result = await serviceCall();
-
-        const endTime = Date.now();
-        console.log('[DEBUG] handleAuthCall - Service call completed', {
-          duration: endTime - startTime,
-          timestamp: new Date().toISOString(),
-        });
-
-        return result;
-      } catch (error) {
-        const endTime = Date.now();
-        console.error('[DEBUG] handleAuthCall - Error in service call', {
-          error,
-          duration: endTime - startTime,
-          stack: error instanceof Error ? error.stack : undefined,
-          timestamp: new Date().toISOString(),
-        });
-        throw error;
-      }
-    },
-    []
-  );
-
+  // Auth methods
   const login = useCallback(
-    async (
-      email: string,
-      password: string
-    ): Promise<{ user: User | null; error: AuthError | null }> => {
-      console.log('[DEBUG] Starting login process in auth context...');
-
+    async (email: string, password: string) => {
       try {
-        // Check Supabase client initialization
-        if (!supabase.auth) {
-          console.error('[DEBUG] Supabase client not properly initialized');
-          throw new Error('Authentication service not available');
-        }
+        dispatch({ type: 'SET_LOADING', payload: true });
+        dispatch({ type: 'SET_ERROR', payload: null });
 
-        const result = await handleAuthCall<User>(
-          () => signInWithPassword(email, password),
-          {
-            successMessage: 'Successfully logged in',
-            errorMessage: 'Failed to log in',
-          }
-        );
-
-        if (result.error) {
-          console.error('[DEBUG] Login error:', {
-            error: result.error,
-            timestamp: new Date().toISOString(),
-          });
-          throw result.error;
-        }
-
-        if (!result.data) {
-          console.error('[DEBUG] No user returned from login');
-          throw new Error('No user returned from authentication service');
-        }
-
-        return { user: result.data, error: null };
-      } catch (error) {
-        console.error('[DEBUG] Login process failed:', {
-          error,
-          stack: error instanceof Error ? error.stack : undefined,
-          timestamp: new Date().toISOString(),
+        console.log('[DEBUG] Attempting login with email:', email);
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.toLowerCase().trim(),
+          password,
         });
-        if (error instanceof AuthError) {
-          return { user: null, error };
+
+        if (error) {
+          console.error('[DEBUG] Login error:', error);
+          handleError(error);
+          return;
         }
-        return {
-          user: null,
-          error: new Error('An unexpected error occurred') as AuthError,
-        };
+
+        if (!data.session) {
+          console.error('[DEBUG] No session after login');
+          dispatch({
+            type: 'SET_ERROR',
+            payload: 'No session after login. Please try again.',
+          });
+          return;
+        }
+
+        console.log('[DEBUG] Login successful, redirecting to dashboard');
+        toast({
+          title: 'Success',
+          description: 'Logged in successfully',
+        });
+
+        // Ensure we have the user before redirecting
+        dispatch({ type: 'SET_USER', payload: data.session.user });
+
+        // Small delay to ensure state updates are processed
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        router.push('/dashboard');
+      } catch (error) {
+        console.error('[DEBUG] Unexpected login error:', error);
+        handleError(error as AuthError);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
-    [handleAuthCall]
+    [handleError, router]
   );
 
   const signup = useCallback(
-    async (name: string, email: string, password: string): Promise<void> => {
-      const result = await handleAuthCall<{ user: User | null }>(
-        () => signUp(name, email.trim().toLowerCase(), password),
-        { errorMessage: 'Failed to sign up' }
-      );
-      if (result.error) throw result.error;
-    },
-    [handleAuthCall]
-  );
+    async (email: string, password: string, name: string) => {
+      try {
+        dispatch({ type: 'SET_LOADING', payload: true });
 
-  const updateProfile = useCallback(
-    async (data: Partial<UserProfile>) => {
-      if (!state.user?.id) return;
-      const result = await handleAuthCall<UserProfile>(
-        async () => {
-          const { profile, error } = await updateUserProfileData(
-            state.user!.id,
-            data
-          );
-          if (error) throw error;
-          return { data: profile, error: null };
-        },
-        { errorMessage: 'Failed to update profile' }
-      );
-      if (result.data) {
-        dispatch({ type: 'PROFILE_LOADED', payload: result.data });
+        const { error } = await supabase.auth.signUp({
+          email: email.toLowerCase().trim(),
+          password,
+          options: {
+            data: { name },
+          },
+        });
+
+        if (handleError(error)) return;
+
         toast({
           title: 'Success',
-          description: 'Profile updated successfully',
-          variant: 'default',
+          description: 'Please check your email to confirm your account',
         });
+        router.push('/auth/verify');
+      } catch (error) {
+        handleError(error as AuthError);
       }
     },
-    [state.user?.id, handleAuthCall]
-  );
-
-  const loginWithGoogle = useCallback(async () => {
-    await handleAuthCall<void>(() => signInWithOAuth('google'), {
-      errorMessage: 'Failed to login with Google',
-    });
-  }, [handleAuthCall]);
-
-  const loginWithGithub = useCallback(async () => {
-    await handleAuthCall<void>(() => signInWithOAuth('github'), {
-      errorMessage: 'Failed to login with GitHub',
-    });
-  }, [handleAuthCall]);
-
-  const loginWithOtp = useCallback(
-    async (email: string) => {
-      await handleAuthCall<void>(
-        () => signInWithOtp(email.trim().toLowerCase()),
-        { errorMessage: 'Failed to login with OTP' }
-      );
-    },
-    [handleAuthCall]
-  );
-
-  const loginWithFacebook = useCallback(async () => {
-    await handleAuthCall<void>(() => signInWithOAuth('facebook'), {
-      errorMessage: 'Failed to login with Facebook',
-    });
-  }, [handleAuthCall]);
-
-  const loginWithMagicLink = useCallback(
-    async (email: string) => {
-      await handleAuthCall<void>(
-        () => signInWithOtp(email.trim().toLowerCase()),
-        { errorMessage: 'Failed to send magic link' }
-      );
-    },
-    [handleAuthCall]
-  );
-
-  const sendMagicLink = useCallback(
-    async (email: string) => {
-      await handleAuthCall<void>(
-        () => signInWithOtp(email.trim().toLowerCase()),
-        { errorMessage: 'Failed to send magic link' }
-      );
-    },
-    [handleAuthCall]
+    [handleError, router]
   );
 
   const logout = useCallback(async () => {
-    await handleAuthCall<void>(() => signOut(), {
-      errorMessage: 'Failed to logout',
-    });
-  }, [handleAuthCall]);
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
 
-  const refreshSession = useCallback(async () => {
-    console.warn('Attempting to refresh session manually...');
-    await handleAuthCall<void>(
-      async () => {
-        const { error } = await supabase.auth.refreshSession();
-        return { error, data: undefined };
-      },
-      { errorMessage: 'Failed to refresh session' }
-    );
-  }, [handleAuthCall]);
+      const { error } = await supabase.auth.signOut();
+
+      if (handleError(error)) return;
+
+      dispatch({ type: 'CLEAR_STATE' });
+      router.push('/');
+    } catch (error) {
+      handleError(error as AuthError);
+    }
+  }, [handleError, router]);
+
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (handleError(error)) return;
+    } catch (error) {
+      handleError(error as AuthError);
+    }
+  }, [handleError]);
+
+  const loginWithGithub = useCallback(async () => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (handleError(error)) return;
+    } catch (error) {
+      handleError(error as AuthError);
+    }
+  }, [handleError]);
+
+  const resetPassword = useCallback(
+    async (email: string) => {
+      try {
+        dispatch({ type: 'SET_LOADING', payload: true });
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/update-password`,
+        });
+
+        if (handleError(error)) return;
+
+        toast({
+          title: 'Success',
+          description: 'Password reset instructions sent to your email',
+        });
+      } catch (error) {
+        handleError(error as AuthError);
+      }
+    },
+    [handleError]
+  );
+
+  const updatePassword = useCallback(
+    async (newPassword: string) => {
+      try {
+        dispatch({ type: 'SET_LOADING', payload: true });
+
+        const { error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (handleError(error)) return;
+
+        toast({
+          title: 'Success',
+          description: 'Password updated successfully',
+        });
+        router.push('/dashboard');
+      } catch (error) {
+        handleError(error as AuthError);
+      }
+    },
+    [handleError, router]
+  );
 
   const value = useMemo(
     () => ({
       state,
       login,
-      loginWithGoogle,
-      loginWithFacebook,
-      sendMagicLink,
-      logout,
       signup,
-      updateProfile,
-      refreshSession,
+      logout,
+      loginWithGoogle,
+      loginWithGithub,
+      resetPassword,
+      updatePassword,
     }),
     [
       state,
       login,
-      loginWithGoogle,
-      loginWithFacebook,
-      sendMagicLink,
-      logout,
       signup,
-      updateProfile,
-      refreshSession,
+      logout,
+      loginWithGoogle,
+      loginWithGithub,
+      resetPassword,
+      updatePassword,
     ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Create hook for using the context
-export const useAuth = () => {
+// Hook
+export function useAuth() {
   const context = useContext(AuthContext);
-
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-
   return context;
-};
+}

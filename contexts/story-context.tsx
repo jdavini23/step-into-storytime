@@ -173,7 +173,11 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('[DEBUG] Making API request to /api/stories');
       const response = await fetch('/api/stories', {
+        method: 'GET',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -200,6 +204,10 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
         payload:
           error instanceof Error ? error.message : 'Failed to fetch stories',
       });
+      // If unauthorized, clear the stories
+      if (error instanceof Error && error.message.includes('Unauthorized')) {
+        dispatch({ type: 'SET_STORIES', payload: [] });
+      }
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }

@@ -25,21 +25,26 @@ export default function DashboardPage() {
   useEffect(() => {
     console.log('[DEBUG] Dashboard useEffect:', {
       authLoading: authState.isLoading,
-      authInitialized: authState.isInitialized,
       authAuthenticated: authState.isAuthenticated,
       storyLoading: storyState.loading,
       storiesCount: storyState.stories.length,
       isLoading,
     });
 
+    // Check if auth is still initializing
+    if (authState.isLoading) {
+      console.log('[DEBUG] Auth is still loading');
+      return;
+    }
+
     // Check if user is authenticated
-    if (!authState.isLoading && !authState.isAuthenticated) {
+    if (!authState.isAuthenticated) {
       console.log('[DEBUG] User not authenticated, redirecting to sign-in');
       router.push('/sign-in');
       return;
     }
 
-    // Fetch stories
+    // Fetch stories only if authenticated and not already loading
     const loadStories = async () => {
       try {
         console.log('[DEBUG] Loading stories...');
@@ -48,6 +53,10 @@ export default function DashboardPage() {
         console.log('[DEBUG] Stories loaded successfully');
       } catch (error) {
         console.error('[DEBUG] Error fetching stories:', error);
+        // If unauthorized, redirect to sign-in
+        if (error instanceof Error && error.message.includes('Unauthorized')) {
+          router.push('/sign-in');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -55,8 +64,6 @@ export default function DashboardPage() {
 
     if (authState.isAuthenticated && !storyState.loading) {
       loadStories();
-    } else if (!authState.isLoading && !authState.isAuthenticated) {
-      setIsLoading(false);
     }
   }, [
     authState.isAuthenticated,
