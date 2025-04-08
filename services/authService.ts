@@ -42,7 +42,7 @@ export const getSupabaseUser = async (): Promise<{
 export const signInWithPassword = async (
   email: string,
   password: string
-): Promise<{ user: User | null; error: AuthError | null }> => {
+): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> => {
   try {
     console.log('[Auth] Attempting login with:', {
       email: email.slice(0, 3) + '***@' + email.split('@')[1],
@@ -96,6 +96,12 @@ export const signInWithPassword = async (
       }
     }
 
+    // Check if session exists before attempting to fetch profile
+    if (!data?.session) {
+      console.error('No session after authentication');
+      throw new Error('Authentication succeeded but no session was created');
+    }
+
     // Post-login session verification
     if (data?.session) {
       const { data: verifySession } = await supabase.auth.getSession();
@@ -107,11 +113,12 @@ export const signInWithPassword = async (
       });
     }
 
-    return { user: data?.user || null, error: null };
+    return { user: data?.user || null, session: data?.session || null, error: null };
   } catch (error) {
     console.error('[Auth] Unexpected login error:', error);
     return {
       user: null,
+      session: null,
       error:
         error instanceof Error
           ? new AuthError(error.message)
@@ -195,7 +202,11 @@ export const signUp = async (
         data: { name },
       },
     });
-    return { user: data?.user || null, error };
+    const user = data?.user || null;
+    if (user) {
+      await createUserProfile(user);
+    }
+    return { user, error };
   } catch (error) {
     console.error('Error in signUp:', error);
     return { user: null, error: error as AuthError };
@@ -203,40 +214,124 @@ export const signUp = async (
 };
 
 // --- Profile Management ---
+async function createUserProfileWrapper(userId: string, user?: User) {
+  try {
+    const { profile, error: createError } = await createUserProfile(
+      (user || {
+        id: userId,
+        email: '',
+        user_metadata: {
+          name: 'New User',
+        },
+      }) as User
+    );
+
+    if (createError) {
+      console.error('Error creating new profile for userId:', userId, createError);
+      throw new Error(`Failed to create a new profile for userId: ${userId}`);
+    }
+
+    return { profile, error: null };
+  } catch (error) {
+    console.error('Error in createUserProfileWrapper:', error);
+    throw new Error(`Failed to create a new profile in wrapper: ${error}`); // More specific error
+  }
+}
 
 export const getUserProfile = async (
   userId: string
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
+  if (!userId) {
+    console.error('getUserProfile called with invalid userId:', userId);
+    throw new Error('Invalid user ID provided');
+  }
+
+  console.log('Fetching profile for userId:', userId);
+
   try {
-    console.log(`[DEBUG] Fetching profile for user: ${userId}`);
+    // Log authentication state before query
+    const { data: sessionData } = await getClient().auth.getSession();
+    console.log('Auth state before fetching profile:', {
+      hasSession: !!sessionData?.session,
+      sessionData,
+    });
+
     const { data, error } = await getClient()
       .from('profiles')
-      .select('*')
+      .select('*', { head: false }) // Ensure correct headers are set
       .eq('id', userId)
       .single();
 
+    console.log('Profile query result:', { data, error });
+
     if (error) {
-      console.error(`[DEBUG] Error fetching profile:`, error);
-      // Check for 406 Not Acceptable error
-      if (error.code === '406') {
-        console.error(
-          `[DEBUG] 406 Not Acceptable error encountered. This may be a content negotiation issue.`
-        );
+      if (error.code === 'PGRST116') {
+        console.warn('No profile found for userId:', userId, '- Creating a new profile.');
+
+        try {
+          const currentUser = await getClient().auth.getUser();
+          const currentUserId = currentUser.data?.user?.id; // Get the user ID from auth.getUser()
+
+          if (!currentUserId) {
+            console.error('No user ID found after authentication.');
+            throw new Error('No user ID found after authentication.');
+          }
+
+          const { profile, error } = await (currentUser.data?.user
+            ? createUserProfileWrapper(currentUserId, currentUser.data.user) // Use the correct user ID
+            : createUserProfileWrapper(currentUserId)); // Use the correct user ID
+
+          if (error) {
+            console.error('Error creating new profile:', error);
+            throw new Error('Failed to create a new profile');
+          }
+
+          return { profile, error: null };
+        } catch (err) {
+          console.error('Error creating new profile:', err);
+          throw new Error('Failed to create a new profile');
+        }
       }
-    } else {
-      console.log(`[DEBUG] Successfully fetched profile for user: ${userId}`);
     }
 
     return {
       profile: data as UserProfile | null,
-      error: error as PostgrestError | null,
+      error: null,
     };
-  } catch (err) {
-    console.error(`[DEBUG] Unexpected error in getUserProfile:`, err);
-    return {
-      profile: null,
-      error: err as PostgrestError,
-    };
+  } catch (error) {
+    console.error('Error details in getUserProfile:', error);
+    throw error;
+  }
+};
+
+// Debugging utility to verify userId in the database
+export const verifyUserIdInDatabase = async (userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await getClient()
+      .from('profiles')
+      .select('id')
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error verifying userId in database:', error);
+      return false;
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('No matching userId found in database:', userId);
+      return false;
+    }
+
+    if (data.length > 1) {
+      console.error('Multiple entries found for userId in database:', userId);
+      return false;
+    }
+
+    console.log('userId verified in database:', userId);
+    return true;
+  } catch (error) {
+    console.error('Unexpected error while verifying userId in database:', error);
+    return false;
   }
 };
 

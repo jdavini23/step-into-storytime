@@ -1,5 +1,5 @@
 // Refactored Supabase client initialization
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -11,7 +11,7 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-// Create a single supabase client for interacting with your database
+// Update Supabase client configuration to ensure cookies are set for all paths
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
@@ -38,9 +38,9 @@ export const createServerClient = () => {
 export type TypedSupabaseClient = typeof supabase;
 
 // Singleton instance for browser and server
-let supabaseInstance: TypedSupabaseClient | null = null;
+let supabaseInstance: SupabaseClient<Database> | null = null;
 
-export const createSupabaseClient = (): TypedSupabaseClient => {
+export const createSupabaseClient = (): SupabaseClient<Database> => {
   if (supabaseInstance) return supabaseInstance;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -67,8 +67,9 @@ export const createSupabaseClient = (): TypedSupabaseClient => {
     });
 
     // Test the client
-    if (typeof window !== 'undefined') {
-      supabaseInstance.auth.onAuthStateChange((event, session) => {
+    // Add auth listener only if client initialized successfully and in browser
+    if (supabaseInstance && typeof window !== 'undefined') {
+      supabaseInstance.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
         console.log('[Supabase] Auth state changed:', event, !!session);
       });
     }
@@ -767,72 +768,6 @@ export async function createStory(
     return data;
   } catch (error) {
     console.error('Create story error:', error);
-    throw error;
-  }
-}
-
-export async function updateStory(
-  storyId: string,
-  storyData: Record<string, any>,
-  userId: string
-) {
-  try {
-    // For development/demo purposes
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn(
-        'Using mock story update because Supabase is not configured'
-      );
-
-      return {
-        id: storyId,
-        user_id: userId,
-        ...storyData,
-        updated_at: new Date().toISOString(),
-      };
-    }
-
-    const { data, error } = await createSupabaseClient()
-      .from('stories')
-      .update(storyData)
-      .eq('id', storyId)
-      .eq('user_id', userId) // Security: ensure user owns the story
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Update story error:', error);
-    throw error;
-  }
-}
-
-export async function deleteStory(storyId: string, userId: string) {
-  try {
-    // For development/demo purposes
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn(
-        'Using mock story deletion because Supabase is not configured'
-      );
-      return true;
-    }
-
-    const { error } = await createSupabaseClient()
-      .from('stories')
-      .delete()
-      .eq('id', storyId)
-      .eq('user_id', userId); // Security: ensure user owns the story
-
-    if (error) {
-      throw error;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Delete story error:', error);
     throw error;
   }
 }

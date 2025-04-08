@@ -19,9 +19,15 @@ export default function CreateStoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Check authentication status
+  // Add debugging logs to check authentication state
   useEffect(() => {
     const checkAuth = async () => {
+      console.log('[DEBUG] Auth state:', {
+        isLoading: authState.isLoading,
+        isInitialized: authState.isInitialized,
+        isAuthenticated: authState.isAuthenticated,
+      });
+
       // Wait for auth state to be initialized
       if (authState.isLoading || !authState.isInitialized) {
         return;
@@ -29,7 +35,7 @@ export default function CreateStoryPage() {
 
       // Only redirect if we're sure about the auth state and not already redirecting
       if (!authState.isAuthenticated && !isRedirecting) {
-        console.log('Not authenticated, redirecting to sign-in');
+        console.log('[DEBUG] Not authenticated, redirecting to sign-in');
         setIsRedirecting(true);
         // Store the current URL to redirect back after login
         const returnUrl = encodeURIComponent(window.location.pathname);

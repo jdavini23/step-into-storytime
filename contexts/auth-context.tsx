@@ -3,8 +3,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
-import { AuthError } from '@supabase/supabase-js';
-import getClient from '@/lib/supabase/client';
 import {
   signInWithPassword,
   signInWithOAuth,
@@ -18,50 +16,53 @@ import {
 import { User, UserProfile } from '@/types/auth';
 
 // Define auth state type
-type AuthState = {
+interface AuthState {
   user: User | null;
   profile: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  isInitialized: boolean;
   error: string | null;
-};
+}
 
 // Define auth context type
-type Provider = 'google' | 'github' | 'apple';
-
-type AuthContextType = {
+interface AuthContextType {
   state: AuthState;
   login: (email: string, password: string) => Promise<void>;
-  loginWithProvider: (provider: Provider) => Promise<void>;
+  loginWithProvider: (provider: 'google' | 'github' | 'apple') => Promise<void>;
   logout: () => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
-};
+}
 
 const initialState: AuthState = {
   user: null,
   profile: null,
   isAuthenticated: false,
-  isLoading: true,
-  isInitialized: false,
+  isLoading: false,
   error: null,
 };
 
-// Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Define action types
-type AuthAction =
-  | {
-      type: 'SET_USER';
-      payload: { user: User | null; profile: UserProfile | null };
-    }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'LOGOUT' }
-  | { type: 'SET_INITIALIZED'; payload: boolean };
+interface SetUserAction {
+  type: 'SET_USER';
+  payload: { user: User | null; profile: UserProfile | null };
+}
+interface SetLoadingAction {
+  type: 'SET_LOADING';
+  payload: boolean;
+}
+interface SetErrorAction {
+  type: 'SET_ERROR';
+  payload: string | null;
+}
+interface LogoutAction {
+  type: 'LOGOUT';
+}
+
+type AuthAction = SetUserAction | SetLoadingAction | SetErrorAction | LogoutAction;
 
 // Auth reducer
 function authReducer(state: AuthState, action: AuthAction): AuthState {
@@ -80,12 +81,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
     case 'SET_ERROR':
       return { ...state, error: action.payload, isLoading: false };
     case 'LOGOUT':
-      return {
-        ...initialState,
-        isLoading: false,
-      };
-    case 'SET_INITIALIZED':
-      return { ...state, isInitialized: action.payload };
+      return { ...initialState };
     default:
       return state;
   }
@@ -94,285 +90,118 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const router = useRouter();
-  const supabase = getClient();
 
-  // Handle auth state changes
   useEffect(() => {
-    let mounted = true;
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[Auth] State change:', event, !!session, {
-        timestamp: new Date().toISOString(),
-        userId: session?.user?.id,
-      });
-
-      if (!mounted) {
-        console.log('[Auth] Component unmounted, skipping state update');
-        return;
-      }
-
-      if (!session) {
-        console.log('[Auth] No session, logging out');
-        dispatch({ type: 'LOGOUT' });
-        return;
-      }
-
-      try {
-        dispatch({ type: 'SET_LOADING', payload: true });
-        const user = session.user as User;
-        console.log('[Auth] Fetching profile for user:', user.id);
-        const { profile } = await getUserProfile(user.id);
-
-        if (!mounted) {
-          console.log(
-            '[Auth] Component unmounted during profile fetch, skipping state update'
-          );
-          return;
-        }
-
-        if (!profile) {
-          console.log(
-            '[Auth] No profile found, creating new profile for user:',
-            user.id
-          );
-          const { profile: newProfile } = await createUserProfile(user);
-          dispatch({
-            type: 'SET_USER',
-            payload: { user, profile: newProfile },
-          });
-        } else {
-          console.log(
-            '[Auth] Profile found, updating state with user:',
-            user.id
-          );
-          dispatch({
-            type: 'SET_USER',
-            payload: { user, profile },
-          });
-        }
-      } catch (error) {
-        console.error('[Auth] Profile error:', error);
-        if (mounted) {
-          dispatch({
-            type: 'SET_ERROR',
-            payload: 'Failed to load user profile',
-          });
-        }
-      }
-    });
-
-    // Check initial session
     const initializeAuth = async () => {
-      console.log('[Auth] Starting auth initialization');
+      dispatch({ type: 'SET_LOADING', payload: true });
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        console.log('[Auth] Initial session check:', {
-          hasSession: !!session,
-          userId: session?.user?.id,
-          timestamp: new Date().toISOString(),
-        });
-
-        if (!mounted) {
-          console.log('[Auth] Component unmounted during initialization');
-          return;
-        }
-
-        if (session) {
-          const user = session.user as User;
-          console.log(
-            '[Auth] Fetching profile for initial session user:',
-            user.id
-          );
-          const { profile } = await getUserProfile(user.id);
-
-          if (!mounted) {
-            console.log('[Auth] Component unmounted during profile fetch');
-            return;
-          }
-
-          if (!profile) {
-            console.log(
-              '[Auth] Creating profile for initial session user:',
-              user.id
-            );
-            const { profile: newProfile } = await createUserProfile(user);
-            dispatch({
-              type: 'SET_USER',
-              payload: { user, profile: newProfile },
-            });
-          } else {
-            console.log('[Auth] Setting user and profile for initial session');
-            dispatch({
-              type: 'SET_USER',
-              payload: { user, profile },
-            });
-          }
+        const { user, profile } = await fetchInitialAuthState();
+        if (user) {
+          dispatch({ type: 'SET_USER', payload: { user, profile } });
         } else {
-          console.log(
-            '[Auth] No initial session found, setting logged out state'
-          );
           dispatch({ type: 'LOGOUT' });
         }
       } catch (error) {
-        console.error('[Auth] Initial session error:', error);
-        if (mounted) {
-          dispatch({ type: 'SET_ERROR', payload: 'Failed to initialize auth' });
-        }
+        console.error('[Auth] Initialization error:', error);
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to initialize authentication' });
       } finally {
-        if (mounted) {
-          console.log('[Auth] Completing initialization');
-          dispatch({ type: 'SET_INITIALIZED', payload: true });
-        }
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
 
     initializeAuth();
+  }, []);
 
-    return () => {
-      console.log('[Auth] Cleaning up auth listener');
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
-
-  // Auth methods
   const login = async (email: string, password: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const { error } = await signInWithPassword(email, password);
+      const { user } = await signInWithPassword(email, password);
+      if (!user || !user.id) {
+        console.error('[Auth] Login failed: User ID is not available');
+        throw new Error('User ID is not available');
+      }
 
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Logged in successfully',
-      });
-
+      const { profile } = await getUserProfile(user.id);
+      dispatch({ type: 'SET_USER', payload: { user, profile } });
       router.push('/dashboard');
     } catch (error) {
-      const authError = error as AuthError;
-      console.error('[Auth] Login error:', authError);
-      dispatch({ type: 'SET_ERROR', payload: authError.message });
-      toast({
-        title: 'Error',
-        description: authError.message,
-        variant: 'destructive',
-      });
+      handleError(error, 'Login failed');
     }
   };
 
-  const loginWithProvider = async (provider: Provider) => {
+  const loginWithProvider = async (provider: 'google' | 'github' | 'apple') => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const { error } = await signInWithOAuth(
-        provider as 'google' | 'github' | 'apple'
-      );
-
-      if (error) throw error;
+      await signInWithOAuth(provider);
     } catch (error) {
-      const authError = error as AuthError;
-      console.error('[Auth] OAuth error:', authError);
-      dispatch({ type: 'SET_ERROR', payload: authError.message });
-      toast({
-        title: 'Error',
-        description: authError.message,
-        variant: 'destructive',
-      });
+      handleError(error, 'OAuth login failed');
     }
   };
 
   const logout = async () => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const { error } = await signOut();
-
-      if (error) throw error;
-
+      await signOut();
       dispatch({ type: 'LOGOUT' });
       router.push('/sign-in');
     } catch (error) {
-      const authError = error as AuthError;
-      console.error('[Auth] Logout error:', authError);
-      dispatch({ type: 'SET_ERROR', payload: authError.message });
+      handleError(error, 'Logout failed');
     }
   };
 
   const signUp = async (email: string, password: string, name: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const { error } = await supabaseSignUp(name, email, password);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Please check your email to confirm your account',
-      });
-
+      await supabaseSignUp(name, email, password);
+      toast({ title: 'Success', description: 'Check your email to confirm your account' });
       router.push('/sign-in');
     } catch (error) {
-      const authError = error as AuthError;
-      console.error('[Auth] Signup error:', authError);
-      dispatch({ type: 'SET_ERROR', payload: authError.message });
-      toast({
-        title: 'Error',
-        description: authError.message,
-        variant: 'destructive',
-      });
+      handleError(error, 'Signup failed');
     }
   };
 
   const resetPassword = async (email: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const { error } = await resetPasswordForEmail(email);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Password reset instructions sent to your email',
-      });
+      await resetPasswordForEmail(email);
+      toast({ title: 'Success', description: 'Password reset instructions sent to your email' });
     } catch (error) {
-      const authError = error as AuthError;
-      console.error('[Auth] Reset password error:', authError);
-      dispatch({ type: 'SET_ERROR', payload: authError.message });
-      toast({
-        title: 'Error',
-        description: authError.message,
-        variant: 'destructive',
-      });
+      handleError(error, 'Password reset failed');
     }
   };
 
   const updatePassword = async (password: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const { error } = await updateUserPassword(password);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Password updated successfully',
-      });
-
+      await updateUserPassword(password);
+      toast({ title: 'Success', description: 'Password updated successfully' });
       router.push('/dashboard');
     } catch (error) {
-      const authError = error as AuthError;
-      console.error('[Auth] Update password error:', authError);
-      dispatch({ type: 'SET_ERROR', payload: authError.message });
-      toast({
-        title: 'Error',
-        description: authError.message,
-        variant: 'destructive',
-      });
+      handleError(error, 'Password update failed');
     }
+  };
+
+  const handleError = (error: unknown, defaultMessage: string) => {
+    console.error('[Auth] Error:', error);
+    const message = error instanceof Error ? error.message : defaultMessage;
+    dispatch({ type: 'SET_ERROR', payload: message });
+    toast({ title: 'Error', description: message, variant: 'destructive' });
+  };
+
+  const fetchInitialAuthState = async (): Promise<{ user: User | null; profile: UserProfile | null }> => {
+    if (!state.user) {
+      console.warn('[Auth] No user found during initialization');
+      return { user: null, profile: null };
+    }
+
+    const userId = state.user.id;
+    if (!userId) {
+      console.error('[Auth] User ID is not available');
+      return { user: state.user, profile: null };
+    }
+
+    const { profile } = await getUserProfile(userId);
+    return { user: state.user, profile };
   };
 
   return (
