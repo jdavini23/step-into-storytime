@@ -43,12 +43,6 @@ let supabaseInstance: TypedSupabaseClient | null = null;
 export const createSupabaseClient = (): TypedSupabaseClient => {
   if (supabaseInstance) return supabaseInstance;
 
-  if (typeof window === 'undefined') {
-    throw new Error(
-      'Supabase client cannot be initialized server-side. Please use in browser context only.'
-    );
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -73,9 +67,11 @@ export const createSupabaseClient = (): TypedSupabaseClient => {
     });
 
     // Test the client
-    supabaseInstance.auth.onAuthStateChange((event, session) => {
-      console.log('[Supabase] Auth state changed:', event, !!session);
-    });
+    if (typeof window !== 'undefined') {
+      supabaseInstance.auth.onAuthStateChange((event, session) => {
+        console.log('[Supabase] Auth state changed:', event, !!session);
+      });
+    }
 
     return supabaseInstance;
   } catch (error) {

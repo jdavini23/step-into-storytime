@@ -1,13 +1,15 @@
-import { createSupabaseClient } from "@/lib/supabase";
+'use client';
+
+import { createSupabaseClient } from '@/lib/supabase';
 import {
   AuthError,
   Session,
   Provider,
   PostgrestError,
-} from "@supabase/supabase-js";
+} from '@supabase/supabase-js';
 
 // Import shared types
-import { User, UserProfile } from "@/types/auth";
+import { User, UserProfile } from '@/types/auth';
 
 const supabase = createSupabaseClient();
 
@@ -50,7 +52,7 @@ export const signInWithPassword = async (
     });
     return { user: data?.user || null, error };
   } catch (error) {
-    console.error("Error in signInWithPassword:", error);
+    console.error('Error in signInWithPassword:', error);
     return { user: null, error: error as AuthError };
   }
 };
@@ -84,7 +86,7 @@ export const signOut = async (): Promise<{ error: AuthError | null }> => {
     const { error } = await supabase.auth.signOut();
     return { error };
   } catch (error) {
-    console.error("Error in signOut:", error);
+    console.error('Error in signOut:', error);
     return { error: error as AuthError };
   }
 };
@@ -98,7 +100,7 @@ export const resetPasswordForEmail = async (
     });
     return { error };
   } catch (error) {
-    console.error("Error in resetPasswordForEmail:", error);
+    console.error('Error in resetPasswordForEmail:', error);
     return { error: error as AuthError };
   }
 };
@@ -112,7 +114,7 @@ export const updateUserPassword = async (
     });
     return { error };
   } catch (error) {
-    console.error("Error in updateUserPassword:", error);
+    console.error('Error in updateUserPassword:', error);
     return { error: error as AuthError };
   }
 };
@@ -132,7 +134,7 @@ export const signUp = async (
     });
     return { user: data?.user || null, error };
   } catch (error) {
-    console.error("Error in signUp:", error);
+    console.error('Error in signUp:', error);
     return { user: null, error: error as AuthError };
   }
 };
@@ -145,15 +147,15 @@ export const getUserProfile = async (
   try {
     console.log(`[DEBUG] Fetching profile for user: ${userId}`);
     const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
       .single();
 
     if (error) {
       console.error(`[DEBUG] Error fetching profile:`, error);
       // Check for 406 Not Acceptable error
-      if (error.code === "406") {
+      if (error.code === '406') {
         console.error(
           `[DEBUG] 406 Not Acceptable error encountered. This may be a content negotiation issue.`
         );
@@ -179,13 +181,13 @@ export const createUserProfile = async (
   user: User
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
   const { data, error } = await supabase
-    .from("profiles")
+    .from('profiles')
     .insert({
       id: user.id,
-      name: user.user_metadata?.name || user.email?.split("@")[0] || "User",
-      email: user.email || "",
+      name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+      email: user.email || '',
       avatar_url: user.user_metadata?.avatar_url || null,
-      subscription_tier: "free",
+      subscription_tier: 'free',
     })
     .select()
     .single();
@@ -200,11 +202,12 @@ export const updateUserProfileData = async (
   data: Partial<UserProfile>
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
   const { data: updatedProfile, error } = await supabase
-    .from("profiles")
-    .update({ ...data, updated_at: new Date().toISOString() })
-    .eq("id", userId)
+    .from('profiles')
+    .update(data)
+    .eq('id', userId)
     .select()
     .single();
+
   return {
     profile: updatedProfile as UserProfile | null,
     error: error as PostgrestError | null,
