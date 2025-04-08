@@ -17,17 +17,37 @@ export default function CreateStoryPage() {
   const router = useRouter();
   const { state: authState } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Check authentication status
   useEffect(() => {
-    if (!authState.isLoading && !authState.isAuthenticated) {
-      // Redirect to sign-in page with return URL
-      router.push(`/sign-in?returnUrl=${encodeURIComponent('/create')}`);
-    }
-  }, [authState.isLoading, authState.isAuthenticated, router]);
+    const checkAuth = async () => {
+      // Wait for auth state to be initialized
+      if (authState.isLoading || !authState.isInitialized) {
+        return;
+      }
 
-  // If still loading auth state, show loading indicator
-  if (authState.isLoading) {
+      // Only redirect if we're sure about the auth state and not already redirecting
+      if (!authState.isAuthenticated && !isRedirecting) {
+        console.log('Not authenticated, redirecting to sign-in');
+        setIsRedirecting(true);
+        // Store the current URL to redirect back after login
+        const returnUrl = encodeURIComponent(window.location.pathname);
+        router.push(`/sign-in?returnUrl=${returnUrl}`);
+      }
+    };
+
+    checkAuth();
+  }, [
+    authState.isLoading,
+    authState.isAuthenticated,
+    authState.isInitialized,
+    router,
+    isRedirecting,
+  ]);
+
+  // If still loading auth state or redirecting, show loading indicator
+  if (authState.isLoading || !authState.isInitialized || isRedirecting) {
     return <Loading />;
   }
 

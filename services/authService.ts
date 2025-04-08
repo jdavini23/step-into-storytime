@@ -1,6 +1,6 @@
 'use client';
 
-import { supabase } from '@/lib/supabase/client';
+import getClient from '@/lib/supabase/client';
 import {
   AuthError,
   Session,
@@ -17,23 +17,23 @@ export const getSupabaseSession = async (): Promise<{
   session: Session | null;
   error: AuthError | null;
 }> => {
-  const { data, error } = await supabase.auth.getSession();
-  return { session: data.session, error };
+  const { data, error } = await getClient().auth.getSession();
+  return { session: data?.session || null, error };
 };
 
 export const refreshSupabaseSession = async (): Promise<{
   session: Session | null;
   error: AuthError | null;
 }> => {
-  const { data, error } = await supabase.auth.refreshSession();
-  return { session: data.session, error };
+  const { data, error } = await getClient().auth.refreshSession();
+  return { session: data?.session || null, error };
 };
 
 export const getSupabaseUser = async (): Promise<{
   user: User | null;
   error: AuthError | null;
 }> => {
-  const { data, error } = await supabase.auth.getUser();
+  const { data, error } = await getClient().auth.getUser();
   return { user: data.user as User | null, error };
 };
 
@@ -50,6 +50,8 @@ export const signInWithPassword = async (
       environment: process.env.NODE_ENV,
       host: typeof window !== 'undefined' ? window.location.hostname : 'server',
     });
+
+    const supabase = getClient();
 
     // Pre-login state check
     const { data: sessionData } = await supabase.auth.getSession();
@@ -121,7 +123,7 @@ export const signInWithPassword = async (
 export const signInWithOAuth = async (
   provider: Provider
 ): Promise<{ error: AuthError | null }> => {
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { error } = await getClient().auth.signInWithOAuth({
     provider,
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
@@ -133,7 +135,7 @@ export const signInWithOAuth = async (
 export const signInWithOtp = async (
   email: string
 ): Promise<{ error: AuthError | null }> => {
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await getClient().auth.signInWithOtp({
     email,
     options: {
       emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -144,7 +146,7 @@ export const signInWithOtp = async (
 
 export const signOut = async (): Promise<{ error: AuthError | null }> => {
   try {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await getClient().auth.signOut();
     return { error };
   } catch (error) {
     console.error('Error in signOut:', error);
@@ -156,7 +158,7 @@ export const resetPasswordForEmail = async (
   email: string
 ): Promise<{ error: AuthError | null }> => {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await getClient().auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/update-password`,
     });
     return { error };
@@ -170,7 +172,7 @@ export const updateUserPassword = async (
   newPassword: string
 ): Promise<{ error: AuthError | null }> => {
   try {
-    const { error } = await supabase.auth.updateUser({
+    const { error } = await getClient().auth.updateUser({
       password: newPassword,
     });
     return { error };
@@ -186,7 +188,7 @@ export const signUp = async (
   password: string
 ): Promise<{ user: User | null; error: AuthError | null }> => {
   try {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await getClient().auth.signUp({
       email,
       password,
       options: {
@@ -207,7 +209,7 @@ export const getUserProfile = async (
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
   try {
     console.log(`[DEBUG] Fetching profile for user: ${userId}`);
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -241,7 +243,7 @@ export const getUserProfile = async (
 export const createUserProfile = async (
   user: User
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
-  const { data, error } = await supabase
+  const { data, error } = await getClient()
     .from('profiles')
     .insert({
       id: user.id,
@@ -262,7 +264,7 @@ export const updateUserProfileData = async (
   userId: string,
   data: Partial<UserProfile>
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
-  const { data: updatedProfile, error } = await supabase
+  const { data: updatedProfile, error } = await getClient()
     .from('profiles')
     .update(data)
     .eq('id', userId)
@@ -279,4 +281,4 @@ export const updateUserProfileData = async (
 // Note: The actual listener setup (onAuthStateChange) will be handled
 // by the useAuthListener hook in the next step. This service provides
 // the core Supabase client instance if needed by the hook.
-export const getSupabaseClient = () => supabase;
+export const getSupabaseClient = () => getClient();

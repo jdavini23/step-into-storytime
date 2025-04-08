@@ -112,9 +112,7 @@ export const useAuthListener = (
     console.log(`[DEBUG][${effectId}] Setting up auth listener`);
     let mounted = true;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
+    const { data: subscription } = (supabase as any).auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) {
           console.log(

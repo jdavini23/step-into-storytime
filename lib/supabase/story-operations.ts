@@ -1,4 +1,4 @@
-import { supabase } from './client';
+import supabase from './client';
 import type { Database } from '@/types/supabase';
 
 type Story = Database['public']['Tables']['stories']['Row'];
@@ -10,7 +10,7 @@ export async function createStory(
   userId: string
 ): Promise<Story> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabase()
       .from('stories')
       .insert({
         ...storyData,
@@ -31,7 +31,7 @@ export async function createStory(
 
 export async function fetchStories(userId: string): Promise<Story[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabase()
       .from('stories')
       .select('*')
       .eq('user_id', userId)
@@ -51,7 +51,7 @@ export async function updateStory(
   userId: string
 ): Promise<Story> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabase()
       .from('stories')
       .update(updates)
       .eq('id', storyId)
@@ -75,7 +75,7 @@ export async function deleteStory(
   userId: string
 ): Promise<boolean> {
   try {
-    const { error } = await supabase
+    const { error } = await supabase()
       .from('stories')
       .delete()
       .match({ id: storyId, user_id: userId }); // Security: ensure user owns the story

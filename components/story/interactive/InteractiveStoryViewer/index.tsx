@@ -1,19 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, TouchEvent } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   motion,
   AnimatePresence,
   AnimationControls,
   useAnimation,
 } from 'framer-motion';
-import type { StoryData } from '@/components/story/common/types';
+import type { StoryData } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import StoryTextRenderer from './StoryTextRenderer';
 import AudioController from './AudioController';
 import { useSoundEffects } from './SoundEffects';
 import { InteractiveStoryErrorBoundary } from './ErrorBoundary';
 import { usePerformanceMonitor } from './usePerformanceMonitor';
+import { usePassiveEventListener } from '@/lib/utils/event-listeners';
 
 interface InteractiveStoryViewerProps {
   story: StoryData;
@@ -123,40 +124,61 @@ export default function InteractiveStoryViewer({
     return () => clearInterval(logInterval);
   }, []);
 
-  const handleTouchStart = (e: TouchEvent) => {
+  const handleTouchStart = useCallback((e: Event) => {
+    if (!(e instanceof TouchEvent)) return;
     touchStartX.current = e.touches[0].clientX;
     setIsSwiping(true);
-  };
+  }, []);
 
-  const handleTouchMove = (e: TouchEvent) => {
-    if (!isSwiping) return;
+  const handleTouchMove = useCallback(
+    (e: Event) => {
+      if (!(e instanceof TouchEvent) || !isSwiping) return;
+      const touchEndX = e.touches[0].clientX;
+      const diff = touchStartX.current - touchEndX;
 
-    const touchEndX = e.touches[0].clientX;
-    const diff = touchStartX.current - touchEndX;
-
-    // Prevent vertical scrolling while swiping
-    if (Math.abs(diff) > 5) {
-      e.preventDefault();
-    }
-  };
-
-  const handleTouchEnd = (e: TouchEvent) => {
-    if (!isSwiping) return;
-
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX;
-
-    // Minimum swipe distance threshold
-    if (Math.abs(diff) > 50) {
-      if (diff > 0 && currentPage < pages.length - 1) {
-        handlePageChange('next');
-      } else if (diff < 0 && currentPage > 0) {
-        handlePageChange('prev');
+      // Prevent vertical scrolling while swiping
+      if (Math.abs(diff) > 5) {
+        e.preventDefault();
       }
-    }
+    },
+    [isSwiping]
+  );
 
-    setIsSwiping(false);
-  };
+  const handleTouchEnd = useCallback(
+    (e: Event) => {
+      if (!(e instanceof TouchEvent) || !isSwiping) return;
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX.current - touchEndX;
+
+      // Minimum swipe distance threshold
+      if (Math.abs(diff) > 50) {
+        if (diff > 0 && currentPage < pages.length - 1) {
+          handlePageChange('next');
+        } else if (diff < 0 && currentPage > 0) {
+          handlePageChange('prev');
+        }
+      }
+
+      setIsSwiping(false);
+    },
+    [isSwiping, currentPage, pages.length, handlePageChange]
+  );
+
+  // Use passive event listeners
+  usePassiveEventListener(containerRef, 'touchstart', handleTouchStart, {
+    passive: true,
+  });
+
+  usePassiveEventListener(
+    containerRef,
+    'touchmove',
+    handleTouchMove,
+    { passive: false } // We need to prevent default in some cases
+  );
+
+  usePassiveEventListener(containerRef, 'touchend', handleTouchEnd, {
+    passive: true,
+  });
 
   return (
     <InteractiveStoryErrorBoundary>
@@ -168,9 +190,6 @@ export default function InteractiveStoryViewer({
           'flex flex-col overflow-hidden touch-pan-y',
           'sm:rounded-lg sm:min-h-[80vh] sm:my-8'
         )}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
       >
         <div className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto">
           <div className="max-w-prose mx-auto">

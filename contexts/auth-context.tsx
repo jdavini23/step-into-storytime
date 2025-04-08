@@ -4,6 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 import { AuthError } from '@supabase/supabase-js';
+import getClient from '@/lib/supabase/client';
 import {
   signInWithPassword,
   signInWithOAuth,
@@ -11,7 +12,6 @@ import {
   signUp as supabaseSignUp,
   resetPasswordForEmail,
   updateUserPassword,
-  getSupabaseClient,
   getUserProfile,
   createUserProfile,
 } from '@/services/authService';
@@ -94,7 +94,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const router = useRouter();
-  const supabase = getSupabaseClient();
+  const supabase = getClient();
 
   // Handle auth state changes
   useEffect(() => {
