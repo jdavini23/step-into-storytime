@@ -44,26 +44,17 @@ export const signInWithPassword = async (
   password: string
 ): Promise<{ user: User | null; error: AuthError | null }> => {
   try {
-    // Input validation logging
-    if (!email || !password) {
-      console.error('[Auth] Missing credentials:', {
-        hasEmail: !!email,
-        hasPassword: !!password,
-      });
-      throw new Error('Email and password are required');
-    }
+    console.log('[Auth] Attempting login with:', {
+      email: email.slice(0, 3) + '***@' + email.split('@')[1],
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+      host: typeof window !== 'undefined' ? window.location.hostname : 'server',
+    });
 
     // Pre-login state check
     const { data: sessionData } = await supabase.auth.getSession();
     console.log('[Auth] Pre-login session state:', {
       hasSession: !!sessionData?.session,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Attempt login
-    console.log('[Auth] Attempting login with:', {
-      email: email.slice(0, 3) + '***@' + email.split('@')[1],
-      passwordLength: password?.length,
       timestamp: new Date().toISOString(),
     });
 
@@ -90,21 +81,40 @@ export const signInWithPassword = async (
         status: error.status,
         timestamp: new Date().toISOString(),
       });
+
+      // Map Supabase errors to user-friendly messages
+      if (error.message?.includes('Invalid login credentials')) {
+        throw new Error('Invalid email or password. Please try again.');
+      } else if (error.message?.includes('Email not confirmed')) {
+        throw new Error('Please verify your email address before logging in.');
+      } else if (error.message?.includes('rate limit')) {
+        throw new Error('Too many login attempts. Please try again later.');
+      } else {
+        throw error;
+      }
     }
 
-    // Post-login session check if successful
-    if (data?.user) {
-      const { data: newSession } = await supabase.auth.getSession();
-      console.log('[Auth] Post-login session state:', {
-        hasSession: !!newSession?.session,
+    // Post-login session verification
+    if (data?.session) {
+      const { data: verifySession } = await supabase.auth.getSession();
+      console.log('[Auth] Post-login session verification:', {
+        hasSession: !!verifySession?.session,
+        sessionMatch:
+          verifySession?.session?.access_token === data.session.access_token,
         timestamp: new Date().toISOString(),
       });
     }
 
-    return { user: data?.user || null, error };
+    return { user: data?.user || null, error: null };
   } catch (error) {
     console.error('[Auth] Unexpected login error:', error);
-    return { user: null, error: error as AuthError };
+    return {
+      user: null,
+      error:
+        error instanceof Error
+          ? new AuthError(error.message)
+          : new AuthError('An unexpected error occurred'),
+    };
   }
 };
 
