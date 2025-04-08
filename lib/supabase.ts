@@ -1,24 +1,69 @@
 // Refactored Supabase client initialization
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
-// Type for Supabase instance with all tables
-export type TypedSupabaseClient = SupabaseClient<Database>;
-
-// Environment variables for Supabase connection
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing required Supabase environment variables.');
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    'Missing required Supabase environment variables. Please check your .env file and Vercel environment variables.'
+  );
 }
+
+// Create a single supabase client for interacting with your database
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'sb-auth-token',
+  },
+});
+
+// For client-side only operations
+export const createBrowserClient = () => {
+  if (typeof window === 'undefined') {
+    throw new Error('Browser client must be used in browser context only');
+  }
+  return supabase;
+};
+
+// For server-side operations
+export const createServerClient = () => {
+  return supabase;
+};
+
+// Type for Supabase instance with all tables
+export type TypedSupabaseClient = typeof supabase;
 
 // Singleton instance for browser and server
 let supabaseInstance: TypedSupabaseClient | null = null;
 
 export const createSupabaseClient = (): TypedSupabaseClient => {
-  if (!supabaseInstance) {
-    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  if (supabaseInstance) return supabaseInstance;
+
+  if (typeof window === 'undefined') {
+    throw new Error(
+      'Supabase client cannot be initialized server-side. Please use in browser context only.'
+    );
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[Supabase] Missing environment variables:', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseKey,
+    });
+    throw new Error(
+      'Missing required Supabase environment variables. Please check your .env file and Vercel environment variables.'
+    );
+  }
+
+  try {
+    supabaseInstance = createClient<Database>(supabaseUrl, supabaseKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -26,9 +71,23 @@ export const createSupabaseClient = (): TypedSupabaseClient => {
         storageKey: 'sb-auth-token',
       },
     });
+
+    // Test the client
+    supabaseInstance.auth.onAuthStateChange((event, session) => {
+      console.log('[Supabase] Auth state changed:', event, !!session);
+    });
+
+    return supabaseInstance;
+  } catch (error) {
+    console.error('[Supabase] Failed to initialize client:', error);
+    throw new Error(
+      'Failed to initialize Supabase client. Please try again later.'
+    );
   }
-  return supabaseInstance;
 };
+
+// Export a function to check if the client is initialized
+export const isSupabaseInitialized = () => !!supabaseInstance;
 
 // Custom fetch with retry logic and improved error handling
 const customFetch = async (
@@ -53,10 +112,10 @@ const customFetch = async (
 
       // Add required Supabase headers if not present
       if (!headers.has('apikey')) {
-        headers.set('apikey', supabaseAnonKey);
+        headers.set('apikey', supabaseKey);
       }
       if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${supabaseAnonKey}`);
+        headers.set('Authorization', `Bearer ${supabaseKey}`);
       }
 
       const response = await fetch(url.toString(), {
@@ -141,10 +200,11 @@ export const signInWithEmail = async (
     });
 
     // Real Supabase authentication
-    const { data, error } = await createSupabaseClient().auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    const { data, error } =
+      await createSupabaseClient().auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
 
     // DEBUG: Log authentication response
     console.log('[DEBUG] Supabase auth response:', {
@@ -220,7 +280,7 @@ export async function signUpWithEmail(
 ) {
   try {
     // For development/demo purposes, allow a mock signup when Supabase is not configured
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn('Using mock signup because Supabase is not configured');
 
       return {
@@ -266,7 +326,7 @@ export async function signUpWithEmail(
 export async function signOut() {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn('Using mock signout because Supabase is not configured');
       return true;
     }
@@ -295,7 +355,7 @@ export async function signOut() {
 export async function getSession() {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn('Using mock session because Supabase is not configured');
 
       // Check if we have a mock token in localStorage
@@ -331,7 +391,7 @@ export async function getSession() {
 export async function getCurrentUser() {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn('Using mock user because Supabase is not configured');
 
       // Check if we have a mock token in localStorage
@@ -391,11 +451,12 @@ export const fetchUserProfile = async (userId: string) => {
     }
 
     // First try to fetch the existing profile
-    const { data: existingProfile, error: fetchError } = await createSupabaseClient()
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle(); // Use maybeSingle instead of single to handle no results case
+    const { data: existingProfile, error: fetchError } =
+      await createSupabaseClient()
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle(); // Use maybeSingle instead of single to handle no results case
 
     // If there's an error that's not a "no rows" error, throw it
     if (fetchError && fetchError.code !== 'PGRST116') {
@@ -419,19 +480,20 @@ export const fetchUserProfile = async (userId: string) => {
 
     try {
       // Attempt to create a new profile
-      const { data: newProfile, error: createError } = await createSupabaseClient()
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            email: userEmail || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            subscription_tier: 'free' as const,
-          },
-        ])
-        .select()
-        .single();
+      const { data: newProfile, error: createError } =
+        await createSupabaseClient()
+          .from('profiles')
+          .insert([
+            {
+              id: userId,
+              email: userEmail || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              subscription_tier: 'free' as const,
+            },
+          ])
+          .select()
+          .single();
 
       if (createError) {
         throw createError;
@@ -446,11 +508,12 @@ export const fetchUserProfile = async (userId: string) => {
         console.log(
           '[DEBUG] Profile creation failed due to conflict, retrying fetch'
         );
-        const { data: retryProfile, error: retryError } = await createSupabaseClient()
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+        const { data: retryProfile, error: retryError } =
+          await createSupabaseClient()
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
 
         if (retryError) {
           console.error('[DEBUG] Retry profile fetch error:', retryError);
@@ -480,7 +543,7 @@ export async function updateUserProfile(
 ) {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn(
         'Using mock profile update because Supabase is not configured'
       );
@@ -514,7 +577,7 @@ export async function updateUserProfile(
 export async function getUserSubscription(userId: string) {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn(
         'Using mock subscription because Supabase is not configured'
       );
@@ -561,7 +624,7 @@ export async function getUserSubscription(userId: string) {
 export async function fetchStories(userId: string) {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn('Using mock stories because Supabase is not configured');
 
       // Return some mock stories
@@ -627,7 +690,7 @@ export async function fetchStories(userId: string) {
 export async function fetchStory(storyId: string, userId: string) {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn('Using mock story because Supabase is not configured');
 
       // Return a mock story
@@ -677,7 +740,7 @@ export async function createStory(
 ) {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn(
         'Using mock story creation because Supabase is not configured'
       );
@@ -719,7 +782,7 @@ export async function updateStory(
 ) {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn(
         'Using mock story update because Supabase is not configured'
       );
@@ -754,7 +817,7 @@ export async function updateStory(
 export async function deleteStory(storyId: string, userId: string) {
   try {
     // For development/demo purposes
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       console.warn(
         'Using mock story deletion because Supabase is not configured'
       );
