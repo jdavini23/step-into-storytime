@@ -10,6 +10,8 @@ import {
 } from 'react';
 import { Story } from '@/components/story/common/types';
 import { generateStoryIllustrations } from '@/lib/image-generation';
+import { useAuth } from '@/contexts/auth-context';
+import { getSupabaseClient } from '@/services/authService';
 
 // Define types
 export type StoryBranch = {
@@ -120,6 +122,8 @@ const StoryContext = createContext<StoryContextType>({
 // Create provider
 export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(storyReducer, initialState);
+  const { state: authState } = useAuth();
+  const supabase = getSupabaseClient();
 
   // Load stories from localStorage on initial render (client-side only)
   useEffect(() => {
@@ -165,12 +169,29 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       console.log('[DEBUG] Fetching stories...');
+
+      // Get the current session
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        console.error('[DEBUG] No access token found in fetchStories');
+        throw new Error('Authentication required');
+      }
+
+      console.log(
+        '[DEBUG] Using access token:',
+        session.access_token.substring(0, 10) + '...'
+      );
+
       const response = await fetch('/api/stories', {
         method: 'GET',
         credentials: 'include',
         headers: {
           'Cache-Control': 'no-store',
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -216,13 +237,7 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
         payload:
           error instanceof Error ? error.message : 'Failed to fetch stories',
       });
-      // If unauthorized, let the dashboard handle the redirect
-      if (
-        error instanceof Error &&
-        error.message === 'Authentication required'
-      ) {
-        throw error;
-      }
+      throw error;
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }

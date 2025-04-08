@@ -12,50 +12,67 @@ import type { RequestCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 // Consider using a more robust storage solution like a database
 let stories: Story[] = [];
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     console.log('[DEBUG] Starting GET /api/stories request');
-    const supabase = await createServerSupabaseClient();
 
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (sessionError) {
-      console.error('[DEBUG] Session error:', {
-        error: sessionError.message,
-        timestamp: new Date().toISOString(),
-      });
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    if (!session) {
-      console.log('[DEBUG] No session found');
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    console.log('[DEBUG] Session found:', {
-      userId: session.user.id,
+    // Get the authorization header and extract the token
+    const authHeader = req.headers.get('authorization');
+    console.log('[DEBUG] Authorization header:', {
+      exists: !!authHeader,
+      prefix: authHeader?.substring(0, 10),
       timestamp: new Date().toISOString(),
     });
 
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
+    if (!token) {
+      console.error('[DEBUG] No valid authorization token found');
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    console.log('[DEBUG] Received token:', token.substring(0, 10) + '...');
+
+    const supabase = await createServerSupabaseClient();
+
+    // Verify the session using the token
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('[DEBUG] Invalid or expired token:', {
+        error: authError?.message,
+        timestamp: new Date().toISOString(),
+      });
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    console.log('[DEBUG] Authenticated user:', {
+      userId: user.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Fetch stories for the authenticated user
     const { data: stories, error: storiesError } = await supabase
       .from('stories')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (storiesError) {
       console.error('[DEBUG] Error fetching stories:', {
         error: storiesError.message,
-        userId: session.user.id,
+        userId: user.id,
         timestamp: new Date().toISOString(),
       });
       return NextResponse.json(
@@ -65,12 +82,12 @@ export async function GET() {
     }
 
     console.log('[DEBUG] Successfully fetched stories:', {
-      count: stories.length,
-      userId: session.user.id,
+      count: stories?.length || 0,
+      userId: user.id,
       timestamp: new Date().toISOString(),
     });
 
-    return NextResponse.json({ stories });
+    return NextResponse.json({ stories: stories || [] });
   } catch (error) {
     console.error('[DEBUG] Unexpected error in GET /api/stories:', {
       error: error instanceof Error ? error.message : 'Unknown error',

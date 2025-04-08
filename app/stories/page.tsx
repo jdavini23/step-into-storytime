@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { StoryList } from '@/components/story/StoryList';
-import { StoryData } from '@/components/story/common/types';
 import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
@@ -15,6 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import type { Story, StoryData } from '@/lib/types';
 
 export default function StoriesPage() {
   const router = useRouter();
@@ -24,14 +24,37 @@ export default function StoriesPage() {
 
   useEffect(() => {
     const fetchStories = async () => {
+      console.log('[DEBUG] Starting to fetch stories in StoriesPage');
       try {
         const response = await fetch('/api/stories');
+        console.log('[DEBUG] Stories API response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+
         if (!response.ok) {
-          throw new Error('Failed to fetch stories');
+          console.error('[DEBUG] Failed to fetch stories:', {
+            status: response.status,
+            statusText: response.statusText,
+          });
+          throw new Error(
+            `Failed to fetch stories: ${response.status} ${response.statusText}`
+          );
         }
+
         const data = await response.json();
-        setStories(data);
+        console.log('[DEBUG] Successfully fetched stories:', {
+          count: data.stories?.length || 0,
+          firstStoryId: data.stories?.[0]?.id,
+          timestamp: new Date().toISOString(),
+        });
+        setStories(data.stories || []);
       } catch (error) {
+        console.error('[DEBUG] Error in fetchStories:', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString(),
+        });
         toast.error('Failed to load stories');
       } finally {
         setIsLoading(false);

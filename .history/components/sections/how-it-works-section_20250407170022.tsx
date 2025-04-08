@@ -1,14 +1,14 @@
-import Image from "next/image";
-import { Zap } from "lucide-react";
+import Image from 'next/image';
+import { Zap } from 'lucide-react';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 
-type ColorKey = "violet" | "indigo" | "sky";
+type ColorKey = 'violet' | 'indigo' | 'sky';
 
 interface ColorStyles {
   bg: string;
@@ -74,22 +74,22 @@ export default function HowItWorksSection() {
 function StepCard({ number, title, description, image, color }: StepCardProps) {
   const colorMap: Record<ColorKey, ColorStyles> = {
     violet: {
-      bg: "bg-violet-600",
+      bg: 'bg-violet-600',
       gradient:
-        "bg-gradient-to-r from-transparent via-violet-300 to-violet-600",
+        'bg-gradient-to-r from-transparent via-violet-300 to-violet-600',
       nextGradient:
-        "bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600",
+        'bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600',
     },
     indigo: {
-      bg: "bg-indigo-600",
-      gradient: "bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600",
+      bg: 'bg-indigo-600',
+      gradient: 'bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600',
       nextGradient:
-        "bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent",
+        'bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent',
     },
     sky: {
-      bg: "bg-sky-600",
-      gradient: "bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent",
-      nextGradient: "",
+      bg: 'bg-sky-600',
+      gradient: 'bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent',
+      nextGradient: '',
     },
   };
 
@@ -110,12 +110,12 @@ function StepCard({ number, title, description, image, color }: StepCardProps) {
         <CardContent>
           <div className="h-40 w-full mb-4 rounded-lg overflow-hidden">
             <Image
-              src={image || "/placeholder.svg"}
+              src={image || '/placeholder.svg'}
               alt={title}
               width={300}
               height={160}
               className="object-cover"
-              style={{ width: "100%", height: "auto" }}
+              style={{ width: '100%', height: 'auto' }}
             />
           </div>
           <CardDescription className="text-slate-600">
