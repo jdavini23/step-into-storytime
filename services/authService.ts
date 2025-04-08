@@ -1,6 +1,6 @@
 'use client';
 
-import { createSupabaseClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 import {
   AuthError,
   Session,
@@ -10,8 +10,6 @@ import {
 
 // Import shared types
 import { User, UserProfile } from '@/types/auth';
-
-const supabase = createSupabaseClient();
 
 // --- Session & User ---
 
@@ -46,13 +44,66 @@ export const signInWithPassword = async (
   password: string
 ): Promise<{ user: User | null; error: AuthError | null }> => {
   try {
+    // Input validation logging
+    if (!email || !password) {
+      console.error('[Auth] Missing credentials:', {
+        hasEmail: !!email,
+        hasPassword: !!password,
+      });
+      throw new Error('Email and password are required');
+    }
+
+    // Pre-login state check
+    const { data: sessionData } = await supabase.auth.getSession();
+    console.log('[Auth] Pre-login session state:', {
+      hasSession: !!sessionData?.session,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Attempt login
+    console.log('[Auth] Attempting login with:', {
+      email: email.slice(0, 3) + '***@' + email.split('@')[1],
+      passwordLength: password?.length,
+      timestamp: new Date().toISOString(),
+    });
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
+
+    // Detailed response logging
+    console.log('[Auth] Login response:', {
+      success: !error,
+      hasData: !!data,
+      hasUser: !!data?.user,
+      hasSession: !!data?.session,
+      errorType: error?.name,
+      errorMessage: error?.message,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error('[Auth] Login error details:', {
+        name: error.name,
+        message: error.message,
+        status: error.status,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Post-login session check if successful
+    if (data?.user) {
+      const { data: newSession } = await supabase.auth.getSession();
+      console.log('[Auth] Post-login session state:', {
+        hasSession: !!newSession?.session,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     return { user: data?.user || null, error };
   } catch (error) {
-    console.error('Error in signInWithPassword:', error);
+    console.error('[Auth] Unexpected login error:', error);
     return { user: null, error: error as AuthError };
   }
 };
