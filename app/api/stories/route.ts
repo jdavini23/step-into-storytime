@@ -1,46 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Story } from '@/contexts/story-context';
-import { createClient } from '@/utils/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateStory } from '@/utils/ai/story-generator';
 import type { Database } from '@/types/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { cookies } from 'next/headers';
+import type { RequestCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 
 // In-memory storage for demo purposes
 // TODO: Replace with database storage
 // Consider using a more robust storage solution like a database
 let stories: Story[] = [];
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    console.log('[DEBUG] Starting GET /api/stories request');
 
-    if (authError || !user) {
+    // Get the authorization header and extract the token
+    const authHeader = req.headers.get('authorization');
+    console.log('[DEBUG] Authorization header:', {
+      exists: !!authHeader,
+      prefix: authHeader?.substring(0, 10),
+      timestamp: new Date().toISOString(),
+    });
+
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
+    if (!token) {
+      console.error('[DEBUG] No valid authorization token found');
       return NextResponse.json(
-        { error: 'Unauthorized - Please sign in' },
+        { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    const { data: stories, error } = await supabase
+    console.log('[DEBUG] Received token:', token.substring(0, 10) + '...');
+
+    const supabase = await createServerSupabaseClient();
+
+    // Verify the session using the token
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('[DEBUG] Invalid or expired token:', {
+        error: authError?.message,
+        timestamp: new Date().toISOString(),
+      });
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    console.log('[DEBUG] Authenticated user:', {
+      userId: user.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Fetch stories for the authenticated user
+    const { data: stories, error: storiesError } = await supabase
       .from('stories')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching stories:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (storiesError) {
+      console.error('[DEBUG] Error fetching stories:', {
+        error: storiesError.message,
+        userId: user.id,
+        timestamp: new Date().toISOString(),
+      });
+      return NextResponse.json(
+        { error: 'Failed to fetch stories' },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json(stories);
+    console.log('[DEBUG] Successfully fetched stories:', {
+      count: stories?.length || 0,
+      userId: user.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    return NextResponse.json({ stories: stories || [] });
   } catch (error) {
-    console.error('Error in stories route:', error);
+    console.error('[DEBUG] Unexpected error in GET /api/stories:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    });
     return NextResponse.json(
-      { error: 'Internal Server Error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -48,7 +102,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
     const {
       data: { user },
       error: authError,
@@ -76,7 +130,10 @@ export async function POST(request: NextRequest) {
       const storyData = {
         id: json.id || crypto.randomUUID(),
         title: json.title || 'Untitled Story',
-        content: typeof json.content === 'string' ? json.content : JSON.stringify(json.content),
+        content:
+          typeof json.content === 'string'
+            ? json.content
+            : JSON.stringify(json.content),
         character: json.character,
         setting: json.setting,
         theme: json.theme,
@@ -130,7 +187,7 @@ export async function PUT(
   context: { params: Promise<{ storyId: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -193,7 +250,7 @@ export async function DELETE(
   context: { params: Promise<{ storyId: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

@@ -8,29 +8,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { authenticateUser } from '@/lib/auth';
+import { useAuth } from '@/contexts/auth-context';
+import { toast } from '@/components/ui/use-toast';
 
 interface FormData {
-  username: string;
+  email: string;
   password: string;
   rememberMe: boolean;
 }
 
 interface FormErrors {
-  username: string;
+  email: string;
   password: string;
   general: string;
 }
 
 export default function SignInForm() {
   const router = useRouter();
+  const { login } = useAuth();
   const [formData, setFormData] = useState<FormData>({
-    username: '',
+    email: '',
     password: '',
     rememberMe: false,
   });
   const [errors, setErrors] = useState<FormErrors>({
-    username: '',
+    email: '',
     password: '',
     general: '',
   });
@@ -62,13 +64,16 @@ export default function SignInForm() {
   const validateForm = () => {
     let isValid = true;
     const newErrors: FormErrors = {
-      username: '',
+      email: '',
       password: '',
       general: '',
     };
 
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
       isValid = false;
     }
 
@@ -92,24 +97,52 @@ export default function SignInForm() {
     setErrors({ ...errors, general: '' });
 
     try {
-      const success = await authenticateUser(
-        formData.username,
-        formData.password
-      );
+      console.log('[DEBUG] Attempting login with:', {
+        emailLength: formData.email.length,
+        timestamp: new Date().toISOString(),
+      });
 
-      if (success) {
-        // Redirect to dashboard on successful sign-in
-        router.push('/dashboard');
-      } else {
-        setErrors({
-          ...errors,
-          general: 'Invalid username or password. Please try again.',
-        });
-      }
+      await login(formData.email, formData.password);
+      // Redirect is handled by auth context
     } catch (error) {
+      console.error('[DEBUG] Form login error:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.constructor.name : typeof error,
+        timestamp: new Date().toISOString(),
+      });
+
+      let errorMessage = 'An error occurred while signing in';
+
+      if (error instanceof Error) {
+        // Handle specific error messages
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please verify your email address before signing in';
+        } else if (error.message.includes('rate limit')) {
+          errorMessage = 'Too many sign in attempts. Please try again later';
+        } else if (error.message.includes('required')) {
+          errorMessage = 'Please fill in all required fields';
+        } else if (
+          error.message.includes('network') ||
+          error.message.includes('fetch')
+        ) {
+          errorMessage = 'Network error. Please check your internet connection';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       setErrors({
         ...errors,
-        general: 'An error occurred. Please try again later.',
+        general: errorMessage,
+      });
+
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -125,26 +158,26 @@ export default function SignInForm() {
         </div>
       )}
 
-      {/* Username field */}
+      {/* Email field */}
       <div className="space-y-2">
-        <Label htmlFor="username" className="text-slate-700">
-          Username or Email
+        <Label htmlFor="email" className="text-slate-700">
+          Email Address
         </Label>
         <Input
-          id="username"
-          name="username"
-          type="text"
-          autoComplete="username"
-          value={formData.username}
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          value={formData.email}
           onChange={handleChange}
           className={`h-12 ${
-            errors.username ? 'border-red-500 focus-visible:ring-red-500' : ''
+            errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''
           }`}
-          placeholder="Enter your username or email"
+          placeholder="Enter your email address"
           disabled={isLoading}
         />
-        {errors.username && (
-          <p className="text-red-500 text-sm mt-1">{errors.username}</p>
+        {errors.email && (
+          <p className="text-red-500 text-sm mt-1">{errors.email}</p>
         )}
       </div>
 
@@ -182,33 +215,47 @@ export default function SignInForm() {
       {/* Remember me checkbox */}
       <div className="flex items-center space-x-2">
         <Checkbox
-          id="remember-me"
+          id="rememberMe"
           checked={formData.rememberMe}
           onCheckedChange={handleCheckboxChange}
           disabled={isLoading}
         />
         <Label
-          htmlFor="remember-me"
-          className="text-sm text-slate-600 font-normal cursor-pointer"
+          htmlFor="rememberMe"
+          className="text-sm text-slate-600 cursor-pointer"
         >
           Remember me for 30 days
         </Label>
       </div>
 
-      {/* Sign in button */}
+      {/* Submit button */}
       <Button
         type="submit"
-        className="w-full h-12 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium"
+        className="w-full h-12 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
         disabled={isLoading}
       >
         {isLoading ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Signing in...
           </>
         ) : (
           'Sign in'
         )}
       </Button>
+
+      {/* Sign up link */}
+      <div className="text-center">
+        <span className="text-sm text-slate-600">
+          Don't have an account?{' '}
+          <Link
+            href="/sign-up"
+            className="text-violet-600 hover:text-violet-700 font-medium"
+          >
+            Sign up
+          </Link>
+        </span>
+      </div>
     </form>
   );
 }

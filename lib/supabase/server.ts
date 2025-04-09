@@ -1,102 +1,94 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
-import type { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
+import { type NextRequest, type NextResponse } from 'next/server';
 
-// Environment variables for Supabase connection
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing required Supabase environment variables. Please check your .env.local file.'
-  );
+if (!supabaseUrl) {
+  throw new Error('Missing required Supabase environment variables.');
 }
 
-// Validate URL format
-try {
-  new URL(supabaseUrl);
-} catch (error) {
-  console.error('Invalid Supabase URL format:', supabaseUrl);
-  throw new Error(
-    'Invalid Supabase URL format. Please check your NEXT_PUBLIC_SUPABASE_URL.'
-  );
-}
-
-// Helper function to create a Supabase client for server components
 export const createServerSupabaseClient = async () => {
   const cookieStore = await cookies();
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables.');
+  }
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      get: (name: string) => cookieStore.get(name)?.value,
+      set: (name: string, value: string, options: any) => {
+        cookieStore.set({ name, value, ...options });
       },
-      set(
-        name: string,
-        value: string,
-        options: Omit<ResponseCookie, 'name' | 'value'>
-      ) {
-        try {
-          cookieStore.set({ name, value, ...options });
-        } catch (error) {
-          console.error('Error setting cookie:', error);
-        }
-      },
-      remove(name: string, options: Omit<ResponseCookie, 'name' | 'value'>) {
-        try {
-          cookieStore.delete({ name, ...options });
-        } catch (error) {
-          console.error('Error removing cookie:', error);
-        }
-      },
-    },
-    auth: {
-      flowType: 'pkce',
-      debug: process.env.NODE_ENV === 'development',
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-      storageKey: 'sb-auth-token',
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'supabase-js-web/2.38.4',
-        apikey: supabaseAnonKey,
-      },
-      fetch: async (url, options = {}) => {
-        const fetchWithRetry = async (retries = 3) => {
-          try {
-            const response = await fetch(url, {
-              ...options,
-              credentials: 'omit',
-              headers: {
-                ...options.headers,
-                apikey: supabaseAnonKey,
-                Origin:
-                  process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
-              },
-            });
-            if (!response.ok && retries > 0) {
-              console.error('[DEBUG] Server fetch error:', {
-                status: response.status,
-                url: url.toString(),
-                retries,
-              });
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response;
-          } catch (error) {
-            if (retries > 0) {
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              return fetchWithRetry(retries - 1);
-            }
-            throw error;
-          }
-        };
-        return fetchWithRetry();
+      remove: (name: string, options: any) => {
+        cookieStore.delete({ name, ...options });
       },
     },
   });
 };
+
+// Export a function to get the session on the server side
+export async function getServerSession() {
+  const supabase = await createServerSupabaseClient();
+  try {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      return null;
+    }
+
+    // Verify the user's authentication status
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error('User verification error:', userError);
+      return null;
+    }
+
+    // Only return session if both checks pass
+    if (session && user && session.user.id === user.id) {
+      return session;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Server session error:', error);
+    return null;
+  }
+}
+
+// Export a function to get the authenticated user on the server side
+export async function getServerUser() {
+  const supabase = await createServerSupabaseClient();
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error) {
+      console.error('Server user error:', error);
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    console.error('Server user error:', error);
+    return null;
+  }
+}
+
+// Export a function to check if a user is authenticated on the server side
+export async function isAuthenticated() {
+  const user = await getServerUser();
+  return !!user;
+}

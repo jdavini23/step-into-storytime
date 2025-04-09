@@ -19,7 +19,8 @@ export function ThemeProvider(props: ThemeProviderProps) {
   );
 }
 
-function ThemeWrapper({ children }: { children: React.ReactNode }) {
+// Remove console logs for theme and class names
+const ThemeWrapper = React.memo(({ children }: { children: React.ReactNode }) => {
   const { theme } = useTheme();
 
   const className = cn(
@@ -43,11 +44,8 @@ function ThemeWrapper({ children }: { children: React.ReactNode }) {
     'dark:[--story-border:theme(colors.slate.800)]'
   );
 
-  console.log('Current theme:', theme);
-  console.log('Generated class names:', className);
-
   return <div className={className}>{children}</div>;
-}
+});
 
 // Utility function for combining class names
 function cn(...classes: (string | boolean | undefined)[]) {

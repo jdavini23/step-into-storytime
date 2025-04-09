@@ -1,8 +1,8 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { type NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const runtime = "edge";
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!email || !password || !name) {
       return NextResponse.json(
-        { error: 'Email, password, and name are required' },
+        { error: "Email, password, and name are required" },
         { status: 400 }
       );
     }
@@ -21,15 +21,17 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient();
 
     // Sign up the user
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
+    const supabaseClient = await supabase;
+    const { data: authData, error: signUpError } =
+      await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
         },
-      },
-    });
+      });
 
     if (signUpError) {
       return NextResponse.json({ error: signUpError.message }, { status: 400 });
@@ -37,23 +39,25 @@ export async function POST(request: NextRequest) {
 
     if (!authData.user) {
       return NextResponse.json(
-        { error: 'Failed to create user' },
+        { error: "Failed to create user" },
         { status: 500 }
       );
     }
 
     // Create user profile
-    const { error: profileError } = await supabase.from('profiles').insert([
-      {
-        id: authData.user.id,
-        email: email,
-        name: name,
-        subscription_tier: 'free',
-      },
-    ]);
+    const { error: profileError } = await (await supabase)
+      .from("profiles")
+      .insert([
+        {
+          id: authData.user.id,
+          email: email,
+          name: name,
+          subscription_tier: "free",
+        },
+      ]);
 
     if (profileError) {
-      console.error('Error creating profile:', profileError);
+      console.error("Error creating profile:", profileError);
       // Don't fail the signup if profile creation fails
       // We can handle this case separately
     }
@@ -61,10 +65,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       user: authData.user,
       session: authData.session,
-      message: 'User created successfully',
+      message: "User created successfully",
     });
   } catch (error) {
-    console.error('Signup error:', error);
-    return NextResponse.json({ error: 'Registration failed' }, { status: 500 });
+    console.error("Signup error:", error);
+    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 }

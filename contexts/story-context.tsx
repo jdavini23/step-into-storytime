@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { Story } from '@/components/story/common/types';
 import { generateStoryIllustrations } from '@/lib/image-generation';
+import { useAuth } from '@/contexts/auth-context';
 
 // Define types
 export type StoryBranch = {
@@ -119,36 +120,49 @@ const StoryContext = createContext<StoryContextType>({
 
 // Create provider
 export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
+  const { state: authState, supabase } = useAuth();
   const [state, dispatch] = useReducer(storyReducer, initialState);
 
-  // Load stories from localStorage on initial render (client-side only)
   useEffect(() => {
-    let isMounted = true;
+    const fetchInitialData = async () => {
+      if (!authState.isAuthenticated || !authState.user?.id) {
+        console.log(
+          '[Story] User not authenticated, skipping initial story fetch.'
+        );
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
+      }
+      if (supabase && authState.user.id) {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+          console.log('[Story] Fetching stories for user:', authState.user.id);
+          const { data, error } = await supabase
+            .from('stories')
+            .select('*')
+            .eq('user_id', authState.user.id)
+            .order('created_at', { ascending: false });
 
-    const loadStoriesFromLocalStorage = () => {
-      try {
-        // Only run on client side
-        if (typeof window !== 'undefined') {
-          const savedStories = localStorage.getItem('stories');
-          if (savedStories && isMounted) {
-            dispatch({
-              type: 'SET_STORIES',
-              payload: JSON.parse(savedStories),
-            });
+          if (error) {
+            console.error('[Story] Error fetching stories:', error);
+            dispatch({ type: 'SET_ERROR', payload: 'Failed to load stories' });
+          } else {
+            console.log('[Story] Stories fetched successfully:', data);
+            dispatch({ type: 'SET_STORIES', payload: data || [] });
           }
+        } catch (error) {
+          console.error('[Story] Unexpected error fetching stories:', error);
+          dispatch({
+            type: 'SET_ERROR',
+            payload: 'An unexpected error occurred while loading stories',
+          });
+        } finally {
+          dispatch({ type: 'SET_LOADING', payload: false });
         }
-      } catch (error) {
-        console.error('Error loading stories from localStorage:', error);
       }
     };
 
-    loadStoriesFromLocalStorage();
-
-    // Cleanup function to prevent state updates after unmount
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    fetchInitialData();
+  }, [supabase, authState.isAuthenticated, authState.user?.id]);
 
   // Save stories to localStorage whenever they change
   useEffect(() => {
@@ -158,52 +172,86 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
   }, [state.stories]);
 
   // API functions
-  const fetchStories = useCallback(async () => {
-    console.log('[DEBUG] fetchStories called:', {
-      currentLoading: state.loading,
-      storiesCount: state.stories.length,
-    });
-
-    // Don't set loading state if already loading to prevent additional renders
-    if (!state.loading) {
-      dispatch({ type: 'SET_LOADING', payload: true });
-    }
-    dispatch({ type: 'SET_ERROR', payload: null }); // Clear previous errors
+  const fetchStories = async () => {
+    if (state.loading) return;
+    dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
-      console.log('[DEBUG] Making API request to /api/stories');
+      console.log('[DEBUG] Fetching stories...');
+
+      // Get the current session
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        console.error('[DEBUG] No access token found in fetchStories');
+        throw new Error('Authentication required');
+      }
+
+      console.log(
+        '[DEBUG] Using access token:',
+        session.access_token.substring(0, 10) + '...'
+      );
+
       const response = await fetch('/api/stories', {
+        method: 'GET',
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-store',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
+
+      console.log('[DEBUG] Stories API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
+      if (response.status === 401) {
+        console.error('[DEBUG] Authentication error in fetchStories');
+        dispatch({ type: 'SET_STORIES', payload: [] });
+        throw new Error('Authentication required');
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('[DEBUG] API request failed:', {
+        console.error('[DEBUG] Error response from stories API:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData,
         });
         throw new Error(
-          errorData.error || `Failed to fetch stories: ${response.status}`
+          errorData.error ||
+            `Failed to fetch stories: ${response.status} ${response.statusText}`
         );
       }
 
-      const stories = await response.json();
-      console.log('[DEBUG] Stories fetched successfully:', {
-        count: stories.length,
+      const data = await response.json();
+      console.log('[DEBUG] Stories data:', {
+        count: data.stories?.length || 0,
+        firstStoryId: data.stories?.[0]?.id,
       });
-      dispatch({ type: 'SET_STORIES', payload: stories });
+
+      dispatch({ type: 'SET_STORIES', payload: data.stories || [] });
     } catch (error) {
-      console.error('[DEBUG] Error in fetchStories:', error);
+      console.error('[DEBUG] Error fetching stories:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
       dispatch({
         type: 'SET_ERROR',
         payload:
           error instanceof Error ? error.message : 'Failed to fetch stories',
       });
+      throw error;
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [state.loading]);
+  };
 
   const fetchStory = useCallback(
     async (id: string) => {

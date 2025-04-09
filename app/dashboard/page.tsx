@@ -36,27 +36,25 @@ export default function DashboardPage() {
     if (!authState.isLoading && !authState.isAuthenticated) {
       console.log('[DEBUG] User not authenticated, redirecting to sign-in');
       router.push('/sign-in');
+      setIsLoading(false);
       return;
     }
 
-    // Fetch stories
-    const loadStories = async () => {
-      try {
-        console.log('[DEBUG] Loading stories...');
-        setIsLoading(true);
-        await fetchStories();
-        console.log('[DEBUG] Stories loaded successfully');
-      } catch (error) {
-        console.error('[DEBUG] Error fetching stories:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    // Load stories only once when authenticated
+    if (authState.isAuthenticated && !storyState.loading && isLoading) {
+      const loadStories = async () => {
+        try {
+          console.log('[DEBUG] Loading stories...');
+          await fetchStories();
+          console.log('[DEBUG] Stories loaded successfully');
+        } catch (error) {
+          console.error('[DEBUG] Error fetching stories:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
-    if (authState.isAuthenticated && !storyState.loading) {
       loadStories();
-    } else if (!authState.isLoading && !authState.isAuthenticated) {
-      setIsLoading(false);
     }
   }, [
     authState.isAuthenticated,
