@@ -403,7 +403,7 @@ export function SubscriptionProvider({
       const {
         data: { session },
         error,
-      } = await supabase.auth.getSession();
+      } = await supabase().auth.getSession();
 
       if (error) {
         console.error('Error getting session:', error);

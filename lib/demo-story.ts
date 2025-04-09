@@ -1,10 +1,12 @@
-import { StoryData } from '@/components/story/common/types';
+import { Story } from '@/components/story/common/types';
 
-export const demoStory: StoryData = {
+export const demoStory: Story = {
   id: 'demo-story',
-  userId: 'demo-user',
+  user_id: 'demo-user',
   title: 'The Magic of Reading',
   description: 'A delightful tale about the joy of reading and imagination',
+  createdAt: Date.now(),
+  illustrations: undefined,
   content: {
     en: [
       'Once upon a time, in a cozy little room filled with books, there was a young child who discovered the magic of reading.',
@@ -17,33 +19,17 @@ export const demoStory: StoryData = {
       'Cuanto más leía, más se daba cuenta de que dentro de las páginas de cada libro había infinitas posibilidades y maravillosos descubrimientos esperando ser realizados.',
     ],
   },
-  mainCharacter: {
+  character: {
     name: 'Alex',
     age: '7',
     traits: ['curious', 'imaginative'],
-    appearance: 'A bright-eyed child with a warm smile',
   },
   setting: 'A cozy reading room',
   theme: 'adventure',
-  plotElements: ['discovery', 'imagination', 'books'],
-  targetAge: 6,
-  readingLevel: 'beginner',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  metadata: {
-    targetAge: 6,
-    difficulty: 'easy',
-    theme: 'adventure',
-    setting: 'reading room',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    wordCount: 150,
-    readingTime: 5,
-  },
-  accessibility: {
-    contrast: 'normal',
-    motionReduced: false,
-    fontSize: 'medium',
-    lineHeight: 1.5,
-  },
+  plot_elements: ['discovery', 'imagination', 'books'],
+  is_published: true,
+  author: 'Demo Author',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  prompt: () => null,
 };
