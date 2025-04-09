@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 Thanks for the insight\! Since you’re using AI tools to build *Step Into Storytime* and have limited JavaScript experience, I’ll tailor the Software Requirements Specification (SRS) to leverage beginner-friendly, AI-supported tools and frameworks. I’ll keep the stack simple, leaning on platforms like Supabase (which you mentioned in the PRD) and low-code/no-code integrations where possible, while still supporting the PRD and UI requirements. Here’s the finalized SRS in markdown:
 

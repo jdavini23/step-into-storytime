@@ -6,6 +6,11 @@ alwaysApply: false
 ---
 description: 
 globs: 
+alwaysApply: false
+---
+---
+description: 
+globs: 
 alwaysApply: true
 ---
 Thank you for the detailed breakdown of *Step Into Storytime*\! You’ve provided a fantastic foundation, and I’ve incorporated your clarifications into a concise PRD using the Sample PRD headings. Here’s the markdown output:
