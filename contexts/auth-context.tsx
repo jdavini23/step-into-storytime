@@ -46,7 +46,11 @@ interface AuthState {
 interface AuthContextType {
   state: AuthState;
   supabase: SupabaseClient; // Expose the client
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean
+  ) => Promise<void>;
   loginWithProvider: (provider: SupabaseProvider) => Promise<void>;
   logout: () => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
@@ -320,22 +324,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, rememberMe = false) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       try {
-        const { user, error } = await apiSignInWithPassword(email, password);
+        const { user, error } = await apiSignInWithPassword(email, password, {
+          // Set session expiry based on remember me option
+          expiresIn: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60, // 30 days or 1 day
+        });
+
         if (error || !user) {
-          // Throw the error to be caught by the catch block
           throw error || new Error('Login failed: No user returned.');
         }
-        // Profile fetching is now handled by onAuthStateChange listener
-        // router.push('/dashboard'); // Navigation can also be handled by listener or here
+
+        // Explicitly redirect to dashboard after successful login
+        router.push('/dashboard');
+        router.refresh();
       } catch (error) {
         handleError(error, 'Login failed');
+        throw error; // Re-throw to be caught by the form
       }
-      // Loading state is handled by the listener or handleError
     },
-    [handleError]
+    [handleError, router]
   );
 
   const loginWithProvider = useCallback(
@@ -372,20 +381,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error || !user) {
           throw error || new Error('Sign up failed: No user returned.');
         }
-        // Sign-up success typically triggers a SIGNED_IN event
-        // Profile creation/fetch handled by listener
+
+        // After successful signup, attempt immediate login
+        const { user: loggedInUser, error: loginError } =
+          await apiSignInWithPassword(email, password);
+
+        if (loginError || !loggedInUser) {
+          throw loginError || new Error('Auto-login after signup failed');
+        }
+
+        // Show success toast
         toast({
-          title: 'Success',
-          description:
-            'Check your email to confirm your account (if required).',
+          title: 'Welcome to Step Into Storytime!',
+          description: 'Your account has been created successfully.',
         });
-        // Optionally navigate or let the listener handle state changes
-        // router.push('/sign-in'); // Or maybe dashboard if auto-login occurs
+
+        // Redirect to dashboard
+        router.push('/dashboard');
+        router.refresh();
       } catch (error) {
         handleError(error, 'Signup failed');
+        throw error;
       }
     },
-    [handleError]
+    [handleError, router]
   );
 
   const resetPassword = useCallback(

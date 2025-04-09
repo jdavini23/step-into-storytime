@@ -26,9 +26,14 @@ function getBrowserClient(): SupabaseClient {
 // where a Supabase client is readily available (like AuthProvider)
 // or they create a temporary client.
 
+interface SignInOptions {
+  expiresIn?: number;
+}
+
 export const signInWithPassword = async (
   email: string,
-  password: string
+  password: string,
+  options?: SignInOptions
 ): Promise<{ user: User | null; error: AuthError | null }> => {
   const supabase = getBrowserClient();
   try {
@@ -39,6 +44,7 @@ export const signInWithPassword = async (
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
+      ...(options?.expiresIn ? {} : {}),
     });
 
     if (error) {
@@ -178,11 +184,9 @@ export const signUp = async (
         email: email.trim().toLowerCase(),
         password,
         options: {
-          // Include name in user_metadata which can be accessed later
-          // Ensure your Supabase instance allows 'name' in user metadata (check Auth -> Settings -> User Metadata)
           data: { name: name.trim() },
-          // Optional: Specify email redirect for confirmation if needed
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          shouldCreateUser: true,
         },
       }
     );

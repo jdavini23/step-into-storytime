@@ -31,7 +31,7 @@ interface FormErrors {
 export default function SignUpPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signup } = useAuth();
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -147,7 +147,7 @@ export default function SignUpPage() {
         duration: 10000, // 10 seconds
       });
 
-      await signup(formData.email, formData.password, formData.name);
+      await signUp(formData.name, formData.email, formData.password);
 
       // Clear the loading toast
       loadingToast.dismiss();

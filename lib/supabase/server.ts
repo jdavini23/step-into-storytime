@@ -35,29 +35,60 @@ export async function getServerSession() {
   try {
     const {
       data: { session },
-      error,
+      error: sessionError,
     } = await supabase.auth.getSession();
 
-    if (error) {
-      // Silent error in production
+    if (sessionError) {
+      console.error('Session error:', sessionError);
       return null;
     }
 
-    return session;
+    // Verify the user's authentication status
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error('User verification error:', userError);
+      return null;
+    }
+
+    // Only return session if both checks pass
+    if (session && user && session.user.id === user.id) {
+      return session;
+    }
+
+    return null;
   } catch (error) {
-    // Silent error in production
+    console.error('Server session error:', error);
     return null;
   }
 }
 
 // Export a function to get the authenticated user on the server side
 export async function getServerUser() {
-  const session = await getServerSession();
-  return session?.user || null;
+  const supabase = await createServerSupabaseClient();
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error) {
+      console.error('Server user error:', error);
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    console.error('Server user error:', error);
+    return null;
+  }
 }
 
 // Export a function to check if a user is authenticated on the server side
 export async function isAuthenticated() {
-  const session = await getServerSession();
-  return !!session?.user;
+  const user = await getServerUser();
+  return !!user;
 }

@@ -1,46 +1,74 @@
-import { createClient as createMiddlewareClient} from '@/lib/supabase/serverClient';
+import { createClient as createMiddlewareClient } from '@/lib/supabase/serverClient';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { publicRoutes, defaultRedirectPath } from './config/authRoutes';
-import { getServerSession } from '@/lib/supabase/server';
 import { Session } from '@supabase/supabase-js';
+
+// Simple in-memory rate limiting store
+const rateLimit = new Map<string, { count: number; timestamp: number }>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS = 100; // Max requests per minute
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const userRateLimit = rateLimit.get(ip);
+
+  if (!userRateLimit) {
+    rateLimit.set(ip, { count: 1, timestamp: now });
+    return true;
+  }
+
+  if (now - userRateLimit.timestamp > RATE_LIMIT_WINDOW) {
+    rateLimit.set(ip, { count: 1, timestamp: now });
+    return true;
+  }
+
+  if (userRateLimit.count >= MAX_REQUESTS) {
+    return false;
+  }
+
+  userRateLimit.count++;
+  return true;
+}
 
 export async function middleware(req: NextRequest) {
   console.log('--- Middleware START ---');
   console.log('Request URL:', req.url);
   console.log('Request Method:', req.method);
-  console.log('Middleware Request Cookies:', req.cookies.getAll());
+
+  // Rate limiting check
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0] ||
+    req.headers.get('x-real-ip') ||
+    'unknown';
+
+  if (!checkRateLimit(ip)) {
+    console.warn('Rate limit exceeded for IP:', ip);
+    return new NextResponse('Too Many Requests', { status: 429 });
+  }
 
   const res = NextResponse.next();
   const { pathname } = req.nextUrl;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing Supabase environment variables in middleware!');
-    return NextResponse.next();
-  }
-
+  // Create Supabase client
   const supabase = createMiddlewareClient(req, res);
 
   try {
-    const session: Session | null = await getServerSession();
+    // Get session using the middleware client
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
 
-    console.log('Middleware Session:', session ? 'Found' : 'Not Found');
-
-    if (session) {
-      console.log('Middleware Session Details:', {
-        userId: session.user?.id,
-        accessToken: session.access_token?.slice(0, 10) + '...',
-        expiresAt: session.expires_at,
-      });
-    } else {
-      console.log('Middleware Session Data: null');
+    if (error) {
+      console.error('Session error:', error);
+      return res;
     }
 
-    console.log('Middleware Pathname:', pathname);
-    console.log('Middleware publicRoutes:', publicRoutes);
+    console.log('Middleware Auth Status:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+    });
 
     const isPublicRoute = publicRoutes.some(
       (route) =>
@@ -48,39 +76,29 @@ export async function middleware(req: NextRequest) {
         (route.endsWith('/*') && pathname.startsWith(route.slice(0, -2)))
     );
 
-    console.log('Middleware isPublicRoute:', isPublicRoute);
-    console.log('Middleware pathname:', pathname);
+    console.log('Route Status:', {
+      pathname,
+      isPublicRoute,
+      isAuthenticated: !!session,
+    });
 
+    // Handle authentication redirects
     if (!isPublicRoute && !session) {
-      console.log('>>> REDIRECTING: No session or non-public route', {
-        pathname,
-        isPublicRoute,
-        hasSession: !!session,
-      });
-
+      console.log('>>> REDIRECTING: Authentication required');
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = defaultRedirectPath;
       redirectUrl.searchParams.set('redirect', pathname);
-
       return NextResponse.redirect(redirectUrl);
     }
 
+    // Redirect authenticated users away from auth pages
     if (session && (pathname === '/sign-in' || pathname === '/signup')) {
+      console.log('>>> REDIRECTING: Authenticated user to dashboard');
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = '/dashboard';
       redirectUrl.search = '';
       return NextResponse.redirect(redirectUrl);
     }
-
-    console.log('Response cookies:', res.cookies.getAll().map(c => ({
-      name: c.name,
-      value: c.value.substring(0, 10) + '...',
-      domain: c.domain,
-      path: c.path,
-      sameSite: c.sameSite,
-      secure: c.secure,
-      maxAge: c.maxAge
-    })));
 
     return res;
   } catch (error) {
@@ -89,15 +107,26 @@ export async function middleware(req: NextRequest) {
   }
 }
 
+// Clean up rate limit data periodically
+setInterval(() => {
+  const now = Date.now();
+  Array.from(rateLimit.entries()).forEach(([ip, data]) => {
+    if (now - data.timestamp > RATE_LIMIT_WINDOW) {
+      rateLimit.delete(ip);
+    }
+  });
+}, RATE_LIMIT_WINDOW);
+
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * Match specific routes that need authentication
+     * while excluding Next.js static files
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/',
+    '/dashboard/:path*',
+    '/sign-in',
+    '/signup',
+    '/_sites/:path*',
   ],
 };
