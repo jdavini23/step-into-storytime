@@ -186,7 +186,6 @@ export const signUp = async (
         options: {
           data: { name: name.trim() },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
-          shouldCreateUser: true,
         },
       }
     );

@@ -1,9 +1,9 @@
 // Auth callback handler
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getSupabaseSession } from "@/services/authService";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -11,24 +11,32 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const { session, error } = await getSupabaseSession();
-        console.log("Auth callback session check:", { session, error });
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+        console.log('Auth callback session check:', { session, error });
 
         if (error) {
-          console.error("Session error:", error);
+          console.error('Session error:', error);
           throw error;
         }
 
         if (session) {
-          console.log("Redirecting to dashboard...");
-          await router.replace("/dashboard");
+          console.log('Redirecting to dashboard...');
+          await router.replace('/dashboard');
         } else {
-          console.log("No session found, redirecting to sign-in...");
-          await router.replace("/sign-in");
+          console.log('No session found, redirecting to sign-in...');
+          await router.replace('/sign-in');
         }
       } catch (error) {
-        console.error("Error in auth callback:", error);
-        await router.replace("/sign-in");
+        console.error('Error in auth callback:', error);
+        await router.replace('/sign-in');
       }
     };
 
