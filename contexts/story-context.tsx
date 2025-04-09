@@ -11,7 +11,6 @@ import {
 import { Story } from '@/components/story/common/types';
 import { generateStoryIllustrations } from '@/lib/image-generation';
 import { useAuth } from '@/contexts/auth-context';
-import { getSupabaseClient } from '@/services/authService';
 
 // Define types
 export type StoryBranch = {
@@ -121,38 +120,49 @@ const StoryContext = createContext<StoryContextType>({
 
 // Create provider
 export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
+  const { state: authState, supabase } = useAuth();
   const [state, dispatch] = useReducer(storyReducer, initialState);
-  const { state: authState } = useAuth();
-  const supabase = getSupabaseClient();
 
-  // Load stories from localStorage on initial render (client-side only)
   useEffect(() => {
-    let isMounted = true;
+    const fetchInitialData = async () => {
+      if (!authState.isAuthenticated || !authState.user?.id) {
+        console.log(
+          '[Story] User not authenticated, skipping initial story fetch.'
+        );
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
+      }
+      if (supabase && authState.user.id) {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+          console.log('[Story] Fetching stories for user:', authState.user.id);
+          const { data, error } = await supabase
+            .from('stories')
+            .select('*')
+            .eq('user_id', authState.user.id)
+            .order('created_at', { ascending: false });
 
-    const loadStoriesFromLocalStorage = () => {
-      try {
-        // Only run on client side
-        if (typeof window !== 'undefined') {
-          const savedStories = localStorage.getItem('stories');
-          if (savedStories && isMounted) {
-            dispatch({
-              type: 'SET_STORIES',
-              payload: JSON.parse(savedStories),
-            });
+          if (error) {
+            console.error('[Story] Error fetching stories:', error);
+            dispatch({ type: 'SET_ERROR', payload: 'Failed to load stories' });
+          } else {
+            console.log('[Story] Stories fetched successfully:', data);
+            dispatch({ type: 'SET_STORIES', payload: data || [] });
           }
+        } catch (error) {
+          console.error('[Story] Unexpected error fetching stories:', error);
+          dispatch({
+            type: 'SET_ERROR',
+            payload: 'An unexpected error occurred while loading stories',
+          });
+        } finally {
+          dispatch({ type: 'SET_LOADING', payload: false });
         }
-      } catch (error) {
-        console.error('Error loading stories from localStorage:', error);
       }
     };
 
-    loadStoriesFromLocalStorage();
-
-    // Cleanup function to prevent state updates after unmount
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    fetchInitialData();
+  }, [supabase, authState.isAuthenticated, authState.user?.id]);
 
   // Save stories to localStorage whenever they change
   useEffect(() => {

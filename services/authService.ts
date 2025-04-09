@@ -1,128 +1,77 @@
 'use client';
 
-import getClient from '@/lib/supabase/client';
+// Remove the old client import
+// import getClient from '@/lib/supabase/client';
+import { createBrowserClient } from '@supabase/ssr';
 import {
   AuthError,
-  Session,
   Provider,
   PostgrestError,
+  SupabaseClient, // Import SupabaseClient type
 } from '@supabase/supabase-js';
-
-// Import shared types
 import { User, UserProfile } from '@/types/auth';
 
-// --- Session & User ---
+// Helper function to get the browser client
+// We create it directly in the AuthProvider now, so this might not be strictly needed
+// But can be useful if authService functions are called from other client components
+function getBrowserClient(): SupabaseClient {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
-export const getSupabaseSession = async (): Promise<{
-  session: Session | null;
-  error: AuthError | null;
-}> => {
-  const { data, error } = await getClient().auth.getSession();
-  return { session: data?.session || null, error };
-};
-
-export const refreshSupabaseSession = async (): Promise<{
-  session: Session | null;
-  error: AuthError | null;
-}> => {
-  const { data, error } = await getClient().auth.refreshSession();
-  return { session: data?.session || null, error };
-};
-
-export const getSupabaseUser = async (): Promise<{
-  user: User | null;
-  error: AuthError | null;
-}> => {
-  const { data, error } = await getClient().auth.getUser();
-  return { user: data.user as User | null, error };
-};
-
-// --- Authentication Methods ---
+// --- Authentication Methods (Simplified) ---
+// Note: These functions now often assume they are called from a context
+// where a Supabase client is readily available (like AuthProvider)
+// or they create a temporary client.
 
 export const signInWithPassword = async (
   email: string,
   password: string
-): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> => {
+): Promise<{ user: User | null; error: AuthError | null }> => {
+  const supabase = getBrowserClient();
   try {
-    console.log('[Auth] Attempting login with:', {
-      email: email.slice(0, 3) + '***@' + email.split('@')[1],
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
-      host: typeof window !== 'undefined' ? window.location.hostname : 'server',
-    });
-
-    const supabase = getClient();
-
-    // Pre-login state check
-    const { data: sessionData } = await supabase.auth.getSession();
-    console.log('[Auth] Pre-login session state:', {
-      hasSession: !!sessionData?.session,
-      timestamp: new Date().toISOString(),
-    });
-
+    console.log(
+      '[Auth] Attempting login with email:',
+      email.split('@')[0] + '***'
+    );
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
 
-    // Detailed response logging
-    console.log('[Auth] Login response:', {
-      success: !error,
-      hasData: !!data,
-      hasUser: !!data?.user,
-      hasSession: !!data?.session,
-      errorType: error?.name,
-      errorMessage: error?.message,
-      timestamp: new Date().toISOString(),
-    });
-
     if (error) {
-      console.error('[Auth] Login error details:', {
-        name: error.name,
-        message: error.message,
-        status: error.status,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Map Supabase errors to user-friendly messages
+      console.error('[Auth] Login error:', error.message);
+      // Re-throw specific user-friendly errors or a generic one
       if (error.message?.includes('Invalid login credentials')) {
-        throw new Error('Invalid email or password. Please try again.');
+        throw new Error('Invalid email or password.');
       } else if (error.message?.includes('Email not confirmed')) {
-        throw new Error('Please verify your email address before logging in.');
+        throw new Error('Please verify your email address.');
       } else if (error.message?.includes('rate limit')) {
-        throw new Error('Too many login attempts. Please try again later.');
-      } else {
-        throw error;
+        throw new Error('Too many attempts. Please try again later.');
       }
+      // Throw original error for other cases or logging
+      throw error;
     }
 
-    // Check if session exists before attempting to fetch profile
-    if (!data?.session) {
-      console.error('No session after authentication');
-      throw new Error('Authentication succeeded but no session was created');
-    }
-
-    // Post-login session verification
-    if (data?.session) {
-      const { data: verifySession } = await supabase.auth.getSession();
-      console.log('[Auth] Post-login session verification:', {
-        hasSession: !!verifySession?.session,
-        sessionMatch:
-          verifySession?.session?.access_token === data.session.access_token,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    return { user: data?.user || null, session: data?.session || null, error: null };
+    // Session is now managed by @supabase/ssr via cookies and middleware.
+    // No need for manual session checks here.
+    console.log('[Auth] Login successful for user:', data.user?.id);
+    return { user: data.user as User | null, error: null };
   } catch (error) {
     console.error('[Auth] Unexpected login error:', error);
+    // Ensure the caught error is returned in the expected structure
     return {
       user: null,
-      session: null,
       error:
-        error instanceof Error
-          ? new AuthError(error.message)
-          : new AuthError('An unexpected error occurred'),
+        error instanceof AuthError
+          ? error
+          : new AuthError(
+              error instanceof Error
+                ? error.message
+                : 'An unexpected error occurred during login.'
+            ),
     };
   }
 };
@@ -130,63 +79,86 @@ export const signInWithPassword = async (
 export const signInWithOAuth = async (
   provider: Provider
 ): Promise<{ error: AuthError | null }> => {
-  const { error } = await getClient().auth.signInWithOAuth({
+  const supabase = getBrowserClient();
+  const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
+      // Ensure the redirect URL is absolute for OAuth flows
       redirectTo: `${window.location.origin}/auth/callback`,
     },
   });
+  if (error) console.error('[Auth] OAuth Sign In error:', error.message);
   return { error };
 };
 
 export const signInWithOtp = async (
   email: string
 ): Promise<{ error: AuthError | null }> => {
-  const { error } = await getClient().auth.signInWithOtp({
-    email,
+  const supabase = getBrowserClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
     options: {
       emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
+  if (error) console.error('[Auth] OTP Sign In error:', error.message);
   return { error };
 };
 
 export const signOut = async (): Promise<{ error: AuthError | null }> => {
+  const supabase = getBrowserClient();
   try {
-    const { error } = await getClient().auth.signOut();
+    console.log('[Auth] Signing out...');
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('[Auth] Sign out error:', error.message);
+    } else {
+      console.log('[Auth] Sign out successful.');
+    }
+    // Clear any local state if necessary (handled in AuthContext)
     return { error };
   } catch (error) {
-    console.error('Error in signOut:', error);
-    return { error: error as AuthError };
+    console.error('[Auth] Unexpected Sign out error:', error);
+    return {
+      error: new AuthError(
+        error instanceof Error
+          ? error.message
+          : 'An unexpected error occurred during sign out.'
+      ),
+    };
   }
 };
 
 export const resetPasswordForEmail = async (
   email: string
 ): Promise<{ error: AuthError | null }> => {
-  try {
-    const { error } = await getClient().auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
-    });
-    return { error };
-  } catch (error) {
-    console.error('Error in resetPasswordForEmail:', error);
-    return { error: error as AuthError };
-  }
+  const supabase = getBrowserClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email.trim().toLowerCase(),
+    {
+      redirectTo: `${window.location.origin}/update-password`, // Ensure this route exists
+    }
+  );
+  if (error) console.error('[Auth] Reset Password error:', error.message);
+  return { error };
 };
 
 export const updateUserPassword = async (
   newPassword: string
 ): Promise<{ error: AuthError | null }> => {
-  try {
-    const { error } = await getClient().auth.updateUser({
-      password: newPassword,
-    });
-    return { error };
-  } catch (error) {
-    console.error('Error in updateUserPassword:', error);
-    return { error: error as AuthError };
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+  if (error) {
+    console.error('[Auth] Update Password error:', error.message);
+  } else {
+    console.log(
+      '[Auth] Password updated successfully for user:',
+      data.user?.id
+    );
   }
+  return { error };
 };
 
 export const signUp = async (
@@ -194,186 +166,283 @@ export const signUp = async (
   email: string,
   password: string
 ): Promise<{ user: User | null; error: AuthError | null }> => {
+  const supabase = getBrowserClient();
   try {
-    const { data, error } = await getClient().auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
-      },
-    });
-    const user = data?.user || null;
-    if (user) {
-      await createUserProfile(user);
+    console.log(
+      '[Auth] Attempting sign up for email:',
+      email.split('@')[0] + '***'
+    );
+    // Sign up the user
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
+      {
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          // Include name in user_metadata which can be accessed later
+          // Ensure your Supabase instance allows 'name' in user metadata (check Auth -> Settings -> User Metadata)
+          data: { name: name.trim() },
+          // Optional: Specify email redirect for confirmation if needed
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      }
+    );
+
+    if (signUpError) {
+      console.error('[Auth] Sign up error:', signUpError.message);
+      // Map common errors
+      if (signUpError.message?.includes('User already registered')) {
+        throw new Error('This email is already registered. Try logging in.');
+      } else if (
+        signUpError.message?.includes(
+          'Password should be at least 6 characters'
+        )
+      ) {
+        throw new Error('Password must be at least 6 characters long.');
+      }
+      throw signUpError; // Re-throw original error for other cases
     }
-    return { user, error };
+
+    if (!signUpData.user) {
+      console.error('[Auth] Sign up succeeded but no user data returned.');
+      throw new Error('Sign up process failed to return user information.');
+    }
+
+    console.log(
+      '[Auth] Sign up successful, user created with ID:',
+      signUpData.user.id
+    );
+    // Profile creation is now typically handled by onAuthStateChange listener
+    // in the AuthContext after successful sign-up and sign-in (or by a trigger in Supabase).
+    // We return the user object here for immediate feedback if needed.
+    return { user: signUpData.user as User | null, error: null };
   } catch (error) {
-    console.error('Error in signUp:', error);
-    return { user: null, error: error as AuthError };
+    console.error('[Auth] Unexpected sign up error:', error);
+    return {
+      user: null,
+      error:
+        error instanceof AuthError
+          ? error
+          : new AuthError(
+              error instanceof Error
+                ? error.message
+                : 'An unexpected error occurred during sign up.'
+            ),
+    };
   }
 };
 
 // --- Profile Management ---
-async function createUserProfileWrapper(userId: string, user?: User) {
-  try {
-    const { profile, error: createError } = await createUserProfile(
-      (user || {
-        id: userId,
-        email: '',
-        user_metadata: {
-          name: 'New User',
-        },
-      }) as User
-    );
-
-    if (createError) {
-      console.error('Error creating new profile for userId:', userId, createError);
-      throw new Error(`Failed to create a new profile for userId: ${userId}`);
-    }
-
-    return { profile, error: null };
-  } catch (error) {
-    console.error('Error in createUserProfileWrapper:', error);
-    throw new Error(`Failed to create a new profile in wrapper: ${error}`); // More specific error
-  }
-}
+// These functions might be called client-side (using getBrowserClient)
+// or server-side (using createServerClient from @supabase/ssr).
+// For simplicity here, we assume client-side usage for now.
 
 export const getUserProfile = async (
   userId: string
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
   if (!userId) {
-    console.error('getUserProfile called with invalid userId:', userId);
-    throw new Error('Invalid user ID provided');
+    console.error('[Profile] getUserProfile called with invalid userId.');
+    return {
+      profile: null,
+      error: {
+        message: 'Invalid user ID',
+        details: '',
+        hint: '',
+        code: '400',
+      } as PostgrestError,
+    };
   }
 
-  console.log('Fetching profile for userId:', userId);
+  const supabase = getBrowserClient(); // Use browser client
+  console.log('[Profile] Fetching profile for userId:', userId);
 
   try {
-    // Log authentication state before query
-    const { data: sessionData } = await getClient().auth.getSession();
-    console.log('Auth state before fetching profile:', {
-      hasSession: !!sessionData?.session,
-      sessionData,
-    });
-
-    const { data, error } = await getClient()
+    const { data, error, status } = await supabase
       .from('profiles')
-      .select('*', { head: false }) // Ensure correct headers are set
+      .select('*')
       .eq('id', userId)
-      .single();
-
-    console.log('Profile query result:', { data, error });
+      .single(); // Use single() to expect one row or throw error (PGRST116) if zero/multiple
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        console.warn('No profile found for userId:', userId, '- Creating a new profile.');
-
-        try {
-          const currentUser = await getClient().auth.getUser();
-          const currentUserId = currentUser.data?.user?.id; // Get the user ID from auth.getUser()
-
-          if (!currentUserId) {
-            console.error('No user ID found after authentication.');
-            throw new Error('No user ID found after authentication.');
-          }
-
-          const { profile, error } = await (currentUser.data?.user
-            ? createUserProfileWrapper(currentUserId, currentUser.data.user) // Use the correct user ID
-            : createUserProfileWrapper(currentUserId)); // Use the correct user ID
-
-          if (error) {
-            console.error('Error creating new profile:', error);
-            throw new Error('Failed to create a new profile');
-          }
-
-          return { profile, error: null };
-        } catch (err) {
-          console.error('Error creating new profile:', err);
-          throw new Error('Failed to create a new profile');
-        }
+      // Handle case where profile doesn't exist (e.g., PGRST116: 'JSON object requested, multiple (or no) rows returned')
+      if (status === 406 || error.code === 'PGRST116') {
+        console.warn(
+          `[Profile] Profile not found for userId: ${userId}. It might need to be created.`
+        );
+        // Decide if creation should happen here or be triggered elsewhere (e.g., on sign-up listener)
+        // For now, just return null profile and no error
+        return { profile: null, error: null };
+      } else {
+        console.error('[Profile] Error fetching profile:', error);
+        return { profile: null, error };
       }
     }
 
+    console.log('[Profile] Profile fetched successfully for userId:', userId);
+    return { profile: data as UserProfile, error: null };
+  } catch (error) {
+    console.error('[Profile] Unexpected error fetching profile:', error);
     return {
-      profile: data as UserProfile | null,
-      error: null,
+      profile: null,
+      error: {
+        message: error instanceof Error ? error.message : 'Unexpected error',
+        details: '',
+        hint: '',
+        code: '500',
+      } as PostgrestError,
     };
-  } catch (error) {
-    console.error('Error details in getUserProfile:', error);
-    throw error;
   }
 };
 
-// Debugging utility to verify userId in the database
-export const verifyUserIdInDatabase = async (userId: string): Promise<boolean> => {
-  try {
-    const { data, error } = await getClient()
-      .from('profiles')
-      .select('id')
-      .eq('id', userId);
-
-    if (error) {
-      console.error('Error verifying userId in database:', error);
-      return false;
-    }
-
-    if (!data || data.length === 0) {
-      console.warn('No matching userId found in database:', userId);
-      return false;
-    }
-
-    if (data.length > 1) {
-      console.error('Multiple entries found for userId in database:', userId);
-      return false;
-    }
-
-    console.log('userId verified in database:', userId);
-    return true;
-  } catch (error) {
-    console.error('Unexpected error while verifying userId in database:', error);
-    return false;
-  }
-};
-
+// This function is crucial and should ideally be triggered automatically
+// after sign-up confirmation, either via Supabase Triggers/Functions or
+// reliably in the onAuthStateChange listener when a new user signs in
+// for the first time without an existing profile.
 export const createUserProfile = async (
   user: User
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
-  const { data, error } = await getClient()
-    .from('profiles')
-    .insert({
-      id: user.id,
-      name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-      email: user.email || '',
-      avatar_url: user.user_metadata?.avatar_url || null,
-      subscription_tier: 'free',
-    })
-    .select()
-    .single();
-  return {
-    profile: data as UserProfile | null,
-    error: error as PostgrestError | null,
-  };
+  if (!user || !user.id) {
+    console.error(
+      '[Profile] createUserProfile called with invalid user object.'
+    );
+    return {
+      profile: null,
+      error: {
+        message: 'Invalid user object provided',
+        details: '',
+        hint: '',
+        code: '400',
+      } as PostgrestError,
+    };
+  }
+
+  const supabase = getBrowserClient(); // Use browser client
+  const userEmail = user.email || '';
+  // Extract name from metadata if available, otherwise fallback to email part
+  const userName =
+    user.user_metadata?.name ||
+    userEmail.split('@')[0] ||
+    `User_${user.id.substring(0, 6)}`;
+  const avatarUrl = user.user_metadata?.avatar_url || null; // Default to null if not provided
+
+  console.log(
+    `[Profile] Attempting to create profile for new user: ${user.id} (${userName})`
+  );
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id, // Ensure this matches the auth.users.id
+        name: userName,
+        email: userEmail, // Store email in profile if needed
+        avatar_url: avatarUrl,
+        subscription_tier: 'free', // Default subscription tier
+        // Add any other default fields for your profile table
+      })
+      .select() // Select the newly created profile data
+      .single(); // Expect a single row back
+
+    if (error) {
+      // Handle potential conflict if profile already exists (e.g., due to race condition or trigger)
+      if (error.code === '23505') {
+        // Unique constraint violation
+        console.warn(
+          `[Profile] Profile already exists for userId: ${user.id}. Fetching existing profile.`
+        );
+        // Attempt to fetch the existing profile instead
+        return await getUserProfile(user.id);
+      } else {
+        console.error('[Profile] Error inserting new profile:', error);
+        return { profile: null, error };
+      }
+    }
+
+    console.log(
+      `[Profile] Profile created successfully for userId: ${user.id}`
+    );
+    return { profile: data as UserProfile, error: null };
+  } catch (error) {
+    console.error('[Profile] Unexpected error creating profile:', error);
+    return {
+      profile: null,
+      error: {
+        message: error instanceof Error ? error.message : 'Unexpected error',
+        details: '',
+        hint: '',
+        code: '500',
+      } as PostgrestError,
+    };
+  }
 };
 
 export const updateUserProfileData = async (
   userId: string,
   data: Partial<UserProfile>
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
-  const { data: updatedProfile, error } = await getClient()
-    .from('profiles')
-    .update(data)
-    .eq('id', userId)
-    .select()
-    .single();
+  if (!userId) {
+    console.error(
+      '[Profile] updateUserProfileData called with invalid userId.'
+    );
+    return {
+      profile: null,
+      error: {
+        message: 'Invalid user ID',
+        details: '',
+        hint: '',
+        code: '400',
+      } as PostgrestError,
+    };
+  }
+  if (!data || Object.keys(data).length === 0) {
+    console.warn(
+      '[Profile] updateUserProfileData called with no data to update for userId:',
+      userId
+    );
+    // Optionally fetch and return the current profile or return null
+    return { profile: null, error: null };
+  }
 
-  return {
-    profile: updatedProfile as UserProfile | null,
-    error: error as PostgrestError | null,
-  };
+  const supabase = getBrowserClient(); // Use browser client
+  console.log(
+    `[Profile] Updating profile for userId: ${userId} with data:`,
+    data
+  );
+
+  try {
+    const { data: updatedProfile, error } = await supabase
+      .from('profiles')
+      .update(data)
+      .eq('id', userId)
+      .select() // Select the updated profile data
+      .single(); // Expect a single row back
+
+    if (error) {
+      console.error('[Profile] Error updating profile:', error);
+      return { profile: null, error };
+    }
+
+    console.log(`[Profile] Profile updated successfully for userId: ${userId}`);
+    return { profile: updatedProfile as UserProfile, error: null };
+  } catch (error) {
+    console.error('[Profile] Unexpected error updating profile:', error);
+    return {
+      profile: null,
+      error: {
+        message: error instanceof Error ? error.message : 'Unexpected error',
+        details: '',
+        hint: '',
+        code: '500',
+      } as PostgrestError,
+    };
+  }
 };
 
-// --- Auth State Listener ---
-// Note: The actual listener setup (onAuthStateChange) will be handled
-// by the useAuthListener hook in the next step. This service provides
-// the core Supabase client instance if needed by the hook.
-export const getSupabaseClient = () => getClient();
+// --- Removed Obsolete Functions ---
+// getSupabaseSession, refreshSupabaseSession, getSupabaseUser,
+// initializeSession, verifySessionAfterLogin, fetchWithAuth, getUserData example
+// are no longer needed as @supabase/ssr handles session management via cookies
+// and middleware. Authentication state and user data are now typically accessed
+// via the AuthContext or directly using the appropriate Supabase client.
+// getSupabaseClient is also removed as clients are created contextually.
+// createUserProfileWrapper removed as direct call to createUserProfile is clearer.
+// verifyUserIdInDatabase removed as it was primarily for debugging the previous complex flow.
