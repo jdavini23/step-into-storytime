@@ -3,18 +3,25 @@ import OpenAI from 'openai';
 import type { Story, StoryBranch } from '@/contexts/story-context';
 import { generateStory } from '@/utils/ai/story-generator';
 import { Story as StoryType } from '@/components/story/common/types';
-import { createClient } from '@/utils/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
+// Initialize OpenAI client with API key from environment variable
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '',
+  defaultHeaders: {
+    'api-key': process.env.OPENAI_API_KEY || '',
+  },
+  defaultQuery: undefined,
+  organization: process.env.OPENAI_ORG_ID,
 });
 
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     console.log('[DEBUG] POST /api/generate-story - Start');
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
 
     // Get user session
     const {
@@ -79,6 +86,14 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
+      );
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('[DEBUG] OpenAI API key not found');
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured' },
+        { status: 500 }
       );
     }
 
