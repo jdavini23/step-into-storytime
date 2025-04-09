@@ -21,6 +21,44 @@ export default function DashboardPage() {
   const { state: authState, logout } = useAuth();
   const { state: storyState, fetchStories, deleteStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
+  const [initializationTimeout, setInitializationTimeout] =
+    useState<NodeJS.Timeout | null>(null);
+
+  // Start initialization timeout only after auth is initialized
+  useEffect(() => {
+    if (!authState.isInitialized) return;
+
+    console.log('[DEBUG] Starting initialization timeout check');
+    const timeout = setTimeout(() => {
+      console.log('[DEBUG] Dashboard initialization timeout reached', {
+        authState: {
+          isLoading: authState.isLoading,
+          isInitialized: authState.isInitialized,
+          isAuthenticated: authState.isAuthenticated,
+        },
+        storyState: {
+          loading: storyState.loading,
+          storiesCount: storyState.stories.length,
+        },
+      });
+      setIsLoading(false);
+    }, 15000); // Increased to 15 seconds to allow for auth
+
+    setInitializationTimeout(timeout);
+
+    return () => {
+      if (timeout) {
+        console.log('[DEBUG] Clearing initialization timeout');
+        clearTimeout(timeout);
+      }
+    };
+  }, [
+    authState.isInitialized,
+    authState.isLoading,
+    authState.isAuthenticated,
+    storyState.loading,
+    storyState.stories.length,
+  ]);
 
   useEffect(() => {
     console.log('[DEBUG] Dashboard useEffect:', {
@@ -32,16 +70,39 @@ export default function DashboardPage() {
       isLoading,
     });
 
-    // Check if user is authenticated
-    if (!authState.isLoading && !authState.isAuthenticated) {
-      console.log('[DEBUG] User not authenticated, redirecting to sign-in');
+    // Clear initialization timeout if we get a definitive state
+    if (
+      initializationTimeout &&
+      !authState.isLoading &&
+      authState.isInitialized
+    ) {
+      console.log('[DEBUG] Clearing timeout due to definitive auth state');
+      clearTimeout(initializationTimeout);
+      setInitializationTimeout(null);
+    }
+
+    // Redirect to sign-in if not authenticated and initialization is complete
+    if (
+      !authState.isLoading &&
+      authState.isInitialized &&
+      !authState.isAuthenticated
+    ) {
+      console.log(
+        '[DEBUG] User not authenticated and initialization complete, redirecting to sign-in'
+      );
       router.push('/sign-in');
       setIsLoading(false);
       return;
     }
 
-    // Load stories only once when authenticated
-    if (authState.isAuthenticated && !storyState.loading && isLoading) {
+    // Load stories only when auth is complete and authenticated
+    if (
+      !authState.isLoading &&
+      authState.isInitialized &&
+      authState.isAuthenticated &&
+      !storyState.loading &&
+      isLoading
+    ) {
       const loadStories = async () => {
         try {
           console.log('[DEBUG] Loading stories...');
@@ -56,12 +117,27 @@ export default function DashboardPage() {
 
       loadStories();
     }
+
+    // Set loading to false if we have a definitive state
+    if (
+      !authState.isLoading &&
+      authState.isInitialized &&
+      ((authState.isAuthenticated && !storyState.loading) ||
+        !authState.isAuthenticated)
+    ) {
+      console.log('[DEBUG] Setting loading to false due to definitive state');
+      setIsLoading(false);
+    }
   }, [
     authState.isAuthenticated,
     authState.isLoading,
+    authState.isInitialized,
     router,
     fetchStories,
     storyState.loading,
+    storyState.stories.length,
+    isLoading,
+    initializationTimeout,
   ]);
 
   const handleLogout = async () => {
@@ -83,14 +159,19 @@ export default function DashboardPage() {
     }
   };
 
-  if (authState.isLoading) {
+  // Loading state JSX
+  if (isLoading || authState.isLoading || !authState.isInitialized) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mx-auto animate-pulse">
             <BookOpen className="h-4 w-4 text-white" />
           </div>
-          <p className="mt-4 text-slate-600">Initializing...</p>
+          <p className="mt-4 text-slate-600">
+            {authState.isLoading
+              ? 'Authenticating...'
+              : 'Loading your stories...'}
+          </p>
         </div>
       </div>
     );
@@ -216,7 +297,7 @@ export default function DashboardPage() {
                         variant="ghost"
                         size="sm"
                         className="text-slate-600"
-                        onClick={() => router.push(`/stories/${story.id}/edit`)}
+                        onClick={() => router.push(`/story/${story.id}/edit`)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>

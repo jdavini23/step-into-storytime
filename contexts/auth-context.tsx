@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
-import { createBrowserClient } from '@supabase/ssr';
+import { createBrowserClient, CookieOptions } from '@supabase/ssr';
 import {
   AuthError,
   Provider as SupabaseProvider, // Renamed to avoid conflict with React Provider
@@ -147,7 +147,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() =>
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            const cookie = document.cookie
+              .split('; ')
+              .find((row) => row.startsWith(`${name}=`));
+            return cookie ? cookie.split('=')[1] : undefined;
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            document.cookie = `${name}=${value}; path=${options.path || '/'}; ${
+              options.secure ? 'secure; ' : ''
+            }samesite=${options.sameSite || 'lax'}`;
+          },
+          remove(name: string, options: CookieOptions) {
+            document.cookie = `${name}=; path=${
+              options.path || '/'
+            }; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+          },
+        },
+      }
     )
   );
 
@@ -236,74 +256,112 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- Auth State Change Listener ---
   useEffect(() => {
     console.log('[Auth] Setting up onAuthStateChange listener...');
+    let mounted = true;
+    let initializationAttempted = false;
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`[Auth] onAuthStateChange event: ${event}`, session);
+        if (!mounted) return;
+
+        console.log(`[Auth] onAuthStateChange event: ${event}`, {
+          event,
+          hasSession: !!session,
+          initializationAttempted,
+          currentState: {
+            isInitialized: state.isInitialized,
+            isLoading: state.isLoading,
+            isAuthenticated: state.isAuthenticated,
+          },
+        });
 
         const currentUser = session?.user ?? null;
 
-        if (event === 'INITIAL_SESSION') {
-          console.log('[Auth] Initial session event.');
-          // Check if user exists from potential server-side render
-          // If not, fetch profile based on session
-          if (!state.user && currentUser) {
-            await fetchAndSetProfile(currentUser, session);
-          } else {
-            // If user exists in state or no session, finalize initialization
-            dispatch({
-              type: 'INITIALIZE',
-              payload: {
-                user: state.user,
-                profile: state.profile,
-                session: state.session,
-              },
+        // Always ensure initialization completes
+        const finalizeInitialization = (
+          user: User | null,
+          profile: UserProfile | null
+        ) => {
+          if (!mounted) return;
+          console.log('[Auth] Finalizing initialization:', {
+            hasUser: !!user,
+            hasProfile: !!profile,
+            hasSession: !!session,
+          });
+          dispatch({
+            type: 'INITIALIZE',
+            payload: {
+              user,
+              profile,
+              session,
+            },
+          });
+          initializationAttempted = true;
+        };
+
+        try {
+          if (event === 'INITIAL_SESSION') {
+            console.log('[Auth] Initial session event, current state:', {
+              hasUser: !!state.user,
+              currentUser: !!currentUser,
+              isInitialized: state.isInitialized,
             });
+
+            if (!initializationAttempted) {
+              if (!state.user && currentUser) {
+                await fetchAndSetProfile(currentUser, session);
+              } else {
+                finalizeInitialization(state.user, state.profile);
+              }
+            }
+          } else if (event === 'SIGNED_IN') {
+            console.log('[Auth] User signed in.');
+            if (currentUser) {
+              await fetchAndSetProfile(currentUser, session);
+            } else {
+              console.error(
+                '[Auth] SIGNED_IN event but no session/user found!'
+              );
+              dispatch({ type: 'LOGOUT' });
+            }
+          } else if (event === 'SIGNED_OUT') {
+            console.log('[Auth] User signed out.');
+            dispatch({ type: 'LOGOUT' });
+            router.push('/sign-in');
           }
-        } else if (event === 'SIGNED_IN') {
-          console.log('[Auth] User signed in.');
-          if (currentUser) {
-            await fetchAndSetProfile(currentUser, session);
-          } else {
-            console.error('[Auth] SIGNED_IN event but no session/user found!');
-            dispatch({ type: 'LOGOUT' }); // Treat as logout if no user
-          }
-        } else if (event === 'SIGNED_OUT') {
-          console.log('[Auth] User signed out.');
-          dispatch({ type: 'LOGOUT' });
-          // Redirect to sign-in page after logout
-          router.push('/sign-in');
-        } else if (event === 'PASSWORD_RECOVERY') {
-          console.log('[Auth] Password recovery event.');
-          // Handle password recovery event if needed (e.g., redirect to update password page)
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log('[Auth] Token refreshed.');
-          // Update session state if necessary, though @supabase/ssr handles cookie refresh
-          if (session) {
-            dispatch({
-              type: 'SET_USER_AND_PROFILE',
-              payload: { user: state.user, profile: state.profile, session },
-            });
-          }
-        } else if (event === 'USER_UPDATED') {
-          console.log('[Auth] User updated.');
-          // User metadata might have changed, re-fetch profile
-          if (currentUser) {
-            await fetchAndSetProfile(currentUser, session);
-          } else {
-            dispatch({ type: 'LOGOUT' }); // If user becomes null after update?
-          }
+        } catch (error) {
+          console.error('[Auth] Error handling auth state change:', error);
+          // Ensure initialization completes even on error
+          finalizeInitialization(null, null);
         }
       }
     );
 
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+
+      console.log('[Auth] Initial session check:', {
+        hasSession: !!session,
+        initializationAttempted,
+      });
+
+      if (session?.user && !initializationAttempted) {
+        fetchAndSetProfile(session.user as User, session);
+      } else if (!session && !initializationAttempted) {
+        dispatch({
+          type: 'INITIALIZE',
+          payload: { user: null, profile: null, session: null },
+        });
+      }
+    });
+
     // Cleanup listener on component unmount
     return () => {
       console.log('[Auth] Cleaning up auth listener.');
+      mounted = false;
       authListener?.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, fetchAndSetProfile, router]); // Add router to dependencies
+  }, [supabase, fetchAndSetProfile, router, state.user, state.profile]);
 
   // --- Action Functions ---
 
