@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/navbar';
+import Navbar from '@/components/navbar/index';
 import StoryContent from '@/components/story/story-content';
 import StoryControls from '@/components/story/story-controls';
 import Footer from '@/components/sections/footer';
