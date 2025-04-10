@@ -1,3 +1,7 @@
+import React, { memo } from 'react';
+import { motion } from 'framer-motion';
+import type { TooltipProps } from './tooltip';
+import Tooltip from './tooltip';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from './loading-spinner';
 
@@ -12,7 +16,7 @@ interface AuthButtonsProps {
   isMobile?: boolean;
 }
 
-export function AuthButtons({
+const AuthButtonsComponent: React.FC<AuthButtonsProps> = ({
   isAuthenticated,
   isNavigating,
   scrolled,
@@ -21,90 +25,89 @@ export function AuthButtons({
   onDashboard,
   onSignUp,
   isMobile = false,
-}: AuthButtonsProps) {
+}) => {
+  const buttonBaseClasses = `px-4 py-2 rounded-lg font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-violet-500 active:scale-95 ${
+    isMobile ? 'w-full justify-center' : ''
+  }`;
+
+  const primaryButtonClasses = `${buttonBaseClasses} bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 shadow-md hover:shadow-lg`;
+  const secondaryButtonClasses = `${buttonBaseClasses} ${
+    scrolled
+      ? 'text-slate-700 hover:bg-slate-100'
+      : 'text-slate-700 hover:bg-white/20'
+  }`;
+
+  if (isNavigating) {
+    return (
+      <div className="flex items-center space-x-3">
+        <div className="w-24 h-10 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="w-24 h-10 bg-slate-200 rounded-lg animate-pulse" />
+      </div>
+    );
+  }
+
   if (isAuthenticated) {
     return (
-      <>
-        <Button
-          variant={isMobile ? 'outline' : 'ghost'}
-          className={
-            isMobile
-              ? 'w-full justify-center rounded-lg border-slate-200 transition-all duration-200 hover:border-violet-200 hover:bg-violet-50/50'
-              : `rounded-lg px-4 transition-all duration-300 ${
-                  scrolled
-                    ? 'text-slate-700 hover:text-violet-600 hover:bg-violet-50'
-                    : 'text-slate-700 hover:text-violet-600 hover:bg-white/20'
-                } focus:ring-2 focus:ring-violet-500 focus:outline-none active:scale-95`
-          }
-          onClick={isMobile ? onDashboard : onLogout}
-          disabled={isNavigating}
-          aria-label={isMobile ? 'Go to dashboard' : 'Log out of your account'}
-        >
-          <span className="flex items-center gap-2">
-            {isNavigating ? (
-              <LoadingSpinner />
-            ) : isMobile ? (
-              'Dashboard'
-            ) : (
-              'Log out'
-            )}
-          </span>
-        </Button>
-        <Button
-          className={`${
-            isMobile ? 'w-full' : ''
-          } justify-center bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg px-5 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:outline-none active:scale-95 active:translate-y-0`}
-          onClick={isMobile ? onLogout : onDashboard}
-          disabled={isNavigating}
-          aria-label={isMobile ? 'Log out of your account' : 'Go to dashboard'}
-        >
-          <span className="flex items-center gap-2">
-            {isNavigating ? (
-              <LoadingSpinner />
-            ) : isMobile ? (
-              'Log out'
-            ) : (
-              'Dashboard'
-            )}
-          </span>
-        </Button>
-      </>
+      <div
+        className={`flex ${
+          isMobile ? 'flex-col space-y-3' : 'items-center space-x-3'
+        }`}
+      >
+        <Tooltip text="Go to your dashboard">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={primaryButtonClasses}
+            onClick={onDashboard}
+          >
+            Dashboard
+          </motion.button>
+        </Tooltip>
+        <Tooltip text="Sign out of your account">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={secondaryButtonClasses}
+            onClick={onLogout}
+          >
+            Sign Out
+          </motion.button>
+        </Tooltip>
+      </div>
     );
   }
 
   return (
-    <>
-      <Button
-        variant={isMobile ? 'outline' : 'ghost'}
-        className={
-          isMobile
-            ? 'w-full justify-center rounded-lg border-slate-200 transition-all duration-200 hover:border-violet-200 hover:bg-violet-50/50'
-            : `rounded-lg px-4 transition-all duration-300 ${
-                scrolled
-                  ? 'text-slate-700 hover:text-violet-600 hover:bg-violet-50'
-                  : 'text-slate-700 hover:text-violet-600 hover:bg-white/20'
-              } focus:ring-2 focus:ring-violet-500 focus:outline-none active:scale-95`
-        }
-        onClick={onLogin}
-        disabled={isNavigating}
-        aria-label="Sign in to your account"
-      >
-        <span className="flex items-center">
-          {isNavigating ? <LoadingSpinner /> : 'Log in'}
-        </span>
-      </Button>
-      <Button
-        className={`${
-          isMobile ? 'w-full' : ''
-        } justify-center bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg px-5 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:outline-none active:scale-95 active:translate-y-0`}
-        onClick={onSignUp}
-        disabled={isNavigating}
-        aria-label="Create a new account"
-      >
-        <span className="flex items-center gap-2">
-          {isNavigating ? <LoadingSpinner /> : 'Get Started'}
-        </span>
-      </Button>
-    </>
+    <div
+      className={`flex ${
+        isMobile ? 'flex-col space-y-3' : 'items-center space-x-3'
+      }`}
+    >
+      <Tooltip text="Sign in to your account">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={secondaryButtonClasses}
+          onClick={onLogin}
+        >
+          Sign In
+        </motion.button>
+      </Tooltip>
+      <Tooltip text="Create a new account">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={primaryButtonClasses}
+          onClick={onSignUp}
+        >
+          Sign Up
+        </motion.button>
+      </Tooltip>
+    </div>
   );
-}
+};
+
+export const AuthButtons = memo(AuthButtonsComponent);
+
+// Re-export Tooltip
+export { default as Tooltip } from './tooltip';

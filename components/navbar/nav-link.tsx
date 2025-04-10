@@ -7,6 +7,7 @@ interface NavLinkProps {
   active: boolean;
   scrolled: boolean;
   children: React.ReactNode;
+  onFocus?: () => void;
   'aria-current'?: 'page' | 'step' | 'location' | 'date' | 'time' | boolean;
 }
 
@@ -15,6 +16,7 @@ export function NavLink({
   active,
   scrolled,
   children,
+  onFocus,
   'aria-current': ariaCurrent,
 }: NavLinkProps) {
   return (
@@ -31,6 +33,7 @@ export function NavLink({
       }`}
       role="menuitem"
       aria-current={ariaCurrent}
+      onFocus={onFocus}
     >
       {children}
       <div

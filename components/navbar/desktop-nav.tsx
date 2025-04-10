@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { NavLink } from './nav-link';
 import { AuthButtons } from './auth-buttons';
+import { motion, AnimatePresence } from 'framer-motion';
+import Tooltip from './tooltip';
 
 interface DesktopNavProps {
   activeSection: string;
@@ -23,60 +25,73 @@ export function DesktopNav({
   onDashboard,
   onSignUp,
 }: DesktopNavProps) {
-  return (
-    <>
-      <div
-        className="hidden md:flex items-center space-x-1"
-        role="menubar"
-        aria-label="Desktop navigation menu"
-      >
-        <NavLink
-          href="/#home"
-          active={activeSection === 'home'}
-          scrolled={scrolled}
-          aria-current={activeSection === 'home' ? 'page' : undefined}
-        >
-          Home
-        </NavLink>
-        <NavLink
-          href="/#features"
-          active={activeSection === 'features'}
-          scrolled={scrolled}
-          aria-current={activeSection === 'features' ? 'page' : undefined}
-        >
-          Features
-        </NavLink>
-        <NavLink
-          href="/#how-it-works"
-          active={activeSection === 'how-it-works'}
-          scrolled={scrolled}
-          aria-current={activeSection === 'how-it-works' ? 'page' : undefined}
-        >
-          How It Works
-        </NavLink>
-        <NavLink
-          href="/#stories"
-          active={activeSection === 'stories'}
-          scrolled={scrolled}
-          aria-current={activeSection === 'stories' ? 'page' : undefined}
-        >
-          Stories
-        </NavLink>
-        <NavLink
-          href="/#pricing"
-          active={activeSection === 'pricing'}
-          scrolled={scrolled}
-          aria-current={activeSection === 'pricing' ? 'page' : undefined}
-        >
-          Pricing
-        </NavLink>
-      </div>
+  const navRef = useRef<HTMLDivElement>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const navItems = [
+    { href: '/#home', label: 'Home', tooltip: 'Back to homepage' },
+    { href: '/#features', label: 'Features', tooltip: 'Explore our features' },
+    {
+      href: '/#how-it-works',
+      label: 'How It Works',
+      tooltip: 'Learn how it works',
+    },
+    { href: '/#stories', label: 'Stories', tooltip: 'Browse stories' },
+    { href: '/#pricing', label: 'Pricing', tooltip: 'View pricing plans' },
+  ];
 
-      <div
-        className="hidden md:flex items-center space-x-3"
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!navRef.current?.contains(document.activeElement)) return;
+
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+          e.preventDefault();
+          setFocusedIndex((prev) => (prev + 1) % navItems.length);
+          break;
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          e.preventDefault();
+          setFocusedIndex(
+            (prev) => (prev - 1 + navItems.length) % navItems.length
+          );
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [navItems.length]);
+
+  useEffect(() => {
+    if (focusedIndex >= 0) {
+      const links = navRef.current?.querySelectorAll('a');
+      links?.[focusedIndex]?.focus();
+    }
+  }, [focusedIndex]);
+
+  return (
+    <div className="hidden md:flex items-center space-x-1" ref={navRef}>
+      <nav
+        className="flex items-center space-x-1"
         role="navigation"
-        aria-label="User actions"
+        aria-label="Desktop navigation"
       >
+        {navItems.map(({ href, label, tooltip }, index) => (
+          <Tooltip key={href} text={tooltip}>
+            <NavLink
+              href={href}
+              active={activeSection === href.replace('/#', '')}
+              scrolled={scrolled}
+              onFocus={() => setFocusedIndex(index)}
+            >
+              {label}
+            </NavLink>
+          </Tooltip>
+        ))}
+      </nav>
+
+      <div className="ml-6 flex items-center space-x-3">
         <AuthButtons
           isAuthenticated={isAuthenticated}
           isNavigating={isNavigating}
@@ -87,6 +102,6 @@ export function DesktopNav({
           onSignUp={onSignUp}
         />
       </div>
-    </>
+    </div>
   );
 }

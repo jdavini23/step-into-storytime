@@ -16,7 +16,7 @@ interface MobileMenuProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
 }
 
-export function MobileMenu({
+const MobileMenu = ({
   isOpen,
   activeSection,
   isAuthenticated,
@@ -27,7 +27,7 @@ export function MobileMenu({
   onDashboard,
   onSignUp,
   onKeyDown,
-}: MobileMenuProps) {
+}: MobileMenuProps) => {
   return (
     <AnimatePresence mode="wait">
       {isOpen && (
@@ -132,4 +132,6 @@ export function MobileMenu({
       )}
     </AnimatePresence>
   );
-}
+};
+
+export default MobileMenu;

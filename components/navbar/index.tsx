@@ -1,15 +1,16 @@
 'use client';
 
-import React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { BookOpen, Menu, X } from 'lucide-react';
-import { motion, useScroll, useSpring } from 'framer-motion';
+import { BookOpen, Menu, X, ArrowUp } from 'lucide-react';
+import { motion, useScroll, useSpring, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/auth-context';
-import { MobileMenu } from './mobile-menu';
 import { DesktopNav } from './desktop-nav';
 import { LoadingSpinner } from './loading-spinner';
+
+// Lazy load the mobile menu
+const MobileMenu = lazy(() => import('./mobile-menu'));
 
 // Debounce utility function
 function debounce<T extends (...args: any[]) => any>(
@@ -27,6 +28,7 @@ export default function Navbar() {
   const { state: authState, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [isNavigating, setIsNavigating] = useState(false);
   const router = useRouter();
@@ -37,6 +39,38 @@ export default function Navbar() {
     damping: 30,
     restDelta: 0.001,
   });
+
+  // Use Intersection Observer for scroll detection
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setScrolled(!entry.isIntersecting);
+      },
+      { threshold: 0, rootMargin: '-50px' }
+    );
+
+    const target = document.createElement('div');
+    target.style.height = '1px';
+    target.style.width = '1px';
+    target.style.position = 'absolute';
+    target.style.top = '0';
+    document.body.appendChild(target);
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+      document.body.removeChild(target);
+    };
+  }, []);
+
+  // Show back to top button after scrolling 500px
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 500);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Memoize the scroll handler
   const handleScroll = useCallback(() => {
@@ -126,10 +160,29 @@ export default function Navbar() {
 
   return (
     <>
+      {/* Skip to main content link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-violet-600 text-white px-4 py-2 rounded-md z-50"
+      >
+        Skip to main content
+      </a>
+
       <motion.div
         className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-600 origin-left z-50 shadow-[0_0_8px_rgba(124,58,237,0.5)]"
         style={{ scaleX }}
       />
+
+      {/* Navigation Progress Indicator */}
+      {isNavigating && (
+        <div
+          className="fixed top-0 left-0 right-0 z-50 bg-violet-600 h-1"
+          role="progressbar"
+          aria-valuetext="Loading page"
+          aria-busy="true"
+        />
+      )}
+
       <nav
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
           scrolled
@@ -210,32 +263,52 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        <MobileMenu
-          isOpen={isMenuOpen}
-          activeSection={activeSection}
-          isAuthenticated={authState.isAuthenticated}
-          isNavigating={isNavigating}
-          onMenuItemClick={() => setIsMenuOpen(false)}
-          onLogin={() => {
-            setIsMenuOpen(false);
-            handleNavigation('/sign-in');
-          }}
-          onLogout={() => {
-            setIsMenuOpen(false);
-            handleLogout();
-          }}
-          onDashboard={() => {
-            setIsMenuOpen(false);
-            handleNavigation('/dashboard');
-          }}
-          onSignUp={() => {
-            setIsMenuOpen(false);
-            handleNavigation('/sign-up');
-          }}
-          onKeyDown={handleMobileMenuKeyDown}
-        />
+        {/* Mobile Menu with Suspense */}
+        <Suspense fallback={<LoadingSpinner />}>
+          {isMenuOpen && (
+            <MobileMenu
+              isOpen={isMenuOpen}
+              activeSection={activeSection}
+              isAuthenticated={authState.isAuthenticated}
+              isNavigating={isNavigating}
+              onMenuItemClick={() => setIsMenuOpen(false)}
+              onLogin={() => {
+                setIsMenuOpen(false);
+                handleNavigation('/sign-in');
+              }}
+              onLogout={() => {
+                setIsMenuOpen(false);
+                handleLogout();
+              }}
+              onDashboard={() => {
+                setIsMenuOpen(false);
+                handleNavigation('/dashboard');
+              }}
+              onSignUp={() => {
+                setIsMenuOpen(false);
+                handleNavigation('/sign-up');
+              }}
+              onKeyDown={handleMobileMenuKeyDown}
+            />
+          )}
+        </Suspense>
       </nav>
+
+      {/* Back to Top Button */}
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-6 right-6 bg-violet-600 text-white p-3 rounded-full shadow-lg hover:bg-violet-700 transition-colors z-40"
+            aria-label="Back to top"
+          >
+            <ArrowUp className="h-5 w-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </>
   );
 }
