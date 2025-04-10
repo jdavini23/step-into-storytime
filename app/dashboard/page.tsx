@@ -21,123 +21,54 @@ export default function DashboardPage() {
   const { state: authState, logout } = useAuth();
   const { state: storyState, fetchStories, deleteStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
-  const [initializationTimeout, setInitializationTimeout] =
-    useState<NodeJS.Timeout | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Start initialization timeout only after auth is initialized
+  // Handle authentication and story loading
   useEffect(() => {
-    if (!authState.isInitialized) return;
+    let mounted = true;
 
-    console.log('[DEBUG] Starting initialization timeout check');
-    const timeout = setTimeout(() => {
-      console.log('[DEBUG] Dashboard initialization timeout reached', {
-        authState: {
-          isLoading: authState.isLoading,
-          isInitialized: authState.isInitialized,
-          isAuthenticated: authState.isAuthenticated,
-        },
-        storyState: {
-          loading: storyState.loading,
-          storiesCount: storyState.stories.length,
-        },
-      });
-      setIsLoading(false);
-    }, 15000); // Increased to 15 seconds to allow for auth
+    const initializeDashboard = async () => {
+      // Skip if already initialized or auth not ready
+      if (hasInitialized || !authState.isInitialized) return;
 
-    setInitializationTimeout(timeout);
+      // Handle not authenticated case
+      if (!authState.isLoading && !authState.isAuthenticated) {
+        if (mounted) {
+          router.push('/sign-in');
+          setIsLoading(false);
+          setHasInitialized(true);
+        }
+        return;
+      }
+
+      // Handle authenticated case
+      if (authState.isAuthenticated && !storyState.loading) {
+        try {
+          await fetchStories();
+        } catch (error) {
+          console.error('[DEBUG] Error fetching stories:', error);
+        } finally {
+          if (mounted) {
+            setIsLoading(false);
+            setHasInitialized(true);
+          }
+        }
+      }
+    };
+
+    initializeDashboard();
 
     return () => {
-      if (timeout) {
-        console.log('[DEBUG] Clearing initialization timeout');
-        clearTimeout(timeout);
-      }
+      mounted = false;
     };
   }, [
     authState.isInitialized,
     authState.isLoading,
     authState.isAuthenticated,
     storyState.loading,
-    storyState.stories.length,
-  ]);
-
-  useEffect(() => {
-    console.log('[DEBUG] Dashboard useEffect:', {
-      authLoading: authState.isLoading,
-      authInitialized: authState.isInitialized,
-      authAuthenticated: authState.isAuthenticated,
-      storyLoading: storyState.loading,
-      storiesCount: storyState.stories.length,
-      isLoading,
-    });
-
-    // Clear initialization timeout if we get a definitive state
-    if (
-      initializationTimeout &&
-      !authState.isLoading &&
-      authState.isInitialized
-    ) {
-      console.log('[DEBUG] Clearing timeout due to definitive auth state');
-      clearTimeout(initializationTimeout);
-      setInitializationTimeout(null);
-    }
-
-    // Redirect to sign-in if not authenticated and initialization is complete
-    if (
-      !authState.isLoading &&
-      authState.isInitialized &&
-      !authState.isAuthenticated
-    ) {
-      console.log(
-        '[DEBUG] User not authenticated and initialization complete, redirecting to sign-in'
-      );
-      router.push('/sign-in');
-      setIsLoading(false);
-      return;
-    }
-
-    // Load stories only when auth is complete and authenticated
-    if (
-      !authState.isLoading &&
-      authState.isInitialized &&
-      authState.isAuthenticated &&
-      !storyState.loading &&
-      isLoading
-    ) {
-      const loadStories = async () => {
-        try {
-          console.log('[DEBUG] Loading stories...');
-          await fetchStories();
-          console.log('[DEBUG] Stories loaded successfully');
-        } catch (error) {
-          console.error('[DEBUG] Error fetching stories:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      loadStories();
-    }
-
-    // Set loading to false if we have a definitive state
-    if (
-      !authState.isLoading &&
-      authState.isInitialized &&
-      ((authState.isAuthenticated && !storyState.loading) ||
-        !authState.isAuthenticated)
-    ) {
-      console.log('[DEBUG] Setting loading to false due to definitive state');
-      setIsLoading(false);
-    }
-  }, [
-    authState.isAuthenticated,
-    authState.isLoading,
-    authState.isInitialized,
     router,
     fetchStories,
-    storyState.loading,
-    storyState.stories.length,
-    isLoading,
-    initializationTimeout,
+    hasInitialized,
   ]);
 
   const handleLogout = async () => {
@@ -160,7 +91,11 @@ export default function DashboardPage() {
   };
 
   // Loading state JSX
-  if (isLoading || authState.isLoading || !authState.isInitialized) {
+  if (
+    !authState.isInitialized ||
+    authState.isLoading ||
+    (isLoading && !hasInitialized)
+  ) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
@@ -177,8 +112,9 @@ export default function DashboardPage() {
     );
   }
 
+  // Will redirect in useEffect
   if (!authState.isAuthenticated) {
-    return null; // Will redirect in useEffect
+    return null;
   }
 
   return (
