@@ -151,20 +151,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {
         cookies: {
           get(name: string) {
-            const cookie = document.cookie
-              .split('; ')
-              .find((row) => row.startsWith(`${name}=`));
-            return cookie ? cookie.split('=')[1] : undefined;
+            try {
+              const cookie = document.cookie
+                .split('; ')
+                .find((row) => row.startsWith(`${name}=`));
+              if (!cookie) return undefined;
+
+              const value = cookie.split('=')[1];
+              // Don't try to decode or parse Supabase session cookies
+              if (name.startsWith('sb-')) {
+                return value;
+              }
+              // For other cookies, decode URI component
+              return decodeURIComponent(value);
+            } catch (error) {
+              console.error('[Auth] Cookie get error:', error);
+              return undefined;
+            }
           },
           set(name: string, value: string, options: CookieOptions) {
-            document.cookie = `${name}=${value}; path=${options.path || '/'}; ${
-              options.secure ? 'secure; ' : ''
-            }samesite=${options.sameSite || 'lax'}`;
+            try {
+              let cookieValue = value;
+              // Don't encode Supabase session cookies
+              if (!name.startsWith('sb-')) {
+                cookieValue = encodeURIComponent(value);
+              }
+
+              let cookieString = `${name}=${cookieValue}; path=${
+                options.path || '/'
+              }`;
+              if (options.domain) cookieString += `; domain=${options.domain}`;
+              if (options.sameSite)
+                cookieString += `; samesite=${options.sameSite}`;
+              if (options.secure) cookieString += '; secure';
+              if (options.maxAge) cookieString += `; max-age=${options.maxAge}`;
+
+              document.cookie = cookieString;
+            } catch (error) {
+              console.error('[Auth] Cookie set error:', error);
+            }
           },
           remove(name: string, options: CookieOptions) {
-            document.cookie = `${name}=; path=${
-              options.path || '/'
-            }; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            try {
+              let cookieString = `${name}=; path=${
+                options.path || '/'
+              }; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+              if (options.domain) cookieString += `; domain=${options.domain}`;
+              if (options.sameSite)
+                cookieString += `; samesite=${options.sameSite}`;
+              if (options.secure) cookieString += '; secure';
+
+              document.cookie = cookieString;
+            } catch (error) {
+              console.error('[Auth] Cookie remove error:', error);
+            }
           },
         },
       }
@@ -257,7 +297,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('[Auth] Setting up onAuthStateChange listener...');
     let mounted = true;
-    let initializationAttempted = false;
+    let initializationTimeout: NodeJS.Timeout;
+
+    // Add timeout to prevent getting stuck
+    const setupInitializationTimeout = () => {
+      if (initializationTimeout) clearTimeout(initializationTimeout);
+      initializationTimeout = setTimeout(() => {
+        if (!state.isInitialized && mounted) {
+          console.warn('[Auth] Initialization timeout - forcing completion');
+          dispatch({
+            type: 'INITIALIZE',
+            payload: { user: null, profile: null, session: null },
+          });
+        }
+      }, 5000); // 5 second timeout
+    };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -266,102 +320,100 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log(`[Auth] onAuthStateChange event: ${event}`, {
           event,
           hasSession: !!session,
-          initializationAttempted,
-          currentState: {
-            isInitialized: state.isInitialized,
-            isLoading: state.isLoading,
-            isAuthenticated: state.isAuthenticated,
-          },
+          currentState: state,
         });
 
         const currentUser = session?.user ?? null;
 
-        // Always ensure initialization completes
-        const finalizeInitialization = (
-          user: User | null,
-          profile: UserProfile | null
-        ) => {
-          if (!mounted) return;
-          console.log('[Auth] Finalizing initialization:', {
-            hasUser: !!user,
-            hasProfile: !!profile,
-            hasSession: !!session,
-          });
-          dispatch({
-            type: 'INITIALIZE',
-            payload: {
-              user,
-              profile,
-              session,
-            },
-          });
-          initializationAttempted = true;
-        };
-
         try {
-          if (event === 'INITIAL_SESSION') {
-            console.log('[Auth] Initial session event, current state:', {
-              hasUser: !!state.user,
-              currentUser: !!currentUser,
-              isInitialized: state.isInitialized,
-            });
-
-            if (!initializationAttempted) {
-              if (!state.user && currentUser) {
+          switch (event) {
+            case 'INITIAL_SESSION':
+              if (currentUser) {
                 await fetchAndSetProfile(currentUser, session);
               } else {
-                finalizeInitialization(state.user, state.profile);
+                dispatch({
+                  type: 'INITIALIZE',
+                  payload: { user: null, profile: null, session: null },
+                });
               }
-            }
-          } else if (event === 'SIGNED_IN') {
-            console.log('[Auth] User signed in.');
-            if (currentUser) {
-              await fetchAndSetProfile(currentUser, session);
-            } else {
-              console.error(
-                '[Auth] SIGNED_IN event but no session/user found!'
-              );
+              break;
+
+            case 'SIGNED_IN':
+              if (currentUser) {
+                await fetchAndSetProfile(currentUser, session);
+              } else {
+                console.error(
+                  '[Auth] SIGNED_IN event but no session/user found!'
+                );
+                dispatch({ type: 'LOGOUT' });
+              }
+              break;
+
+            case 'SIGNED_OUT':
+              console.log('[Auth] User signed out.');
               dispatch({ type: 'LOGOUT' });
-            }
-          } else if (event === 'SIGNED_OUT') {
-            console.log('[Auth] User signed out.');
-            dispatch({ type: 'LOGOUT' });
-            router.push('/sign-in');
+              router.push('/sign-in');
+              break;
+
+            case 'USER_UPDATED':
+              if (currentUser) {
+                await fetchAndSetProfile(currentUser, session);
+              }
+              break;
           }
         } catch (error) {
           console.error('[Auth] Error handling auth state change:', error);
-          // Ensure initialization completes even on error
-          finalizeInitialization(null, null);
+          dispatch({
+            type: 'INITIALIZE',
+            payload: { user: null, profile: null, session: null },
+          });
         }
       }
     );
 
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
+    // Initial session check with timeout
+    setupInitializationTimeout();
 
-      console.log('[Auth] Initial session check:', {
-        hasSession: !!session,
-        initializationAttempted,
-      });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!mounted) return;
 
-      if (session?.user && !initializationAttempted) {
-        fetchAndSetProfile(session.user as User, session);
-      } else if (!session && !initializationAttempted) {
+        console.log('[Auth] Initial session check:', {
+          hasSession: !!session,
+          currentState: state,
+        });
+
+        if (session?.user) {
+          fetchAndSetProfile(session.user as User, session).catch((error) => {
+            console.error('[Auth] Error during initial profile fetch:', error);
+            dispatch({
+              type: 'INITIALIZE',
+              payload: { user: null, profile: null, session: null },
+            });
+          });
+        } else {
+          dispatch({
+            type: 'INITIALIZE',
+            payload: { user: null, profile: null, session: null },
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('[Auth] Error during initial session check:', error);
         dispatch({
           type: 'INITIALIZE',
           payload: { user: null, profile: null, session: null },
         });
-      }
-    });
+      });
 
-    // Cleanup listener on component unmount
     return () => {
       console.log('[Auth] Cleaning up auth listener.');
       mounted = false;
+      if (initializationTimeout) clearTimeout(initializationTimeout);
       authListener?.subscription.unsubscribe();
     };
-  }, [supabase, fetchAndSetProfile, router, state.user, state.profile]);
+  }, [supabase, fetchAndSetProfile, router, dispatch]);
 
   // --- Action Functions ---
 
