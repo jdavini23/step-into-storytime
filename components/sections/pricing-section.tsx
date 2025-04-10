@@ -97,7 +97,7 @@ export default function PricingSection() {
                   aria-hidden="true"
                 />
               }
-              accentColor="border-slate-200"
+              accentColor="border-slate-300"
               buttonColor="bg-slate-900 hover:bg-slate-800"
               isLoading={pricingState.isLoading === 'free'}
               onButtonClick={() => handlePricingButtonClick('free')}
