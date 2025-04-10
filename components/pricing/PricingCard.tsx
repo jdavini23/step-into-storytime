@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { PricingCardProps, FeatureKey } from '@/types/pricing';
@@ -28,7 +27,7 @@ export function PricingCard({
     <div
       role="listitem"
       aria-label={`${title} Plan`}
-      className={`rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 focus-within:ring-2 focus-within:ring-violet-500 ${
+      className={`rounded-2xl overflow-visible transition-all duration-300 hover:-translate-y-1 focus-within:ring-2 focus-within:ring-violet-500 ${
         highlighted ? 'ring-2 ring-violet-500 shadow-2xl' : 'shadow-xl'
       }`}
       tabIndex={0}
@@ -61,7 +60,7 @@ export function PricingCard({
           {features.map((feature, index) => (
             <li
               key={index}
-              className="flex items-center text-slate-700"
+              className="flex items-center text-slate-700 relative"
               role="listitem"
             >
               <div
@@ -70,18 +69,22 @@ export function PricingCard({
               >
                 <Star className="h-3 w-3 text-violet-600" fill="#7c3aed" />
               </div>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger className="text-left hover:text-violet-700 cursor-help">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-left hover:text-violet-700 cursor-help">
                     {feature}
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-sm">
-                      {FEATURE_DESCRIPTIONS[feature as FeatureKey]}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  className="z-50 bg-white px-3 py-2 rounded-lg shadow-lg border border-slate-200 max-w-[200px]"
+                >
+                  <p className="text-sm text-slate-700">
+                    {FEATURE_DESCRIPTIONS[feature as FeatureKey]}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </li>
           ))}
         </ul>
