@@ -1,12 +1,12 @@
-import Navbar from "@/components/navbar"
-import HeroSection from "@/components/sections/hero-section"
-import FeaturesSection from "@/components/sections/features-section"
-import HowItWorksSection from "@/components/sections/how-it-works-section"
-import StoriesSection from "@/components/sections/stories-section"
-import TestimonialsSection from "@/components/sections/testimonials-section"
-import PricingSection from "@/components/sections/pricing-section"
-import CtaSection from "@/components/sections/cta-section"
-import Footer from "@/components/sections/footer"
+import Navbar from '@/components/navbar/index';
+import HeroSection from '@/components/sections/hero-section';
+import FeaturesSection from '@/components/sections/features-section';
+import HowItWorksSection from '@/components/sections/how-it-works-section';
+import StoriesSection from '@/components/sections/stories-section';
+import TestimonialsSection from '@/components/sections/testimonials-section';
+import PricingSection from '@/components/sections/pricing-section';
+import CtaSection from '@/components/sections/cta-section';
+import Footer from '@/components/sections/footer';
 
 export default function HomePage() {
   return (
@@ -31,6 +31,5 @@ export default function HomePage() {
       <CtaSection />
       <Footer />
     </div>
-  )
+  );
 }
-

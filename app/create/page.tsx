@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/navbar';
+import Navbar from '@/components/navbar/index';
 import Footer from '@/components/sections/footer';
 import StoryWizard from '@/components/story-wizard/StoryWizard';
 import { StoryWizardHeader } from '@/components/story-wizard/StoryWizardHeader';
