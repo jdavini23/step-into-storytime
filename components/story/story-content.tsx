@@ -12,6 +12,11 @@ interface StoryContentProps {
   className?: string;
 }
 
+interface StoryContent {
+  en: string[] | string;
+  es: string[] | string;
+}
+
 export default function StoryContent({
   storyId,
   className,
@@ -70,15 +75,44 @@ function StoryDisplay({ className }: { className?: string }) {
       ? `Created by ${currentStory.character.name}'s family`
       : 'Anonymous');
 
-  const paragraphs =
-    typeof currentStory.content === 'string'
-      ? (currentStory.content as string).split('\n').filter(Boolean)
-      : Array.isArray(currentStory.content)
-      ? currentStory.content
-      : typeof currentStory.content === 'object' &&
-        (currentStory.content as any)?.en
-      ? (currentStory.content as any).en
-      : [];
+  let paragraphs: string[] = [];
+  const rawContent = currentStory.content;
+
+  // Helper function to split text into paragraphs
+  const splitIntoParagraphs = (text: string) => {
+    return text
+      .split(/\\n|\n/) // Split on both escaped and regular line breaks
+      .map((p) => p.trim())
+      .filter(Boolean);
+  };
+
+  // Handle potentially stringified content
+  if (typeof rawContent === 'string') {
+    try {
+      // Try to parse if it's a stringified object
+      const parsed = JSON.parse(rawContent) as StoryContent;
+      if (Array.isArray(parsed.en)) {
+        paragraphs = parsed.en.flatMap((text) =>
+          splitIntoParagraphs(text.toString())
+        );
+      } else if (typeof parsed.en === 'string') {
+        paragraphs = splitIntoParagraphs(parsed.en);
+      }
+    } catch (e) {
+      // If parsing fails, treat it as plain text
+      paragraphs = splitIntoParagraphs(rawContent);
+    }
+  } else if (typeof rawContent === 'object' && rawContent !== null) {
+    // Handle content that's already an object
+    const storyContent = rawContent as StoryContent;
+    if (Array.isArray(storyContent.en)) {
+      paragraphs = storyContent.en.flatMap((text) =>
+        splitIntoParagraphs(text.toString())
+      );
+    } else if (typeof storyContent.en === 'string') {
+      paragraphs = splitIntoParagraphs(storyContent.en);
+    }
+  }
 
   return (
     <div
@@ -189,6 +223,16 @@ function StoryIllustration({
 }
 
 function StoryText({ paragraphs }: { paragraphs: string[] }) {
+  // Split text into paragraphs based on line breaks and sentence structure
+  const formattedParagraphs = paragraphs.flatMap((paragraph) => {
+    // Split on line breaks first
+    return paragraph
+      .split(/\\n/) // Handle escaped line breaks
+      .flatMap((p) => p.split('\n')) // Handle regular line breaks
+      .map((p) => p.trim())
+      .filter(Boolean); // Remove empty strings
+  });
+
   return (
     <article
       className={cn(
@@ -199,7 +243,7 @@ function StoryText({ paragraphs }: { paragraphs: string[] }) {
         'transition-colors'
       )}
     >
-      {paragraphs.map((paragraph, index) => (
+      {formattedParagraphs.map((paragraph, index) => (
         <p
           key={index}
           className={cn(

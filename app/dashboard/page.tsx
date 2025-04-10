@@ -21,47 +21,54 @@ export default function DashboardPage() {
   const { state: authState, logout } = useAuth();
   const { state: storyState, fetchStories, deleteStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
+  // Handle authentication and story loading
   useEffect(() => {
-    console.log('[DEBUG] Dashboard useEffect:', {
-      authLoading: authState.isLoading,
-      authInitialized: authState.isInitialized,
-      authAuthenticated: authState.isAuthenticated,
-      storyLoading: storyState.loading,
-      storiesCount: storyState.stories.length,
-      isLoading,
-    });
+    let mounted = true;
 
-    // Check if user is authenticated
-    if (!authState.isLoading && !authState.isAuthenticated) {
-      console.log('[DEBUG] User not authenticated, redirecting to sign-in');
-      router.push('/sign-in');
-      setIsLoading(false);
-      return;
-    }
+    const initializeDashboard = async () => {
+      // Skip if already initialized or auth not ready
+      if (hasInitialized || !authState.isInitialized) return;
 
-    // Load stories only once when authenticated
-    if (authState.isAuthenticated && !storyState.loading && isLoading) {
-      const loadStories = async () => {
+      // Handle not authenticated case
+      if (!authState.isLoading && !authState.isAuthenticated) {
+        if (mounted) {
+          router.push('/sign-in');
+          setIsLoading(false);
+          setHasInitialized(true);
+        }
+        return;
+      }
+
+      // Handle authenticated case
+      if (authState.isAuthenticated && !storyState.loading) {
         try {
-          console.log('[DEBUG] Loading stories...');
           await fetchStories();
-          console.log('[DEBUG] Stories loaded successfully');
         } catch (error) {
           console.error('[DEBUG] Error fetching stories:', error);
         } finally {
-          setIsLoading(false);
+          if (mounted) {
+            setIsLoading(false);
+            setHasInitialized(true);
+          }
         }
-      };
+      }
+    };
 
-      loadStories();
-    }
+    initializeDashboard();
+
+    return () => {
+      mounted = false;
+    };
   }, [
-    authState.isAuthenticated,
+    authState.isInitialized,
     authState.isLoading,
+    authState.isAuthenticated,
+    storyState.loading,
     router,
     fetchStories,
-    storyState.loading,
+    hasInitialized,
   ]);
 
   const handleLogout = async () => {
@@ -83,21 +90,31 @@ export default function DashboardPage() {
     }
   };
 
-  if (authState.isLoading) {
+  // Loading state JSX
+  if (
+    !authState.isInitialized ||
+    authState.isLoading ||
+    (isLoading && !hasInitialized)
+  ) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mx-auto animate-pulse">
             <BookOpen className="h-4 w-4 text-white" />
           </div>
-          <p className="mt-4 text-slate-600">Initializing...</p>
+          <p className="mt-4 text-slate-600">
+            {authState.isLoading
+              ? 'Authenticating...'
+              : 'Loading your stories...'}
+          </p>
         </div>
       </div>
     );
   }
 
+  // Will redirect in useEffect
   if (!authState.isAuthenticated) {
-    return null; // Will redirect in useEffect
+    return null;
   }
 
   return (
@@ -216,7 +233,7 @@ export default function DashboardPage() {
                         variant="ghost"
                         size="sm"
                         className="text-slate-600"
-                        onClick={() => router.push(`/stories/${story.id}/edit`)}
+                        onClick={() => router.push(`/story/${story.id}/edit`)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>

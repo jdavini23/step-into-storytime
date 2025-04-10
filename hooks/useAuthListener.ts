@@ -5,12 +5,9 @@ import {
   AuthError,
   PostgrestError,
 } from '@supabase/supabase-js';
-import {
-  getSupabaseClient,
-  getUserProfile,
-  createUserProfile,
-} from '@/services/authService';
+import { getUserProfile, createUserProfile } from '@/services/authService';
 import { User, UserProfile, AuthAction } from '@/types/auth';
+import supabase from '@/lib/supabase/client';
 
 // Helper function adapted from auth-context (consider centralizing later)
 const fetchOrCreateUserProfile = async (
@@ -72,8 +69,8 @@ export const useAuthListener = (
   dispatch: Dispatch<AuthAction>,
   isContextInitialized: boolean
 ) => {
-  const supabase = getSupabaseClient();
   const hasInitializedRef = useRef(false);
+  const supabaseClient = supabase();
 
   // Define initializeAuth within the hook's scope or pass as arg if needed elsewhere
   const initializeAuth = useCallback(
@@ -112,7 +109,9 @@ export const useAuthListener = (
     console.log(`[DEBUG][${effectId}] Setting up auth listener`);
     let mounted = true;
 
-    const { data: subscription } = (supabase as any).auth.onAuthStateChange(
+    const {
+      data: { subscription },
+    } = supabaseClient.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) {
           console.log(
@@ -192,7 +191,7 @@ export const useAuthListener = (
     );
 
     // Initial session check - only if not already initialized
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
       if (session?.user && !hasInitializedRef.current) {
         console.log(
           `[DEBUG][${effectId}] Found existing session, initializing auth`
@@ -211,5 +210,5 @@ export const useAuthListener = (
       console.log(`[DEBUG][${effectId}] Cleaning up auth listener`);
       subscription.unsubscribe();
     };
-  }, [supabase, dispatch, initializeAuth, isContextInitialized]);
+  }, [supabaseClient, dispatch, initializeAuth, isContextInitialized]);
 };

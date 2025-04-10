@@ -1,63 +1,63 @@
 'use client';
 
-// Use Auth Helpers browser client for cookie-based sessions
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import type { Database } from '@/types/supabase';
-import type {
-  SupabaseClient,
-  AuthChangeEvent,
-  Session,
-} from '@supabase/supabase-js';
+import { createBrowserClient, CookieOptions } from '@supabase/ssr';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { Database } from '@/types/supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing required Supabase environment variables');
-}
-
-// Declare supabase variable, initialize only once
-let supabase: SupabaseClient<Database> | null = null;
+// Use a WeakMap to store the instance (better for garbage collection)
+const instanceMap = new WeakMap<typeof globalThis, SupabaseClient<Database>>();
 
 // Function to initialize and/or get the client instance
 function getSupabaseClientInstance(): SupabaseClient<Database> {
-  if (supabase) {
-    return supabase;
+  if (typeof window === 'undefined') {
+    throw new Error('Supabase client should only be used in the browser');
   }
 
-  // Create the client only if it doesn't exist (singleton pattern)
-  supabase = createPagesBrowserClient<Database>();
+  // Check if instance exists in WeakMap
+  if (instanceMap.has(globalThis)) {
+    return instanceMap.get(globalThis)!;
+  }
+  // Create the client with a single instance
+  const instance = createBrowserClient<Database>(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+    cookieOptions: {
+      name: 'sb-auth-token',
+      domain: process.env.NEXT_PUBLIC_DOMAIN,
+      path: '/',
+      sameSite: 'lax',
+      secure: true,
+    },
+  });
 
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  if (isDevelopment) {
-    console.log('[Supabase Client] Initialized Pages Browser Client');
+  // Store instance in WeakMap
+  instanceMap.set(globalThis, instance as any);
 
-    // Optional: Debug listener for auth state changes in development
-    supabase.auth.onAuthStateChange(
-      (event: AuthChangeEvent, session: Session | null) => {
-        console.log('[Supabase Client] Auth state changed:', {
-          event,
-          hasSession: !!session,
-          timestamp: new Date().toISOString(),
-          host:
-            typeof window !== 'undefined' ? window.location.hostname : 'server',
-        });
-      }
-    );
+  if (process.env.NODE_ENV === 'development') {
+    // Add auth state listener only in development
+    instance.auth.onAuthStateChange((event, session) => {
+      console.log('[Supabase Client] Auth state changed:', {
+        event,
+        hasSession: !!session,
+        timestamp: new Date().toISOString(),
+        host: window.location.hostname,
+      });
+    });
   }
 
-  return supabase;
+  return instance as SupabaseClient<Database, 'public', any>;
 }
 
-// Export a function to get the client, ensuring initialization
-export const getClient = (): SupabaseClient<Database> => {
+// Export a function to get the client
+export const getClient = (): SupabaseClient<Database, 'public', any> => {
   return getSupabaseClientInstance();
 };
 
-// You might still want a direct export for convenience in some cases,
-// but ensure it gets initialized correctly.
-// const browserClient = getSupabaseClientInstance();
-// export default browserClient;
-
-// Consider exporting only the getter function for safety:
+// Export only the getter function
 export default getClient;

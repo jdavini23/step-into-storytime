@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
-import { createBrowserClient } from '@supabase/ssr';
+import { createBrowserClient, CookieOptions } from '@supabase/ssr';
 import {
   AuthError,
   Provider as SupabaseProvider, // Renamed to avoid conflict with React Provider
@@ -30,6 +30,8 @@ import {
   updateUserProfileData, // Assuming you might need this
 } from '@/services/authService';
 import { User, UserProfile } from '@/types/auth';
+import { cookieManager } from '@/lib/cookies';
+import { handleAuthError } from '@/lib/error-handler';
 
 // Define auth state type
 interface AuthState {
@@ -139,171 +141,141 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
   }
 }
 
+// Create Supabase client with cookie handling
+const createClient = () =>
+  createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: cookieManager,
+    }
+  );
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const router = useRouter();
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Create the Supabase client instance using @supabase/ssr for browser
-  const [supabase] = useState(() =>
-    createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  );
+  const [supabase] = useState(() => createClient());
 
-  // --- Profile Fetching Logic ---
-  const fetchAndSetProfile = useCallback(
-    async (user: SupabaseUser | null, session: Session | null) => {
-      if (!user) {
-        console.log('[Auth] No user, skipping profile fetch.');
-        dispatch({
-          type: 'SET_USER_AND_PROFILE',
-          payload: { user: null, profile: null, session: null },
-        });
-        return;
-      }
-
-      console.log(`[Auth] User found (ID: ${user.id}). Fetching profile...`);
-      dispatch({ type: 'SET_LOADING', payload: true });
-      try {
-        const { profile, error: profileError } = await getUserProfile(user.id);
-
-        if (profileError) {
-          console.error('[Auth] Error fetching profile:', profileError.message);
-          // Don't set an error state here, maybe the profile just doesn't exist yet
-          dispatch({
-            type: 'SET_USER_AND_PROFILE',
-            payload: { user: user as User, profile: null, session },
-          });
-          // Optionally: Attempt profile creation if it doesn't exist (e.g., after sign-up)
-          // Consider if this logic belongs here or should be triggered elsewhere
-          // if (!profile && session) { // Only create if profile is null and session exists
-          //     console.log('[Auth] Profile not found, attempting creation...');
-          //     await createUserProfile(user as User);
-          //     // Re-fetch profile after creation attempt - recursive call risk, handle carefully
-          // }
-          return;
-        }
-
-        if (!profile) {
-          console.warn(
-            `[Auth] Profile not found for user ${user.id}, but no error was returned. Attempting to create.`
-          );
-          const { profile: newProfile, error: createError } =
-            await createUserProfile(user as User);
-          if (createError) {
-            console.error(
-              '[Auth] Failed to create missing profile:',
-              createError.message
-            );
-            dispatch({
-              type: 'SET_USER_AND_PROFILE',
-              payload: { user: user as User, profile: null, session },
-            });
-          } else {
-            console.log('[Auth] Successfully created missing profile.');
-            dispatch({
-              type: 'SET_USER_AND_PROFILE',
-              payload: { user: user as User, profile: newProfile, session },
-            });
-          }
-        } else {
-          console.log('[Auth] Profile fetched successfully:', profile);
-          dispatch({
-            type: 'SET_USER_AND_PROFILE',
-            payload: { user: user as User, profile, session },
-          });
-        }
-      } catch (error) {
-        console.error(
-          '[Auth] Unexpected error during profile fetch/creation:',
-          error
-        );
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Failed to load user profile.',
-        });
-        // Keep user but clear profile on unexpected error
-        dispatch({
-          type: 'SET_USER_AND_PROFILE',
-          payload: { user: user as User, profile: null, session },
-        });
-      }
-    },
-    [dispatch]
-  ); // Add dependencies
-
-  // --- Auth State Change Listener ---
+  // Initialize auth state
   useEffect(() => {
-    console.log('[Auth] Setting up onAuthStateChange listener...');
+    let mounted = true;
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log(`[Auth] onAuthStateChange event: ${event}`, session);
+    const initializeAuth = async () => {
+      if (!isInitializing) return;
 
-        const currentUser = session?.user ?? null;
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
 
-        if (event === 'INITIAL_SESSION') {
-          console.log('[Auth] Initial session event.');
-          // Check if user exists from potential server-side render
-          // If not, fetch profile based on session
-          if (!state.user && currentUser) {
-            await fetchAndSetProfile(currentUser, session);
-          } else {
-            // If user exists in state or no session, finalize initialization
+        if (session?.user) {
+          const { profile, error: profileError } = await getUserProfile(
+            session.user.id
+          );
+          if (profileError) throw profileError;
+
+          if (mounted) {
             dispatch({
               type: 'INITIALIZE',
               payload: {
-                user: state.user,
-                profile: state.profile,
-                session: state.session,
+                user: session.user as User,
+                profile: profile || null,
+                session,
               },
             });
           }
-        } else if (event === 'SIGNED_IN') {
-          console.log('[Auth] User signed in.');
-          if (currentUser) {
-            await fetchAndSetProfile(currentUser, session);
-          } else {
-            console.error('[Auth] SIGNED_IN event but no session/user found!');
-            dispatch({ type: 'LOGOUT' }); // Treat as logout if no user
-          }
-        } else if (event === 'SIGNED_OUT') {
-          console.log('[Auth] User signed out.');
-          dispatch({ type: 'LOGOUT' });
-          // Redirect to sign-in page after logout
-          router.push('/sign-in');
-        } else if (event === 'PASSWORD_RECOVERY') {
-          console.log('[Auth] Password recovery event.');
-          // Handle password recovery event if needed (e.g., redirect to update password page)
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log('[Auth] Token refreshed.');
-          // Update session state if necessary, though @supabase/ssr handles cookie refresh
-          if (session) {
+        } else {
+          if (mounted) {
             dispatch({
-              type: 'SET_USER_AND_PROFILE',
-              payload: { user: state.user, profile: state.profile, session },
+              type: 'INITIALIZE',
+              payload: { user: null, profile: null, session: null },
             });
           }
-        } else if (event === 'USER_UPDATED') {
-          console.log('[Auth] User updated.');
-          // User metadata might have changed, re-fetch profile
-          if (currentUser) {
-            await fetchAndSetProfile(currentUser, session);
-          } else {
-            dispatch({ type: 'LOGOUT' }); // If user becomes null after update?
-          }
+        }
+      } catch (error) {
+        console.error('[Auth] Initialization error:', error);
+        if (mounted) {
+          dispatch({
+            type: 'INITIALIZE',
+            payload: { user: null, profile: null, session: null },
+          });
+        }
+      } finally {
+        if (mounted) {
+          setIsInitializing(false);
         }
       }
-    );
-
-    // Cleanup listener on component unmount
-    return () => {
-      console.log('[Auth] Cleaning up auth listener.');
-      authListener?.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, fetchAndSetProfile, router]); // Add router to dependencies
+
+    // Set up auth state change listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted || isInitializing) return;
+
+      // Skip if we're already in the correct state
+      if (
+        (event === 'SIGNED_IN' &&
+          state.isAuthenticated &&
+          state.session?.user?.id === session?.user?.id) ||
+        (event === 'SIGNED_OUT' && !state.isAuthenticated)
+      ) {
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        try {
+          const { profile, error: profileError } = await getUserProfile(
+            session.user.id
+          );
+          if (profileError) throw profileError;
+
+          if (mounted) {
+            dispatch({
+              type: 'SET_USER_AND_PROFILE',
+              payload: {
+                user: session.user as User,
+                profile: profile || null,
+                session,
+              },
+            });
+          }
+        } catch (error) {
+          console.error('[Auth] Error fetching profile:', error);
+          if (mounted) {
+            dispatch({
+              type: 'SET_USER_AND_PROFILE',
+              payload: {
+                user: session.user as User,
+                profile: null,
+                session,
+              },
+            });
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        if (mounted) {
+          dispatch({ type: 'LOGOUT' });
+        }
+      }
+    });
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [
+    supabase,
+    isInitializing,
+    state.isAuthenticated,
+    state.session?.user?.id,
+  ]);
 
   // --- Action Functions ---
 
@@ -478,7 +450,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [state.user, state.session, dispatch, handleError]
   );
 
-  // Memoize the context value
+  // Memoize the context value to prevent unnecessary re-renders
   const contextValue = React.useMemo(
     () => ({
       state,

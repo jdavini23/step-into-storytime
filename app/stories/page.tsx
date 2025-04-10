@@ -14,11 +14,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import type { Story, StoryData } from '@/lib/types';
+import type { Story } from '@/contexts/story-context';
 
 export default function StoriesPage() {
   const router = useRouter();
-  const [stories, setStories] = useState<StoryData[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
   const [deleteStoryId, setDeleteStoryId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -64,8 +64,8 @@ export default function StoriesPage() {
     fetchStories();
   }, []);
 
-  const handleEdit = (story: StoryData) => {
-    router.push(`/stories/${story.id}/edit`);
+  const handleEdit = (story: Story) => {
+    router.push(`/story/${story.id}/edit`);
   };
 
   const handleDelete = async (storyId: string) => {
@@ -88,11 +88,10 @@ export default function StoriesPage() {
     setDeleteStoryId(null);
   };
 
-  const handleShare = async (story: StoryData) => {
+  const handleShare = async (story: Story) => {
     try {
-      // For now, just copy the URL to clipboard
       await navigator.clipboard.writeText(
-        `${window.location.origin}/stories/${story.id}`
+        `${window.location.origin}/story/${story.id}`
       );
       toast.success('Story link copied to clipboard');
     } catch (error) {
@@ -122,8 +121,8 @@ export default function StoriesPage() {
     }
   };
 
-  const handleSelect = (story: StoryData) => {
-    router.push(`/stories/${story.id}`);
+  const handleSelect = (story: Story) => {
+    router.push(`/story/${story.id}`);
   };
 
   if (isLoading) {

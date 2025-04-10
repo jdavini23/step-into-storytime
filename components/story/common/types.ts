@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { StoryBranch } from '@/contexts/story-context';
 
 export type ParagraphType = 'paragraph' | 'heading1' | 'heading2' | 'heading3';
 export type FontSize = 'small' | 'medium' | 'large';
@@ -58,6 +59,8 @@ export interface Story {
   created_at: string;
   updated_at: string;
   thumbnail_url?: string | null;
+  branches?: Record<string, StoryBranch>;
+  currentBranchId?: string;
 }
 
 export interface StoryParagraph {

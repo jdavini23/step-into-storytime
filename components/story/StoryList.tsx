@@ -10,6 +10,7 @@ import {
 import { Story } from './common/types';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreVertical, Edit, Trash, Share, Star } from 'lucide-react';
+import { useRouter } from 'next/router';
 
 interface StoryListProps {
   stories: Story[];
@@ -44,6 +45,7 @@ export function StoryList({
   const [favoriteStories, setFavoriteStories] = useState<Set<string>>(
     new Set()
   );
+  const router = useRouter();
 
   const toggleFavorite = (storyId: string) => {
     const newFavorites = new Set(favoriteStories);
@@ -55,6 +57,10 @@ export function StoryList({
       onFavorite(storyId, true);
     }
     setFavoriteStories(newFavorites);
+  };
+
+  const handleSelect = (story: Story) => {
+    router.push(`/story/${story.id}`);
   };
 
   return (
@@ -76,7 +82,7 @@ export function StoryList({
           <Card
             key={story.id || 'temp-id'}
             className="p-4 hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => story.id && onSelect(story)}
+            onClick={() => story.id && handleSelect(story)}
           >
             <div className="flex justify-between items-start">
               <div className="space-y-1">

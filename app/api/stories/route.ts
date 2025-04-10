@@ -132,8 +132,12 @@ export async function POST(request: NextRequest) {
         title: json.title || 'Untitled Story',
         content:
           typeof json.content === 'string'
-            ? json.content
-            : JSON.stringify(json.content),
+            ? { en: json.content.split('\n').filter(Boolean), es: [] }
+            : typeof json.content === 'object'
+            ? json.content.en
+              ? json.content
+              : { en: [String(json.content)], es: [] }
+            : { en: [String(json.content)], es: [] },
         character: json.character,
         setting: json.setting,
         theme: json.theme,

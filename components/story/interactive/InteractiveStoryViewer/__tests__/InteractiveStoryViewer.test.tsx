@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import InteractiveStoryViewer from '../index';
-import { StoryData } from '@/components/story/common/types';
+import { StoryData } from '@/lib/types';
 
 // Mock the speech synthesis API
 const mockSpeechSynthesis = {
@@ -28,7 +28,6 @@ const now = new Date().toISOString();
 const mockStory: StoryData = {
   id: '1',
   title: 'Test Story',
-  description: 'A test story for unit testing',
   content: {
     en: [
       'Page one content.',
@@ -41,36 +40,18 @@ const mockStory: StoryData = {
       'Contenido de la página tres.',
     ],
   },
-  mainCharacter: {
+  character: {
     name: 'Test Character',
-    age: '8',
-    traits: ['brave', 'curious'],
-    appearance: 'Test appearance',
+    description: 'Test appearance',
   },
   setting: 'Test setting',
   theme: 'Test theme',
-  plotElements: [],
-  targetAge: 8,
-  readingLevel: 'intermediate',
-  createdAt: now,
-  updatedAt: now,
-  metadata: {
-    targetAge: 8,
-    difficulty: 'medium',
-    theme: 'adventure',
-    setting: 'forest',
-    createdAt: now,
-    updatedAt: now,
-    wordCount: 100,
-    readingTime: 5,
-  },
-  accessibility: {
-    contrast: 'normal',
-    motionReduced: false,
-    fontSize: 'medium',
-    lineHeight: 1.5,
-  },
-  userId: '',
+  plot_elements: [],
+  created_at: now,
+  updated_at: now,
+  user_id: '',
+  is_published: true,
+  thumbnail_url: null,
 };
 
 describe('InteractiveStoryViewer', () => {
