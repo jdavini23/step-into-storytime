@@ -1,5 +1,22 @@
 import type { ConversationState } from './types';
-import { SETTINGS, THEMES } from '@/lib/story-options';
+import { z } from 'zod';
+import {
+  characterSchema,
+  settingSchema,
+  themeSchema,
+  lengthSchema,
+  type StoryData,
+} from '@/lib/types';
+
+// Story data validation schema
+const storyDataSchema = z.object({
+  character: characterSchema,
+  setting: settingSchema,
+  theme: themeSchema,
+  length: lengthSchema,
+});
+
+type ValidatedStoryData = z.infer<typeof storyDataSchema>;
 
 export async function generateStory(
   currentState: ConversationState,
@@ -17,18 +34,17 @@ export async function generateStory(
     setIsGenerating(true);
     const { storyData } = currentState;
 
+    // Validate story data before sending
+    const validatedData = storyDataSchema.parse(
+      storyData
+    ) as ValidatedStoryData;
+
     const payload = {
-      title: `${storyData.character?.name}'s ${
-        SETTINGS.find((s) => s.id === storyData.setting)?.title || 'Adventure'
-      }`,
-      character: {
-        name: storyData.character?.name || '',
-        age: storyData.character?.age || '',
-        traits: storyData.character?.traits || [],
-      },
-      setting: SETTINGS.find((s) => s.id === storyData.setting)?.id || '',
-      theme: THEMES.find((t) => t.id === storyData.theme)?.id || '',
-      plotElements: [],
+      title: `${validatedData.character.name}'s Adventure in the ${validatedData.setting}`,
+      character: validatedData.character,
+      setting: validatedData.setting,
+      theme: validatedData.theme,
+      length: validatedData.length,
     };
 
     const response = await fetch('/api/generate-story/', {
@@ -44,24 +60,15 @@ export async function generateStory(
 
     const data = await response.json();
 
-    // Create story in Supabase
-    const selectedSetting = SETTINGS.find((s) => s.id === storyData.setting);
-    const selectedTheme = THEMES.find((t) => t.id === storyData.theme);
-
+    // Create story in database
     const storyPayload = {
       id: crypto.randomUUID(),
-      title: `${storyData.character?.name}'s ${
-        selectedSetting?.title || 'Adventure'
-      }`,
+      title: payload.title,
       content: JSON.stringify(data.content),
-      character: {
-        name: storyData.character?.name || '',
-        age: storyData.character?.age || '',
-        traits: storyData.character?.traits || [],
-      },
-      setting: selectedSetting?.id,
-      theme: selectedTheme?.id,
-      plot_elements: [],
+      character: validatedData.character,
+      setting: validatedData.setting,
+      theme: validatedData.theme,
+      length: validatedData.length,
       is_published: false,
       user_id: authState.user?.id,
       thumbnail_url: null,

@@ -1,61 +1,80 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { themeSchema } from '@/lib/types';
+
+const SUGGESTED_THEMES = [
+  'Friendship',
+  'Adventure',
+  'Discovery',
+  'Courage',
+  'Kindness',
+  'Magic',
+  'Family',
+  'Learning',
+  'Teamwork',
+  'Imagination',
+] as const;
 
 interface ThemeStepProps {
-  selectedTheme: string;
+  theme: string;
   onThemeChange: (theme: string) => void;
+  onValidationError?: (error: string) => void;
 }
 
-const THEMES = [
-  {
-    id: 'friendship',
-    title: 'Friendship',
-    description: 'A story about making friends and working together.',
-  },
-  {
-    id: 'courage',
-    title: 'Courage',
-    description: 'A story about being brave and facing your fears.',
-  },
-  {
-    id: 'discovery',
-    title: 'Discovery',
-    description: 'A story about exploring and learning new things.',
-  },
-  {
-    id: 'kindness',
-    title: 'Kindness',
-    description: 'A story about helping others and showing compassion.',
-  },
-];
+export function ThemeStep({
+  theme,
+  onThemeChange,
+  onValidationError,
+}: ThemeStepProps) {
+  const validateAndUpdate = (value: string) => {
+    try {
+      const validated = themeSchema.parse(value);
+      onThemeChange(validated);
+    } catch (error) {
+      if (error instanceof Error && onValidationError) {
+        onValidationError(error.message);
+      }
+    }
+  };
 
-export function ThemeStep({ selectedTheme, onThemeChange }: ThemeStepProps) {
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Choose a Theme</h2>
-      <p className="text-muted-foreground">
-        What message should the story convey?
-      </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {THEMES.map((theme) => (
-          <Card
-            key={theme.id}
-            className={cn(
-              'p-4 cursor-pointer transition-colors',
-              selectedTheme === theme.id
-                ? 'border-primary bg-primary/5'
-                : 'hover:border-primary/50'
-            )}
-            onClick={() => onThemeChange(theme.id)}
-          >
-            <h3 className="font-semibold">{theme.title}</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {theme.description}
-            </p>
-          </Card>
-        ))}
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Choose Your Theme</h2>
+        <p className="text-muted-foreground">
+          What is the main message or feeling of your story?
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="theme">Story Theme</Label>
+          <Input
+            id="theme"
+            value={theme}
+            onChange={(e) => validateAndUpdate(e.target.value)}
+            placeholder="Enter a theme..."
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm">Suggested Themes:</Label>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTED_THEMES.map((suggestedTheme) => (
+              <Badge
+                key={suggestedTheme}
+                variant="outline"
+                className="cursor-pointer hover:bg-secondary"
+                onClick={() => validateAndUpdate(suggestedTheme)}
+              >
+                {suggestedTheme}
+              </Badge>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

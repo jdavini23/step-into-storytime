@@ -11,7 +11,8 @@ interface StoryPreviewProps {
 }
 
 export function StoryPreview({ storyData, className }: StoryPreviewProps) {
-  const hasCharacter = storyData.name && storyData.traits?.length;
+  const hasCharacter =
+    storyData.character?.name && storyData.character?.traits?.length;
   const hasSetting = storyData.setting;
   const hasTheme = storyData.theme;
 
@@ -19,13 +20,17 @@ export function StoryPreview({ storyData, className }: StoryPreviewProps) {
     <Card className={cn('p-6 space-y-4', className)}>
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Story Preview</h3>
-        <Button variant="ghost" size="icon" disabled={!storyData.name}>
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={!storyData.character?.name}
+        >
           <Volume2 className="h-4 w-4" />
         </Button>
       </div>
 
       <div className="space-y-4 min-h-[200px]">
-        {storyData.name && storyData.traits?.length && (
+        {storyData.character?.name && storyData.character?.traits?.length && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -33,10 +38,10 @@ export function StoryPreview({ storyData, className }: StoryPreviewProps) {
           >
             <h4 className="font-medium">Our Hero</h4>
             <p className="text-muted-foreground">
-              Meet {storyData.name}
-              {storyData.traits &&
-                storyData.traits.length > 0 &&
-                `, who is ${storyData.traits.join(' and ')}`}
+              Meet {storyData.character.name}
+              {storyData.character.traits &&
+                storyData.character.traits.length > 0 &&
+                `, who is ${storyData.character.traits.join(' and ')}`}
               .
             </p>
           </motion.div>
@@ -75,7 +80,7 @@ export function StoryPreview({ storyData, className }: StoryPreviewProps) {
         )}
       </div>
 
-      {storyData.name && (
+      {storyData.character?.name && (
         <div className="pt-4 border-t">
           <Button
             className="w-full"

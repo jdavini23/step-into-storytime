@@ -1,7 +1,7 @@
 'use client';
 
 import { ChatContainer } from '../chat/ChatContainer';
-import type { Story } from '../story/common/types';
+import type { Story } from '@/lib/types';
 import { ConversationProvider } from '@/contexts/conversation-context';
 
 interface StoryWizardProps {

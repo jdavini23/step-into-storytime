@@ -1,19 +1,14 @@
-import type { Story } from '@/components/story/common/types';
+import { Story, StoryData } from '@/lib/types';
+import { type StepId } from '@/lib/story-steps';
 
-export type MessageType = 'system' | 'user' | 'assistant' | 'option';
+export type MessageType = 'user' | 'assistant' | 'system' | 'option';
 
 export interface Message {
   id: string;
   type: MessageType;
-  content: string | React.ReactNode;
-  timestamp: number;
-  error?: boolean;
-  severity?: 'error' | 'warning' | 'info';
-  avatar?: string;
-  reactions?: string[];
-  status?: 'sent' | 'delivered' | 'seen';
-  options?: ChatOption[];
-  metadata?: Record<string, any>;
+  content: string;
+  quickReplies?: string[];
+  timestamp?: number;
 }
 
 export interface ChatOption {
@@ -24,44 +19,26 @@ export interface ChatOption {
   disabled?: boolean;
 }
 
-export type ConversationStep =
-  | 'welcome'
-  | 'character_name'
-  | 'character_age'
-  | 'character_traits'
-  | 'setting'
-  | 'theme'
-  | 'plot_elements'
-  | 'length'
-  | 'preview'
-  | 'complete';
-
-export interface StoryData {
-  mainCharacter: {
-    name: string;
-    age: string;
-    traits: string[];
-  };
-  setting: string;
-  theme: string;
-  plotElements: string[];
-  length: 'short' | 'medium' | 'long';
-}
-
 export interface ConversationState {
   messages: Message[];
-  currentStep: ConversationStep;
-  storyData: Partial<StoryData>;
+  currentStep: StepId;
+  storyData: StoryData;
   isTyping: boolean;
   error: string | null;
 }
+
+export type ConversationAction =
+  | { type: 'ADD_MESSAGE'; payload: Message }
+  | { type: 'SET_CURRENT_STEP'; payload: StepId }
+  | { type: 'UPDATE_STORY_DATA'; payload: Partial<StoryData> }
+  | { type: 'SET_TYPING'; payload: boolean };
 
 export interface ConversationContextType {
   state: ConversationState;
   sendMessage: (content: string | ChatOption) => void;
   selectOption: (option: ChatOption) => void;
   resetConversation: () => void;
-  goToStep: (step: ConversationStep) => void;
+  goToStep: (step: StepId) => void;
 }
 
 export interface ChatContainerProps {

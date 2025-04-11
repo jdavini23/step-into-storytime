@@ -6,11 +6,16 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
-import { ChatQuickReplies } from './ChatQuickReplies';
+import {
+  QuickReplies,
+  STORY_QUICK_REPLIES,
+  type QuickReplyOption,
+} from '@/components/shared/QuickReplies';
 import { ChatProgress } from './ChatProgress';
 import { StoryPreview } from '../preview/StoryPreview';
 import { useConversation } from '@/contexts/conversation-context';
 import { cn } from '@/lib/utils';
+import { type StepId } from '@/lib/story-steps';
 
 // Constants for styling
 const CHAT_CONTAINER_STYLES = {
@@ -22,13 +27,8 @@ const CHAT_CONTAINER_STYLES = {
 // Custom hook for managing preview state
 function usePreviewToggle() {
   const [showPreview, setShowPreview] = useState(false);
-
   const togglePreview = () => setShowPreview((prev) => !prev);
-
-  return {
-    showPreview,
-    togglePreview,
-  };
+  return { showPreview, togglePreview };
 }
 
 // Separate component for the preview toggle button
@@ -70,6 +70,12 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const { showPreview, togglePreview } = usePreviewToggle();
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Get quick replies for current step
+  const getQuickReplies = (): QuickReplyOption[] => {
+    const stepKey = state.currentStep as keyof typeof STORY_QUICK_REPLIES;
+    return STORY_QUICK_REPLIES[stepKey] || [];
+  };
+
   // Handlers
   const handleSend = async (message: string) => {
     try {
@@ -77,10 +83,17 @@ export function ChatContainer({ className }: ChatContainerProps) {
       await sendMessage(message);
     } catch (error) {
       console.error('Failed to send message:', error);
-      // You might want to show an error toast or message here
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleQuickReplySelect = (option: QuickReplyOption) => {
+    selectOption({
+      id: option.id,
+      label: option.label,
+      value: option.value,
+    });
   };
 
   // Render helpers
@@ -98,9 +111,11 @@ export function ChatContainer({ className }: ChatContainerProps) {
 
       {/* Input section */}
       <div className={CHAT_CONTAINER_STYLES.footer}>
-        <ChatQuickReplies
-          currentStep={state.currentStep}
-          onSelect={selectOption}
+        <QuickReplies
+          options={getQuickReplies()}
+          onSelect={handleQuickReplySelect}
+          variant="ghost"
+          animated={true}
         />
         <ChatInput onSend={handleSend} isGenerating={isGenerating} />
       </div>
@@ -109,7 +124,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
 
   const renderSidebar = () => (
     <div className="hidden xl:block xl:col-span-3">
-      <ChatProgress currentStep={state.currentStep} />
+      <ChatProgress currentStep={state.currentStep as StepId} />
       {showPreview && state.currentStep === 'preview' && (
         <div className="mt-8">
           <StoryPreview storyData={state.storyData} />

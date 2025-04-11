@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Story } from '@/components/story/common/types';
+import type { Story } from '@/lib/types';
 
 export default function CreateStoryPage() {
   const router = useRouter();

@@ -1,10 +1,10 @@
 import type {
   Message,
-  ConversationStep,
   ConversationState,
   ChatOption,
-  StoryData,
 } from '@/components/chat/types';
+import { type StepId } from '@/lib/story-steps';
+import { type StoryData } from '@/lib/types';
 import { SETTINGS, THEMES, LENGTH_OPTIONS } from './story-options';
 
 export const WELCOME_MESSAGE = {
@@ -18,37 +18,29 @@ export const WELCOME_MESSAGE = {
   ],
 };
 
-const STEP_MESSAGES: Record<ConversationStep, string> = {
+const STEP_MESSAGES: Record<StepId, string> = {
   welcome: '✨ Hi! Ready to create a magical bedtime story together?',
-  character_name: "📝 First, tell me the name of our story's hero!",
-  character_age: '🎂 And how many birthdays has our hero celebrated?',
-  character_traits:
-    '🌟 What makes our hero special? Pick some magical qualities!',
+  character: "📝 First, tell me the name of our story's hero!",
   setting: "🗺️ Now, let's pick a magical place for our story!",
   theme: '💫 What kind of magical adventure should we create?',
-  plot_elements:
-    "✨ Let's add some extra magic! What special elements should we include?",
   length: '📚 How long should our magical tale be?',
   preview:
     "🎭 Here's a preview of our story! Would you like to make any changes?",
   complete: '✨ Your magical story is ready!',
 };
 
-const NEXT_STEPS: Record<ConversationStep, ConversationStep> = {
-  welcome: 'character_name',
-  character_name: 'character_age',
-  character_age: 'character_traits',
-  character_traits: 'setting',
+const NEXT_STEPS: Record<StepId, StepId> = {
+  welcome: 'character',
+  character: 'setting',
   setting: 'theme',
-  theme: 'plot_elements',
-  plot_elements: 'length',
+  theme: 'length',
   length: 'preview',
   preview: 'complete',
   complete: 'complete',
 };
 
 export function generateResponse(
-  step: ConversationStep,
+  step: StepId,
   state: ConversationState
 ): Message {
   return {
@@ -59,23 +51,19 @@ export function generateResponse(
   };
 }
 
-export function determineNextStep(state: ConversationState): ConversationStep {
+export function determineNextStep(state: ConversationState): StepId {
   return NEXT_STEPS[state.currentStep];
 }
 
 export function validateInput(
-  step: ConversationStep,
+  step: StepId,
   input: string | ChatOption
 ): boolean {
   switch (step) {
-    case 'character_name':
+    case 'character':
       return typeof input === 'string' && input.trim().length > 0;
-    case 'character_age':
-      return typeof input === 'string' && /^\d+$/.test(input.trim());
-    case 'character_traits':
     case 'setting':
     case 'theme':
-    case 'plot_elements':
     case 'length':
       return typeof input !== 'string';
     default:
@@ -85,7 +73,7 @@ export function validateInput(
 
 export function processUserInput(
   input: string | ChatOption,
-  step: ConversationStep,
+  step: StepId,
   state: ConversationState
 ): Partial<ConversationState> {
   if (!validateInput(step, input)) {
@@ -100,38 +88,19 @@ export function processUserInput(
   };
 
   const currentStoryData = state.storyData;
-  const mainCharacter = currentStoryData.mainCharacter || {
+  const character = currentStoryData.character || {
     name: '',
-    age: '',
+    age: 0,
     traits: [],
   };
 
   switch (step) {
-    case 'character_name':
+    case 'character':
       updates.storyData = {
         ...currentStoryData,
-        mainCharacter: {
-          ...mainCharacter,
+        character: {
+          ...character,
           name: input as string,
-        },
-      };
-      break;
-    case 'character_age':
-      updates.storyData = {
-        ...currentStoryData,
-        mainCharacter: {
-          ...mainCharacter,
-          age: input as string,
-        },
-      };
-      break;
-    case 'character_traits':
-      const option = input as ChatOption;
-      updates.storyData = {
-        ...currentStoryData,
-        mainCharacter: {
-          ...mainCharacter,
-          traits: [...mainCharacter.traits, option.value],
         },
       };
       break;
@@ -145,15 +114,6 @@ export function processUserInput(
       updates.storyData = {
         ...currentStoryData,
         theme: (input as ChatOption).value,
-      };
-      break;
-    case 'plot_elements':
-      updates.storyData = {
-        ...currentStoryData,
-        plotElements: [
-          ...(currentStoryData.plotElements || []),
-          (input as ChatOption).value,
-        ],
       };
       break;
     case 'length':

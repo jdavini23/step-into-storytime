@@ -5,41 +5,40 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-
-interface Character {
-  name: string;
-  age: string;
-  traits: string[];
-}
+import { type Character, characterSchema } from '@/lib/types';
+import { SUGGESTED_TRAITS } from '@/lib/story-steps';
 
 interface CharacterStepProps {
   character: Character;
   onCharacterChange: (character: Character) => void;
+  onValidationError?: (error: string) => void;
 }
-
-const SUGGESTED_TRAITS = [
-  'Brave',
-  'Curious',
-  'Kind',
-  'Creative',
-  'Funny',
-  'Smart',
-  'Adventurous',
-  'Caring',
-  'Determined',
-  'Friendly',
-];
 
 export function CharacterStep({
   character,
   onCharacterChange,
+  onValidationError,
 }: CharacterStepProps) {
   const [newTrait, setNewTrait] = useState('');
 
+  const validateAndUpdate = (
+    updatedCharacter: Omit<Character, 'age'> & { age: string }
+  ) => {
+    try {
+      const validated = characterSchema.parse(updatedCharacter);
+      onCharacterChange(validated);
+    } catch (error) {
+      if (error instanceof Error && onValidationError) {
+        onValidationError(error.message);
+      }
+    }
+  };
+
   const addTrait = (trait: string) => {
     if (trait && !character.traits.includes(trait)) {
-      onCharacterChange({
+      validateAndUpdate({
         ...character,
+        age: String(character.age),
         traits: [...character.traits, trait],
       });
     }
@@ -47,8 +46,9 @@ export function CharacterStep({
   };
 
   const removeTrait = (trait: string) => {
-    onCharacterChange({
+    validateAndUpdate({
       ...character,
+      age: String(character.age),
       traits: character.traits.filter((t) => t !== trait),
     });
   };
@@ -69,7 +69,11 @@ export function CharacterStep({
             id="name"
             value={character.name}
             onChange={(e) =>
-              onCharacterChange({ ...character, name: e.target.value })
+              validateAndUpdate({
+                ...character,
+                name: e.target.value,
+                age: String(character.age),
+              })
             }
             placeholder="Enter character name"
           />
@@ -84,7 +88,7 @@ export function CharacterStep({
             max="12"
             value={character.age}
             onChange={(e) =>
-              onCharacterChange({ ...character, age: e.target.value })
+              validateAndUpdate({ ...character, age: e.target.value })
             }
             placeholder="Enter age (1-12)"
           />

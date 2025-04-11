@@ -4,69 +4,61 @@ import { Card } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-
-interface StoryLength {
-  id: string;
-  title: string;
-  description: string;
-  wordCount: string;
-}
+import { lengthSchema, LENGTH_OPTIONS, type StoryLength } from '@/lib/types';
 
 interface LengthStepProps {
-  selectedLength: 'short' | 'medium' | 'long';
-  onLengthChange: (length: 'short' | 'medium' | 'long') => void;
+  length: StoryLength;
+  onLengthChange: (length: StoryLength) => void;
+  onValidationError?: (error: string) => void;
 }
 
-const STORY_LENGTHS: StoryLength[] = [
-  {
-    id: 'short',
-    title: 'Short Story',
-    description: 'Perfect for a quick bedtime story.',
-    wordCount: '300-500 words',
-  },
-  {
-    id: 'medium',
-    title: 'Medium Story',
-    description: 'Ideal for a regular bedtime reading session.',
-    wordCount: '500-800 words',
-  },
-  {
-    id: 'long',
-    title: 'Long Story',
-    description: 'Great for an extended storytelling experience.',
-    wordCount: '800-1200 words',
-  },
-];
-
 export function LengthStep({
-  selectedLength,
+  length,
   onLengthChange,
+  onValidationError,
 }: LengthStepProps) {
+  const validateAndUpdate = (value: string) => {
+    try {
+      const validated = lengthSchema.parse(value);
+      onLengthChange(validated);
+    } catch (error) {
+      if (error instanceof Error && onValidationError) {
+        onValidationError(error.message);
+      }
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Choose Story Length</h2>
-      <p className="text-muted-foreground">How long should the story be?</p>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {(['short', 'medium', 'long'] as const).map((length) => (
-          <Card
-            key={length}
-            className={cn(
-              'p-4 cursor-pointer transition-colors',
-              selectedLength === length
-                ? 'border-primary bg-primary/5'
-                : 'hover:border-primary/50'
-            )}
-            onClick={() => onLengthChange(length)}
-          >
-            <h3 className="font-semibold capitalize">{length}</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {length === 'short' && '5 minutes'}
-              {length === 'medium' && '10 minutes'}
-              {length === 'long' && '15 minutes'}
-            </p>
-          </Card>
-        ))}
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Choose Story Length</h2>
+        <p className="text-muted-foreground">How long should your story be?</p>
       </div>
+
+      <RadioGroup
+        value={length}
+        onValueChange={validateAndUpdate}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+      >
+        {(Object.entries(LENGTH_OPTIONS) as [StoryLength, string][]).map(
+          ([value, label]) => (
+            <Card
+              key={value}
+              className={cn(
+                'relative p-4 cursor-pointer transition-all',
+                length === value ? 'border-primary' : ''
+              )}
+              onClick={() => validateAndUpdate(value)}
+            >
+              <RadioGroupItem value={value} id={value} className="sr-only" />
+              <Label htmlFor={value} className="cursor-pointer">
+                <div className="font-semibold mb-1 capitalize">{value}</div>
+                <p className="text-sm text-muted-foreground">{label}</p>
+              </Label>
+            </Card>
+          )
+        )}
+      </RadioGroup>
     </div>
   );
 }

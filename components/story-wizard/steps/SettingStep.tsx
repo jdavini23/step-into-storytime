@@ -1,85 +1,82 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { settingSchema } from '@/lib/types';
 
-interface Setting {
-  id: string;
-  title: string;
-  description: string;
-}
+const SUGGESTED_SETTINGS = [
+  'Enchanted Forest',
+  'Space Station',
+  'Underwater City',
+  'Magic School',
+  "Dragon's Castle",
+  'Pirate Ship',
+  'Fairy Garden',
+  'Dinosaur Park',
+  'Cloud Kingdom',
+  'Time Machine',
+] as const;
 
 interface SettingStepProps {
-  selectedSetting: string;
+  setting: string;
   onSettingChange: (setting: string) => void;
+  onValidationError?: (error: string) => void;
 }
 
-const SETTINGS: Setting[] = [
-  {
-    id: 'enchanted-forest',
-    title: 'Enchanted Forest',
-    description:
-      'A magical forest filled with mystical creatures and ancient secrets.',
-  },
-  {
-    id: 'space-station',
-    title: 'Space Station',
-    description: 'A futuristic space station orbiting a distant planet.',
-  },
-  {
-    id: 'underwater-city',
-    title: 'Underwater City',
-    description: 'A hidden city beneath the ocean waves.',
-  },
-  {
-    id: 'dragon-castle',
-    title: 'Dragon Castle',
-    description: 'An ancient castle where dragons and humans live together.',
-  },
-];
-
 export function SettingStep({
-  selectedSetting,
+  setting,
   onSettingChange,
+  onValidationError,
 }: SettingStepProps) {
+  const validateAndUpdate = (value: string) => {
+    try {
+      const validated = settingSchema.parse(value);
+      onSettingChange(validated);
+    } catch (error) {
+      if (error instanceof Error && onValidationError) {
+        onValidationError(error.message);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Choose a Setting</h2>
+        <h2 className="text-2xl font-bold">Choose Your Setting</h2>
         <p className="text-muted-foreground">
           Where will your story take place?
         </p>
       </div>
 
-      <RadioGroup
-        value={selectedSetting}
-        onValueChange={onSettingChange}
-        className="grid grid-cols-1 md:grid-cols-2 gap-4"
-      >
-        {SETTINGS.map((setting) => (
-          <Card
-            key={setting.id}
-            className={`relative p-4 cursor-pointer transition-all ${
-              selectedSetting === setting.id ? 'border-primary' : ''
-            }`}
-            onClick={() => onSettingChange(setting.id)}
-          >
-            <RadioGroupItem
-              value={setting.id}
-              id={setting.id}
-              className="sr-only"
-            />
-            <Label htmlFor={setting.id} className="cursor-pointer">
-              <div className="font-semibold mb-2">{setting.title}</div>
-              <p className="text-sm text-muted-foreground">
-                {setting.description}
-              </p>
-            </Label>
-          </Card>
-        ))}
-      </RadioGroup>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="setting">Story Setting</Label>
+          <Input
+            id="setting"
+            value={setting}
+            onChange={(e) => validateAndUpdate(e.target.value)}
+            placeholder="Enter a magical place..."
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm">Suggested Settings:</Label>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTED_SETTINGS.map((suggestedSetting) => (
+              <Badge
+                key={suggestedSetting}
+                variant="outline"
+                className="cursor-pointer hover:bg-secondary"
+                onClick={() => validateAndUpdate(suggestedSetting)}
+              >
+                {suggestedSetting}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -7,13 +7,13 @@ import React, {
   useCallback,
 } from 'react';
 import type {
+  Message,
   ConversationState,
   ConversationContextType,
-  Message,
   ChatOption,
-  ConversationStep,
-  StoryData,
 } from '@/components/chat/types';
+import { type StepId } from '@/lib/story-steps';
+import { Story, StoryData } from '@/lib/types';
 import {
   generateResponse,
   determineNextStep,
@@ -33,8 +33,7 @@ const initialState: ConversationState = {
 type Action =
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'SET_TYPING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_STEP'; payload: ConversationStep }
+  | { type: 'SET_STEP'; payload: StepId }
   | { type: 'UPDATE_STORY_DATA'; payload: Partial<StoryData> }
   | { type: 'RESET' };
 
@@ -52,11 +51,6 @@ function conversationReducer(
       return {
         ...state,
         isTyping: action.payload,
-      };
-    case 'SET_ERROR':
-      return {
-        ...state,
-        error: action.payload,
       };
     case 'SET_STEP':
       return {
@@ -80,8 +74,14 @@ function conversationReducer(
 
 interface ConversationProviderProps {
   children: React.ReactNode;
-  onComplete: (story: any) => void;
+  onComplete: (story: Story) => void;
   onError: (error: string) => void;
+}
+
+interface ProcessUserInputResult {
+  currentStep?: StepId;
+  storyData?: Partial<StoryData>;
+  message?: string;
 }
 
 const ConversationContext = createContext<ConversationContextType | undefined>(
@@ -102,7 +102,6 @@ export function ConversationProvider({
   const handleError = useCallback(
     (error: Error) => {
       const errorMessage = error.message || 'An unexpected error occurred';
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
       onError?.(errorMessage);
     },
     [onError]
@@ -110,10 +109,14 @@ export function ConversationProvider({
 
   const processMessage = useCallback(
     async (content: string | ChatOption) => {
-      const updates = processUserInput(content, state.currentStep, state);
+      const updates = processUserInput(
+        content,
+        state.currentStep,
+        state
+      ) as ProcessUserInputResult;
 
-      if (updates.error) {
-        handleError(new Error(updates.error));
+      if (updates.message) {
+        handleError(new Error(updates.message));
         return;
       }
 
@@ -128,7 +131,7 @@ export function ConversationProvider({
         if (updates.currentStep === 'complete') {
           try {
             dispatch({ type: 'SET_TYPING', payload: true });
-            const story = await generateStory(state.storyData as StoryData);
+            const story = await generateStory(state.storyData);
             onComplete?.(story);
           } catch (error) {
             handleError(error as Error);
@@ -155,8 +158,6 @@ export function ConversationProvider({
         id: crypto.randomUUID(),
         type: 'user',
         content: typeof content === 'string' ? content : content.label,
-        timestamp: Date.now(),
-        status: 'sent',
       };
 
       addMessage(message);
@@ -183,7 +184,7 @@ export function ConversationProvider({
     dispatch({ type: 'RESET' });
   }, []);
 
-  const goToStep = useCallback((step: ConversationStep) => {
+  const goToStep = useCallback((step: StepId) => {
     dispatch({ type: 'SET_STEP', payload: step });
   }, []);
 

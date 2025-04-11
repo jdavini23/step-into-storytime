@@ -10,7 +10,7 @@ import {
   useState,
   useMemo,
 } from 'react';
-import { Story } from '@/components/story/common/types';
+import { Story } from '@/lib/types';
 import { generateStoryIllustrations } from '@/lib/image-generation';
 import { useAuth } from '@/contexts/auth-context';
 
