@@ -7,23 +7,56 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export const runtime = 'edge';
+// Remove edge runtime config
+// export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    console.log('Starting story generation...');
+
     const supabase = await createServerSupabaseClient();
+    console.log('Supabase client created');
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    console.log('User auth checked:', { userId: user?.id });
 
     if (!user) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const { prompt }: { prompt: StoryPrompt } = await request.json();
+    const body = await request.json();
+    console.log('Request body:', JSON.stringify(body, null, 2));
+
+    if (!body.prompt) {
+      console.error('No prompt in request body');
+      return new Response(JSON.stringify({ error: 'No prompt provided' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { prompt }: { prompt: StoryPrompt } = body;
+    console.log('Prompt extracted:', JSON.stringify(prompt, null, 2));
+
+    // Validate required prompt fields
+    if (!prompt.character?.name || !prompt.setting || !prompt.theme) {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing required fields in prompt',
+          details: 'Character name, setting, and theme are required',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Generate story content using OpenAI
+    console.log('Calling OpenAI API...');
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
@@ -36,20 +69,25 @@ export async function POST(request: Request) {
           role: 'user',
           content: `Write a children's story with the following details:
             - Main character: ${prompt.character.name}, age ${
-            prompt.character.age
+            prompt.character.age || 8
           }
-            - Character traits: ${prompt.character.traits.join(', ')}
+            - Character traits: ${
+              prompt.character.traits?.join(', ') || 'friendly'
+            }
             - Setting: ${prompt.setting}
             - Theme: ${prompt.theme}
-            - Target age: ${prompt.targetAge}
-            - Reading level: ${prompt.readingLevel}
+            - Target age: ${prompt.targetAge || 8}
+            - Reading level: ${prompt.readingLevel || 'beginner'}
             - Language: ${prompt.language === 'es' ? 'Spanish' : 'English'}
-            - Style: ${prompt.style}
+            - Style: ${prompt.style || 'bedtime'}
 
             The story should be engaging, age-appropriate, and divided into paragraphs.`,
         },
       ],
+      temperature: 0.7,
+      max_tokens: 2000,
     });
+    console.log('OpenAI API response received');
 
     const storyContent = completion.choices[0].message.content;
     if (!storyContent) {
@@ -68,8 +106,8 @@ export async function POST(request: Request) {
       content: storyContent,
       character: {
         name: prompt.character.name,
-        age: Number(prompt.character.age),
-        traits: prompt.character.traits,
+        age: Number(prompt.character.age || 8),
+        traits: prompt.character.traits || ['friendly'],
       },
       setting: prompt.setting,
       theme: prompt.theme,
@@ -80,23 +118,33 @@ export async function POST(request: Request) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    console.log('Story object created');
 
     // Save story to database
+    console.log('Saving to database...');
     const { error } = await supabase.from('stories').insert(story);
 
     if (error) {
+      console.error('Database error:', error);
       throw error;
     }
+    console.log('Story saved successfully');
 
     return new Response(JSON.stringify(story), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Error generating story:', error);
-    return new Response(JSON.stringify({ error: 'Failed to generate story' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        error: 'Failed to generate story',
+        details: error instanceof Error ? error.message : String(error),
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   }
 }
 

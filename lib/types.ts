@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import type { Json } from '@/types/supabase';
+import type { EducationalElement, StorySettings } from '@/lib/constants';
 
 // Base story type from the database
 export type Story = Omit<
@@ -34,8 +35,13 @@ export interface UIStory {
 // Character types
 export const characterSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  age: z.string().regex(/^\d+$/, 'Age must be a number').transform(Number),
+  age: z
+    .string()
+    .regex(/^\d+$/, 'Age must be a number')
+    .transform(Number)
+    .optional(),
   traits: z.array(z.string()).min(1, 'At least one trait is required'),
+  appearance: z.string().optional(),
 });
 
 export type Character = z.infer<typeof characterSchema>;
@@ -72,9 +78,12 @@ export interface StoryData {
   title?: string;
   content?: string;
   character?: Character;
-  setting?: string;
+  setting?: StorySettings;
+  settingDescription?: string;
   theme?: string;
   length?: StoryLength;
+  readingLevel?: 'beginner' | 'intermediate' | 'advanced';
+  educationalElements?: EducationalElement[];
   is_published?: boolean;
   user_id?: string;
   thumbnail_url?: string | null;
@@ -134,3 +143,15 @@ export interface StoryPrompt {
   style?: 'adventure' | 'fantasy' | 'educational' | 'bedtime';
   educationalFocus?: string[];
 }
+
+// Font size options
+export type FontSize = 'small' | 'medium' | 'large';
+
+// Theme color options
+export type ThemeColors = {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  text: string;
+};

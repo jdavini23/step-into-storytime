@@ -90,7 +90,6 @@ export function processUserInput(
   const currentStoryData = state.storyData;
   const character = currentStoryData.character || {
     name: '',
-    age: 0,
     traits: [],
   };
 
