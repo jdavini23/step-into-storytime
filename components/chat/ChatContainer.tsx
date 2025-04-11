@@ -99,12 +99,12 @@ export function ChatContainer({ className }: ChatContainerProps) {
   // Render helpers
   const renderMainContent = () => (
     <Card className={cn(CHAT_CONTAINER_STYLES.card, className)}>
-      {/* Messages section */}
+      {/* Step 1: Messages section */}
       <div className="flex-1 relative">
         <ChatMessages messages={state.messages} isTyping={state.isTyping} />
       </div>
 
-      {/* Preview section */}
+      {/* Step 2: Preview section */}
       {state.currentStep === 'preview' && (
         <>
           <PreviewToggle showPreview={showPreview} onToggle={togglePreview} />
@@ -119,7 +119,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
         </>
       )}
 
-      {/* Input section */}
+      {/* Step 3: Input section */}
       <div className={CHAT_CONTAINER_STYLES.footer}>
         <QuickReplies
           options={getQuickReplies()}
