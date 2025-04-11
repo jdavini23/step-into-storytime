@@ -1,68 +1,38 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import type { ChatOption } from './types';
+import { cn } from '@/lib/utils';
 
 interface QuickReplyProps {
-  options: Array<{
-    label: string;
-    value: string;
-    icon?: React.ReactNode;
-  }>;
-  onSelect: (value: string) => void;
-  variant?: 'default' | 'outline' | 'ghost';
-  direction?: 'horizontal' | 'vertical';
+  option: ChatOption;
+  onSelect: (option: ChatOption) => void;
+  className?: string;
 }
 
-export function QuickReply({
-  options,
-  onSelect,
-  variant = 'default',
-  direction = 'horizontal',
-}: QuickReplyProps) {
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
-  };
-
+export function QuickReply({ option, onSelect, className }: QuickReplyProps) {
   return (
     <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className={cn(
-        'flex gap-2 my-2',
-        direction === 'vertical' ? 'flex-col' : 'flex-wrap'
-      )}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
     >
-      {options.map((option) => (
-        <motion.div key={option.value} variants={item}>
-          <Button
-            variant={variant === 'default' ? 'secondary' : variant}
-            size="sm"
-            className={cn(
-              'rounded-full transition-all hover:scale-105',
-              variant === 'ghost' && 'hover:bg-primary/10 text-foreground',
-              'flex items-center gap-2 px-4 py-2 h-auto'
-            )}
-            onClick={() => onSelect(option.value)}
-          >
-            {option.icon}
-            <span className="text-sm font-medium">{option.label}</span>
-          </Button>
-        </motion.div>
-      ))}
+      <Button
+        onClick={() => onSelect(option)}
+        className={cn(
+          'bg-background hover:bg-muted text-foreground',
+          'rounded-full px-6 py-2 h-auto',
+          'border border-input shadow-sm',
+          'transition-all duration-200',
+          className
+        )}
+        variant="ghost"
+      >
+        {option.label}
+      </Button>
     </motion.div>
   );
 }

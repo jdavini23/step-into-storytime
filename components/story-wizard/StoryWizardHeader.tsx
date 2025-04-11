@@ -5,7 +5,7 @@ import { Sparkles, Wand2, Book, Stars } from 'lucide-react';
 
 export function StoryWizardHeader() {
   return (
-    <div className="relative w-full flex flex-col items-center justify-center py-12 overflow-hidden">
+    <div className="relative w-full flex flex-col items-center justify-center py-4 overflow-hidden">
       {/* Floating Elements Animation */}
       <div className="absolute inset-0 pointer-events-none">
         <motion.div
@@ -39,9 +39,9 @@ export function StoryWizardHeader() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="relative"
+        className="relative z-10"
       >
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-4">
           <motion.div
             animate={{
               rotate: [0, 10, -10, 0],
@@ -103,7 +103,7 @@ export function StoryWizardHeader() {
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
         transition={{ duration: 0.8, delay: 0.5 }}
-        className="w-full max-w-md h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent mt-8"
+        className="w-full max-w-md h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent mt-6"
       />
     </div>
   );

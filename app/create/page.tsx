@@ -68,10 +68,10 @@ export default function CreateStoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
+    <div className="min-h-screen bg-gradient-to-b from-background to-primary/5 flex flex-col">
       <Navbar />
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="max-w-4xl w-full">
+      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+        <div className="max-w-4xl w-full mx-auto space-y-8">
           {/* Fun animated header */}
           <StoryWizardHeader />
 
@@ -93,7 +93,7 @@ export default function CreateStoryPage() {
           )}
 
           {/* Story creation wizard */}
-          <div className="mt-6">
+          <div className="bg-white/50 backdrop-blur-sm rounded-3xl shadow-lg p-4">
             <Suspense fallback={<Loading />}>
               <StoryWizard
                 onComplete={handleStoryComplete}
