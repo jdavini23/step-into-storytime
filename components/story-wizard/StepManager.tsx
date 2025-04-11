@@ -1,5 +1,12 @@
-import { createContext, useContext, useReducer, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useReducer,
+  ReactNode,
+  useState,
+} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { StoryData } from '@/lib/types';
 
 // Step configuration
 export const WIZARD_STEPS = {
@@ -41,99 +48,127 @@ export const WIZARD_STEPS = {
   },
 } as const;
 
-type StepKey = keyof typeof WIZARD_STEPS;
+type StepKey =
+  | 'WELCOME'
+  | 'CHARACTER'
+  | 'SETTING'
+  | 'THEME'
+  | 'LENGTH'
+  | 'PREVIEW';
 
-interface StepState {
+export interface StepState {
   currentStep: StepKey;
-  completedSteps: Set<StepKey>;
-  storyData: Record<string, any>;
-  isGenerating: boolean;
+  storyData: Partial<StoryData>;
 }
 
 type StepAction =
   | { type: 'NEXT_STEP' }
   | { type: 'PREV_STEP' }
-  | { type: 'SET_STEP'; payload: StepKey }
-  | { type: 'UPDATE_STORY_DATA'; payload: Record<string, any> }
-  | { type: 'SET_GENERATING'; payload: boolean }
-  | { type: 'COMPLETE_STEP'; payload: StepKey };
+  | { type: 'UPDATE_STORY_DATA'; payload: Partial<StoryData> }
+  | { type: 'RESET_WIZARD' }
+  | { type: 'SET_STEP'; payload: StepKey };
 
-const stepReducer = (state: StepState, action: StepAction): StepState => {
+const STEPS: StepKey[] = [
+  'WELCOME',
+  'CHARACTER',
+  'SETTING',
+  'THEME',
+  'PREVIEW',
+];
+
+const initialState: StepState = {
+  currentStep: 'WELCOME',
+  storyData: {},
+};
+
+function stepReducer(state: StepState, action: StepAction): StepState {
+  const currentIndex = STEPS.indexOf(state.currentStep);
+
   switch (action.type) {
     case 'NEXT_STEP': {
-      const currentIndex = Object.keys(WIZARD_STEPS).indexOf(state.currentStep);
-      const nextStep = Object.keys(WIZARD_STEPS)[currentIndex + 1] as StepKey;
-      return {
-        ...state,
-        currentStep: nextStep || state.currentStep,
-      };
+      const nextIndex = currentIndex + 1;
+      if (nextIndex < STEPS.length) {
+        return {
+          ...state,
+          currentStep: STEPS[nextIndex],
+        };
+      }
+      return state;
     }
     case 'PREV_STEP': {
-      const currentIndex = Object.keys(WIZARD_STEPS).indexOf(state.currentStep);
-      const prevStep = Object.keys(WIZARD_STEPS)[currentIndex - 1] as StepKey;
-      return {
-        ...state,
-        currentStep: prevStep || state.currentStep,
-      };
+      const prevIndex = currentIndex - 1;
+      if (prevIndex >= 0) {
+        return {
+          ...state,
+          currentStep: STEPS[prevIndex],
+        };
+      }
+      return state;
     }
-    case 'SET_STEP':
-      return {
-        ...state,
-        currentStep: action.payload,
-      };
     case 'UPDATE_STORY_DATA':
       return {
         ...state,
         storyData: { ...state.storyData, ...action.payload },
       };
-    case 'SET_GENERATING':
+    case 'RESET_WIZARD':
+      return initialState;
+    case 'SET_STEP':
       return {
         ...state,
-        isGenerating: action.payload,
+        currentStep: action.payload,
       };
-    case 'COMPLETE_STEP': {
-      const newCompletedSteps = new Set(state.completedSteps);
-      newCompletedSteps.add(action.payload);
-      return {
-        ...state,
-        completedSteps: newCompletedSteps,
-      };
-    }
     default:
       return state;
   }
-};
+}
 
-const StepContext = createContext<{
+interface StepManagerContextValue {
   state: StepState;
   dispatch: React.Dispatch<StepAction>;
-} | null>(null);
+  storyData: Partial<StoryData>;
+  setStoryData: (data: Partial<StoryData>) => void;
+  isGenerating: boolean;
+  setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const StepManagerContext = createContext<StepManagerContextValue | undefined>(
+  undefined
+);
+
+export function StepManagerProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [state, dispatch] = useReducer(stepReducer, initialState);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const setStoryData = (data: Partial<StoryData>) => {
+    dispatch({ type: 'UPDATE_STORY_DATA', payload: data });
+  };
+
+  return (
+    <StepManagerContext.Provider
+      value={{
+        state,
+        dispatch,
+        storyData: state.storyData,
+        setStoryData,
+        isGenerating,
+        setIsGenerating,
+      }}
+    >
+      {children}
+    </StepManagerContext.Provider>
+  );
+}
 
 export function useStepManager() {
-  const context = useContext(StepContext);
+  const context = useContext(StepManagerContext);
   if (!context) {
     throw new Error('useStepManager must be used within a StepManagerProvider');
   }
   return context;
-}
-
-interface StepManagerProviderProps {
-  children: ReactNode;
-}
-
-export function StepManagerProvider({ children }: StepManagerProviderProps) {
-  const [state, dispatch] = useReducer(stepReducer, {
-    currentStep: 'WELCOME' as StepKey,
-    completedSteps: new Set<StepKey>(),
-    storyData: {},
-    isGenerating: false,
-  });
-
-  return (
-    <StepContext.Provider value={{ state, dispatch }}>
-      {children}
-    </StepContext.Provider>
-  );
 }
 
 interface StepManagerProps {

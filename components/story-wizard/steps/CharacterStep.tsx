@@ -1,154 +1,153 @@
 'use client';
 
-import { useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  AwaitedReactNode,
+  JSXElementConstructor,
+  Key,
+  ReactElement,
+  ReactNode,
+  useState,
+} from 'react';
+import { useStepManager } from '../StepManager';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { type Character, characterSchema } from '@/lib/types';
-import { SUGGESTED_TRAITS } from '@/lib/story-steps';
+import { characterTraits } from '@/lib/constants';
 
-interface CharacterStepProps {
-  character: Character;
-  onCharacterChange: (character: Character) => void;
-  onValidationError?: (error: string) => void;
-}
+export function CharacterStep() {
+  const { state, dispatch } = useStepManager();
+  const [character, setCharacter] = useState({
+    name: state.storyData.character?.name || '',
+    age: state.storyData.character?.age || '',
+    traits: state.storyData.character?.traits || [],
+    appearance: state.storyData.character?.appearance || '',
+  });
 
-export function CharacterStep({
-  character,
-  onCharacterChange,
-  onValidationError,
-}: CharacterStepProps) {
-  const [newTrait, setNewTrait] = useState('');
-
-  const validateAndUpdate = (
-    updatedCharacter: Omit<Character, 'age'> & { age: string }
-  ) => {
-    try {
-      const validated = characterSchema.parse(updatedCharacter);
-      onCharacterChange(validated);
-    } catch (error) {
-      if (error instanceof Error && onValidationError) {
-        onValidationError(error.message);
-      }
-    }
+  const handleTraitToggle = (trait: string) => {
+    setCharacter((prev) => ({
+      ...prev,
+      traits: prev.traits.includes(trait)
+        ? prev.traits.filter((t: string) => t !== trait)
+        : [...prev.traits, trait],
+    }));
   };
 
-  const addTrait = (trait: string) => {
-    if (trait && !character.traits.includes(trait)) {
-      validateAndUpdate({
-        ...character,
-        age: String(character.age),
-        traits: [...character.traits, trait],
-      });
+  const handleNext = () => {
+    if (!character.name) {
+      return; // Show error
     }
-    setNewTrait('');
-  };
 
-  const removeTrait = (trait: string) => {
-    validateAndUpdate({
-      ...character,
-      age: String(character.age),
-      traits: character.traits.filter((t) => t !== trait),
+    dispatch({
+      type: 'UPDATE_STORY_DATA',
+      payload: {
+        character: {
+          name: character.name,
+          age: character.age ? Number(character.age) : undefined,
+          traits: character.traits,
+        },
+      },
     });
+    dispatch({ type: 'NEXT_STEP' });
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Create Your Character</h2>
-        <p className="text-muted-foreground">
-          Tell us about the main character of your story.
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">Character Name</Label>
-          <Input
-            id="name"
-            value={character.name}
-            onChange={(e) =>
-              validateAndUpdate({
-                ...character,
-                name: e.target.value,
-                age: String(character.age),
-              })
-            }
-            placeholder="Enter character name"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="age">Character Age</Label>
-          <Input
-            id="age"
-            type="number"
-            min="1"
-            max="12"
-            value={character.age}
-            onChange={(e) =>
-              validateAndUpdate({ ...character, age: e.target.value })
-            }
-            placeholder="Enter age (1-12)"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Character Traits</Label>
-          <div className="flex flex-wrap gap-2">
-            {character.traits.map((trait) => (
-              <Badge
-                key={trait}
-                variant="secondary"
-                className="cursor-pointer"
-                onClick={() => removeTrait(trait)}
-              >
-                {trait} ×
-              </Badge>
-            ))}
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              value={newTrait}
-              onChange={(e) => setNewTrait(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addTrait(newTrait);
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="space-y-8"
+    >
+      {/* Character Builder Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Visual Character Creator */}
+        <div className="bg-white/50 backdrop-blur-sm rounded-xl p-6 shadow-md">
+          <h3 className="text-2xl font-bold mb-4">Design Your Hero</h3>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Character Name</Label>
+              <Input
+                id="name"
+                value={character.name}
+                onChange={(e) =>
+                  setCharacter((prev) => ({ ...prev, name: e.target.value }))
                 }
-              }}
-              placeholder="Add a trait"
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => addTrait(newTrait)}
-            >
-              Add
-            </Button>
-          </div>
+                placeholder="Enter a name..."
+                className="w-full"
+              />
+            </div>
 
-          <div className="mt-2">
-            <Label className="text-sm">Suggested Traits:</Label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {SUGGESTED_TRAITS.filter(
-                (trait) => !character.traits.includes(trait)
-              ).map((trait) => (
-                <Badge
-                  key={trait}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-secondary"
-                  onClick={() => addTrait(trait)}
-                >
-                  {trait}
-                </Badge>
-              ))}
+            <div className="space-y-2">
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                value={character.age}
+                onChange={(e) =>
+                  setCharacter((prev) => ({ ...prev, age: e.target.value }))
+                }
+                placeholder="How old are they?"
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Character Traits</Label>
+              <div className="flex flex-wrap gap-2">
+                {characterTraits.map((trait: string) => (
+                  <Button
+                    key={trait}
+                    variant={
+                      character.traits.includes(trait) ? 'default' : 'outline'
+                    }
+                    size="sm"
+                    onClick={() => handleTraitToggle(trait)}
+                    className="rounded-full"
+                  >
+                    {trait}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Character Preview */}
+        <div className="bg-white/50 backdrop-blur-sm rounded-xl p-6 shadow-md">
+          <h3 className="text-2xl font-bold mb-4">Preview</h3>
+          <div className="aspect-square rounded-lg bg-gradient-to-b from-primary/5 to-primary/20 flex items-center justify-center">
+            <div className="text-center">
+              <span className="text-6xl mb-4 block">
+                {character.traits.includes('Brave')
+                  ? '🦸‍♂️'
+                  : character.traits.includes('Kind')
+                  ? '🤗'
+                  : character.traits.includes('Smart')
+                  ? '🤓'
+                  : '😊'}
+              </span>
+              {character.name && (
+                <p className="text-xl font-semibold">{character.name}</p>
+              )}
+              {character.age && (
+                <p className="text-sm text-gray-600">Age: {character.age}</p>
+              )}
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <Button
+          variant="outline"
+          onClick={() => dispatch({ type: 'PREV_STEP' })}
+        >
+          Back
+        </Button>
+        <Button onClick={handleNext} disabled={!character.name}>
+          Next
+        </Button>
+      </div>
+    </motion.div>
   );
 }

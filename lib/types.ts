@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import type { Json } from '@/types/supabase';
+import type { EducationalElement, StorySettings } from '@/lib/constants';
 
 // Base story type from the database
 export type Story = Omit<
@@ -40,6 +41,7 @@ export const characterSchema = z.object({
     .transform(Number)
     .optional(),
   traits: z.array(z.string()).min(1, 'At least one trait is required'),
+  appearance: z.string().optional(),
 });
 
 export type Character = z.infer<typeof characterSchema>;
@@ -76,9 +78,12 @@ export interface StoryData {
   title?: string;
   content?: string;
   character?: Character;
-  setting?: string;
+  setting?: StorySettings;
+  settingDescription?: string;
   theme?: string;
   length?: StoryLength;
+  readingLevel?: 'beginner' | 'intermediate' | 'advanced';
+  educationalElements?: EducationalElement[];
   is_published?: boolean;
   user_id?: string;
   thumbnail_url?: string | null;
