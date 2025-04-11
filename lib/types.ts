@@ -34,7 +34,11 @@ export interface UIStory {
 // Character types
 export const characterSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  age: z.string().regex(/^\d+$/, 'Age must be a number').transform(Number),
+  age: z
+    .string()
+    .regex(/^\d+$/, 'Age must be a number')
+    .transform(Number)
+    .optional(),
   traits: z.array(z.string()).min(1, 'At least one trait is required'),
 });
 
@@ -134,3 +138,15 @@ export interface StoryPrompt {
   style?: 'adventure' | 'fantasy' | 'educational' | 'bedtime';
   educationalFocus?: string[];
 }
+
+// Font size options
+export type FontSize = 'small' | 'medium' | 'large';
+
+// Theme color options
+export type ThemeColors = {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  text: string;
+};

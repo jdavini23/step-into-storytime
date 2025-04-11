@@ -104,9 +104,19 @@ export function ChatContainer({ className }: ChatContainerProps) {
         <ChatMessages messages={state.messages} isTyping={state.isTyping} />
       </div>
 
-      {/* Preview toggle */}
+      {/* Preview section */}
       {state.currentStep === 'preview' && (
-        <PreviewToggle showPreview={showPreview} onToggle={togglePreview} />
+        <>
+          <PreviewToggle showPreview={showPreview} onToggle={togglePreview} />
+          {showPreview && (
+            <div className="border-t border-primary/5">
+              <StoryPreview
+                storyData={state.storyData}
+                className="max-w-3xl mx-auto"
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* Input section */}
@@ -125,11 +135,6 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const renderSidebar = () => (
     <div className="hidden xl:block xl:col-span-3">
       <ChatProgress currentStep={state.currentStep as StepId} />
-      {showPreview && state.currentStep === 'preview' && (
-        <div className="mt-8">
-          <StoryPreview storyData={state.storyData} />
-        </div>
-      )}
     </div>
   );
 
