@@ -39,6 +39,8 @@ import { useAuth } from '@/contexts/auth-context';
 import {
   useSubscription,
   type SubscriptionStatus,
+  type Product,
+  type Price,
 } from '@/contexts/subscription-context';
 import { PRICING_PLANS } from '@/constants/pricing';
 
@@ -52,46 +54,80 @@ export default function ManageSubscriptionPage() {
     getSubscriptionTier,
     getRemainingDays,
   } = useSubscription();
-  const [isLoading, setIsLoading] = useState(true);
+
   const [isCancelling, setIsCancelling] = useState(false);
+  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [currentPrice, setCurrentPrice] = useState<Price | null>(null);
 
   useEffect(() => {
-    // Redirect to sign-in if not authenticated
     if (!authState.isLoading && !authState.isAuthenticated) {
       router.push('/sign-in?returnTo=/subscription/manage');
-      return;
     }
+  }, [authState.isLoading, authState.isAuthenticated, router]);
 
-    // Only fetch subscription if authenticated and not already loaded
-    if (authState.isAuthenticated && !subscriptionState.isInitialized) {
-      console.log('[DEBUG] ManageSubscription useEffect:', {
-        authLoading: authState.isLoading,
-        authInitialized: authState.isInitialized,
-        subscriptionLoading: subscriptionState.isLoading,
-        subscriptionInitialized: subscriptionState.isInitialized,
+  useEffect(() => {
+    if (
+      authState.isAuthenticated &&
+      !subscriptionState.isInitialized &&
+      !subscriptionState.isLoading
+    ) {
+      fetchSubscription().catch((error) => {
+        console.error('[DEBUG] Error loading subscription:', error);
       });
-      const loadSubscription = async () => {
-        try {
-          await fetchSubscription();
-        } catch (error) {
-          console.error('[DEBUG] Error loading subscription:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      loadSubscription();
-    } else if (subscriptionState.isInitialized) {
-      setIsLoading(false);
     }
   }, [
     authState.isAuthenticated,
-    authState.isLoading,
-    authState.isInitialized,
-    fetchSubscription,
-    router,
     subscriptionState.isInitialized,
+    subscriptionState.isLoading,
+    fetchSubscription,
   ]);
+
+  useEffect(() => {
+    if (subscriptionState.subscription && subscriptionState.availablePlans) {
+      const product = subscriptionState.availablePlans.find(
+        (plan) =>
+          plan.tier === subscriptionState.subscription?.subscription_plans.tier
+      );
+
+      if (product?.prices?.length) {
+        setCurrentProduct(product);
+        setCurrentPrice(product.prices[0]);
+      }
+    }
+  }, [subscriptionState.subscription, subscriptionState.availablePlans]);
+
+  const currentTier = getSubscriptionTier();
+  const remainingDays = getRemainingDays();
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const getStatusBadge = (status: SubscriptionStatus) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500">Active</Badge>;
+      case 'trialing':
+        return <Badge className="bg-blue-500">Trial</Badge>;
+      case 'canceled':
+        return <Badge className="bg-orange-500">Canceled</Badge>;
+      case 'past_due':
+        return <Badge className="bg-red-500">Past Due</Badge>;
+      case 'incomplete':
+        return <Badge className="bg-slate-500">Pending</Badge>;
+      case 'incomplete_expired':
+        return <Badge className="bg-red-500">Expired</Badge>;
+      case 'unpaid':
+        return <Badge className="bg-red-500">Unpaid</Badge>;
+      default:
+        return <Badge className="bg-slate-500">{status}</Badge>;
+    }
+  };
 
   const handleCancelSubscription = async () => {
     setIsCancelling(true);
@@ -104,39 +140,11 @@ export default function ManageSubscriptionPage() {
     }
   };
 
-  // Helper function to format date
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  // Helper function to get status badge
-  const getStatusBadge = (status: SubscriptionStatus) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-green-500">Active</Badge>;
-      case 'trialing':
-        return <Badge className="bg-blue-500">Trial</Badge>;
-      case 'canceled':
-        return <Badge className="bg-orange-500">Canceled</Badge>;
-      case 'past_due':
-        return <Badge className="bg-red-500">Past Due</Badge>;
-      default:
-        return <Badge className="bg-slate-500">{status}</Badge>;
-    }
-  };
-
-  // Get current tier
-  const currentTier = getSubscriptionTier();
-
-  // Get remaining days
-  const remainingDays = getRemainingDays();
-
-  if (isLoading || authState.isLoading || !subscriptionState.isInitialized) {
+  if (
+    subscriptionState.isLoading ||
+    authState.isLoading ||
+    !subscriptionState.isInitialized
+  ) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50 flex items-center justify-center">
         <div className="text-center">
@@ -391,15 +399,75 @@ export default function ManageSubscriptionPage() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    {PRICING_PLANS[
-                      currentTier.toLowerCase() as keyof typeof PRICING_PLANS
-                    ]?.features.map((feature, index) => (
-                      <li key={index} className="flex items-start">
-                        <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
+                    {(() => {
+                      const plans = subscriptionState.availablePlans || [];
+                      const currentTier = getSubscriptionTier();
+
+                      // Find the plan matching current tier
+                      const currentPlan = plans.find(
+                        (plan) => plan.tier === currentTier
+                      ) || {
+                        tier: 'free',
+                        features: PRICING_PLANS.free.features,
+                      };
+
+                      // Ensure features is always an array of strings
+                      let features: string[] = [];
+
+                      if (Array.isArray(currentPlan.features)) {
+                        // If it's already an array, make sure each item is a string
+                        features = currentPlan.features.map((feature) =>
+                          typeof feature === 'string'
+                            ? feature
+                            : JSON.stringify(feature)
+                        );
+                      } else if (currentPlan.features) {
+                        if (typeof currentPlan.features === 'string') {
+                          // If it's a single string
+                          features = [currentPlan.features];
+                        } else if (typeof currentPlan.features === 'object') {
+                          // If it's an object, convert to array of strings
+                          features = Object.entries(currentPlan.features).map(
+                            ([key, value]) => `${key}: ${value}`
+                          );
+                        }
+                      }
+
+                      // Render features
+                      return features.map((feature, index) => (
+                        <li key={index} className="flex items-start">
+                          <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      ));
+                    })()}
                   </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Current Plan Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold">Current Plan</h3>
+                    {currentProduct && currentPrice ? (
+                      <>
+                        <p>
+                          You are currently subscribed to the{' '}
+                          <b>{currentProduct.name}</b> plan, which costs{' '}
+                          <b>
+                            {currentPrice.unit_amount / 100}{' '}
+                            {currentPrice.currency}
+                          </b>{' '}
+                          per {currentPrice.recurring.interval}.
+                        </p>
+                      </>
+                    ) : (
+                      <p>Loading plan details...</p> // Or handle case where product/price not found
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </>

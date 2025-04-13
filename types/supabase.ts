@@ -123,16 +123,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           user_id: string;
-          status:
-            | 'trialing'
-            | 'active'
-            | 'canceled'
-            | 'incomplete'
-            | 'incomplete_expired'
-            | 'past_due'
-            | 'incomplete_expired'
-            | 'past_due'
-            | 'unpaid';
+          status: 'trialing' | 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'unpaid';
           plan_id: string;
           subscription_start: string | null;
           subscription_end: string | null;
@@ -145,17 +136,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           user_id: string;
-          status:
-            | 'trialing'
-            | 'active'
-            | 'canceled'
-            | 'incomplete'
-            | 'incomplete_expired'
-            | 'past_due'
-            | 'unpaid'
-            | 'incomplete_expired'
-            | 'past_due'
-            | 'unpaid';
+          status: 'trialing' | 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'unpaid';
           plan_id: string;
           subscription_start?: string | null;
           subscription_end?: string | null;
@@ -168,21 +149,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           user_id?: string;
-          status?:
-            | 'trialing'
-            | 'active'
-            | 'canceled'
-            | 'incomplete'
-            | 'incomplete_expired'
-            | 'past_due'
-            | 'unpaid'
-            | 'trialing'
-            | 'active'
-            | 'canceled'
-            | 'incomplete'
-            | 'incomplete_expired'
-            | 'past_due'
-            | 'unpaid';
+          status?: 'trialing' | 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'unpaid';
           plan_id?: string;
           subscription_start?: string | null;
           subscription_end?: string | null;
@@ -214,12 +181,78 @@ export interface Database {
           quantity?: number;
         };
       };
+      subscription_plans: {
+        Row: {
+          id: number;
+          tier: 'free' | 'story_creator' | 'family';
+          name: string;
+          description: string;
+          price_monthly: number;
+          story_limit: number;
+          features: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          tier: 'free' | 'story_creator' | 'family';
+          name: string;
+          description: string;
+          price_monthly: number;
+          story_limit?: number;
+          features?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          tier?: 'free' | 'story_creator' | 'family';
+          name?: string;
+          description?: string;
+          price_monthly?: number;
+          story_limit?: number;
+          features?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      story_usage: {
+        Row: {
+          id: number;
+          user_id: string;
+          story_count: number;
+          reset_date: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          user_id: string;
+          story_count?: number;
+          reset_date?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          story_count?: number;
+          reset_date?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      increment_story_usage: {
+        Args: {
+          user_id: string;
+        };
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;
