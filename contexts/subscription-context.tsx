@@ -11,7 +11,14 @@ import { PRICING_PLANS } from '@/constants/pricing';
 // Define types
 export type SubscriptionTier = 'free' | 'story_creator' | 'family';
 
-export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid';
+export type SubscriptionStatus = 
+  | 'trialing' 
+  | 'active' 
+  | 'canceled' 
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'past_due'
+  | 'unpaid';
 
 export interface StoryUsage {
   id: string;
@@ -22,23 +29,31 @@ export interface StoryUsage {
   updated_at: string;
 }
 
-export interface SubscriptionFeature {
+export interface Price {
+  id: string;
+  unit_amount: number;
+  currency: string;
+  recurring: {
+    interval: string;
+  };
+}
+
+export interface Product {
   id: string;
   name: string;
-  description: string;
-  enabled: boolean;
+  tier: string;
+  prices?: Price[];
+  features: string[];
 }
 
 export interface SubscriptionPlan {
   id: number;
   tier: SubscriptionTier;
   name: string;
-  description: string | null;
+  description: string;
   price_monthly: number;
-  story_limit: number | null;
-  features: Record<string, boolean>;
-  created_at: string;
-  updated_at: string;
+  story_limit: number;
+  features: string[];
 }
 
 export interface Subscription {
@@ -51,6 +66,11 @@ export interface Subscription {
   created_at: string;
   updated_at: string;
   subscription_plans: SubscriptionPlan;
+  price?: Price;
+  subscription_start?: string;
+  trial_end?: string;
+  subscription_end?: string;
+  payment_provider?: string;
 }
 
 type SubscriptionState = {
@@ -59,6 +79,7 @@ type SubscriptionState = {
   storyUsage: StoryUsage | null;
   isLoading: boolean;
   error: string | null;
+  availablePlans?: Product[]; 
 };
 
 type SubscriptionAction =
@@ -67,6 +88,8 @@ type SubscriptionAction =
       payload: {
         subscription: Subscription | null;
         storyUsage: StoryUsage | null;
+        isInitialized: boolean;
+        availablePlans?: Product[];
       };
     }
   | { type: 'SET_SUBSCRIPTION'; payload: Subscription | null }
@@ -82,8 +105,28 @@ const initialState: SubscriptionState = {
   isInitialized: false,
   subscription: null,
   storyUsage: null,
-  isLoading: true,
+  isLoading: false,
   error: null,
+  availablePlans: [
+    {
+      id: 'free',
+      name: PRICING_PLANS.free.title,
+      tier: 'free',
+      features: PRICING_PLANS.free.features,
+    },
+    {
+      id: 'story_creator',
+      name: PRICING_PLANS.unlimited.title,
+      tier: 'story_creator',
+      features: PRICING_PLANS.unlimited.features,
+    },
+    {
+      id: 'family',
+      name: PRICING_PLANS.family.title,
+      tier: 'family',
+      features: PRICING_PLANS.family.features,
+    },
+  ],
 };
 
 // Create reducer
@@ -98,7 +141,8 @@ const subscriptionReducer = (
         subscription: action.payload.subscription,
         storyUsage: action.payload.storyUsage,
         isLoading: false,
-        isInitialized: true,
+        isInitialized: action.payload.isInitialized,
+        availablePlans: action.payload.availablePlans,
       };
     case 'SET_SUBSCRIPTION':
       return {
@@ -170,176 +214,174 @@ export function SubscriptionProvider({
   const auth = useAuth();
   const router = useRouter();
 
-  // Initialize subscription and story usage
   useEffect(() => {
-    const initializeSubscription = async () => {
-      if (!auth.state.isInitialized) {
-        return;
-      }
+    // Only run initialization if user is authenticated and not already initialized
+    if (auth.state.isInitialized && auth.state.user && !state.isInitialized) {
+      const initializeSubscription = async () => {
+        // Ensure user is not null before proceeding
+        if (!auth.state.isInitialized || !auth.state.user) {
+          dispatch({
+            type: 'INITIALIZE',
+            payload: {
+              subscription: null,
+              storyUsage: null,
+              isInitialized: true,
+              availablePlans: [],
+            },
+          });
+          return;
+        }
 
-      if (!auth.state.user || !auth.state.user.id) {
-        dispatch({
-          type: 'INITIALIZE',
-          payload: {
-            subscription: null,
-            storyUsage: null,
-          },
-        });
-        return;
-      }
+        try {
+          dispatch({ type: 'SET_LOADING', payload: true });
+          let subscriptionData = null;
+          // Fetch subscription data
+          const { data: subData, error: subError } = await supabase()
+            .from('user_subscriptions')
+            .select('*')
+            .eq('user_id', auth.state.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-      try {
-        dispatch({ type: 'SET_LOADING', payload: true });
-        dispatch({ type: 'SET_ERROR', payload: null }); // Clear any previous errors
+          const initialSubData = {
+            subscription_plans: { 
+              id: 1,
+              tier: 'free' as SubscriptionTier, 
+              name: 'Free Tier',
+              description: 'Basic story creation',
+              price_monthly: 0,
+              story_limit: 1, 
+              features: ['Basic story generation'] 
+            },
+            user_id: auth.state.user.id,
+            status: 'active' as SubscriptionStatus
+          };
 
-        console.log('Fetching subscription for user:', auth.state.user.id);
-
-        // First check if user has an existing subscription
-        let subscriptionData = null;
-        const { data: initialSubData, error: subError } = await supabase()
-          .from('user_subscriptions')
-          .select(
-            `
-            *,
-            subscription_plans (
-              tier,
-              story_limit,
-              features
-            )
-          `
-          )
-          .eq('user_id', auth.state.user.id)
-          .single();
-
-        if (subError) {
-          console.error('Subscription fetch error:', subError);
-
-          // If no subscription found, we'll create a free tier subscription
-          if (subError.code === 'PGRST116') {
-            console.log(
-              'No subscription found, creating free tier subscription'
-            );
-
-            // Get the free plan ID
-            const { data: freePlan, error: planError } = await supabase()
-              .from('subscription_plans')
-              .select('id')
-              .eq('tier', 'free')
-              .single();
-
-            if (planError) {
-              console.error('Error fetching free plan:', planError);
-              throw planError;
+          if (subError) {
+            if (subError.code === 'PGRST116') {
+              // No subscription found, use initial data
+              subscriptionData = initialSubData;
+            } else {
+              throw subError;
             }
+          } else {
+            subscriptionData = subData || initialSubData;
+          }
 
-            if (!freePlan) {
-              throw new Error('Free plan not found in subscription_plans');
-            }
+          // Fetch or create story usage data
+          let usageData = null;
+          const { data: usage, error: usageError } = await supabase()
+            .from('story_usage')
+            .select('*')
+            .eq('user_id', auth.state.user.id)
+            .maybeSingle();
 
-            // Create new subscription for free tier
-            const { data: newSubscription, error: createSubError } =
-              await supabase()
-                .from('user_subscriptions')
+          if (usageError) {
+            console.error('Story usage fetch error:', usageError);
+
+            if (usageError.code === 'PGRST116') {
+              console.log('No usage record found, creating new one');
+              const { data: newUsage, error: createError } = await supabase()
+                .from('story_usage')
                 .insert({
                   user_id: auth.state.user.id,
-                  plan_id: freePlan.id,
-                  status: 'active',
-                  current_period_start: new Date().toISOString(),
-                  current_period_end: new Date(
-                    Date.now() + 30 * 24 * 60 * 60 * 1000
-                  ).toISOString(), // 30 days from now
+                  story_count: 0,
+                  reset_date: new Date().toISOString(),
                 })
-                .select(
-                  `
-                *,
-                subscription_plans (
-                  tier,
-                  story_limit,
-                  features
-                )
-              `
-                )
-                .single();
+                .select()
+                .maybeSingle();
 
-            if (createSubError) {
-              console.error('Error creating subscription:', createSubError);
-              throw createSubError;
+              if (createError) {
+                console.error('Error creating usage record:', createError);
+                throw createError;
+              }
+
+              usageData = newUsage;
+            } else {
+              throw usageError;
             }
-
-            subscriptionData = newSubscription;
           } else {
-            throw subError;
+            usageData = usage;
           }
-        } else {
-          subscriptionData = initialSubData;
+
+          // Fetch available plans
+          const { data: availablePlans, error: plansError } = await supabase()
+            .from('subscription_plans')
+            .select('*');
+
+          console.log('[DEBUG] Fetched subscription plans:', 
+            JSON.stringify({
+              hasPlans: !!availablePlans,
+              plansLength: availablePlans?.length,
+              plansError: !!plansError,
+              errorMessage: plansError?.message
+            })
+          );
+
+          // Map the database plans to the Product interface
+          const mappedPlans = plansError ? [] : availablePlans.map(plan => ({
+            id: plan.id.toString(),
+            name: plan.name,
+            tier: plan.tier,
+            features: plan.features || [],
+            prices: []  // Initialize with empty prices array
+          }));
+
+          console.log('[DEBUG] Mapped subscription plans:', 
+            JSON.stringify({
+              hasMappedPlans: !!mappedPlans,
+              mappedPlansLength: mappedPlans?.length,
+              firstPlan: mappedPlans?.[0]
+            })
+          );
+
+          dispatch({
+            type: 'INITIALIZE',
+            payload: {
+              subscription: subscriptionData,
+              storyUsage: usageData,
+              isInitialized: true,
+              availablePlans: mappedPlans,
+            },
+          });
+        } catch (error) {
+          console.error('Detailed subscription initialization error:', error);
+          
+          console.log('[DEBUG] Error in subscription initialization:', 
+            JSON.stringify({
+              errorType: error instanceof Error ? 'Error' : typeof error,
+              errorMessage: error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : 'No stack trace'
+            })
+          );
+          
+          dispatch({
+            type: 'SET_ERROR',
+            payload:
+              error instanceof Error
+                ? error.message
+                : 'Failed to load subscription data',
+          });
+
+          // Initialize with null state to prevent loading state
+          dispatch({
+            type: 'INITIALIZE',
+            payload: {
+              subscription: null,
+              storyUsage: null,
+              isInitialized: true,
+              availablePlans: [],
+            },
+          });
+        } finally {
+          dispatch({ type: 'SET_LOADING', payload: false });
         }
+      };
 
-        // Fetch or create story usage data
-        let usageData = null;
-        const { data: usage, error: usageError } = await supabase()
-          .from('story_usage')
-          .select('*')
-          .eq('user_id', auth.state.user.id)
-          .single();
-
-        if (usageError) {
-          console.error('Story usage fetch error:', usageError);
-
-          if (usageError.code === 'PGRST116') {
-            console.log('No usage record found, creating new one');
-            const { data: newUsage, error: createError } = await supabase()
-              .from('story_usage')
-              .insert({
-                user_id: auth.state.user.id,
-                story_count: 0,
-                reset_date: new Date().toISOString(),
-              })
-              .select()
-              .single();
-
-            if (createError) {
-              console.error('Error creating usage record:', createError);
-              throw createError;
-            }
-
-            usageData = newUsage;
-          } else {
-            throw usageError;
-          }
-        } else {
-          usageData = usage;
-        }
-
-        dispatch({
-          type: 'INITIALIZE',
-          payload: {
-            subscription: subscriptionData,
-            storyUsage: usageData,
-          },
-        });
-      } catch (error) {
-        console.error('Detailed subscription initialization error:', error);
-        dispatch({
-          type: 'SET_ERROR',
-          payload:
-            error instanceof Error
-              ? error.message
-              : 'Failed to load subscription data',
-        });
-
-        // Initialize with null state to prevent loading state
-        dispatch({
-          type: 'INITIALIZE',
-          payload: {
-            subscription: null,
-            storyUsage: null,
-          },
-        });
-      }
-    };
-
-    initializeSubscription();
-  }, [auth.state.isInitialized, auth.state.user]);
+      initializeSubscription();
+    }
+  }, [auth.state.isInitialized, auth.state.user, state.isInitialized]);
 
   const getSubscriptionTier = (): SubscriptionTier => {
     if (!state.subscription || !state.subscription.subscription_plans)
@@ -366,10 +408,10 @@ export function SubscriptionProvider({
       return true;
     }
 
-    return (
-      storyUsage.story_count <
-      (state.subscription.subscription_plans?.story_limit ?? 5)
-    );
+    // Get story limit from subscription plan
+    const storyLimit = state.subscription.subscription_plans?.story_limit ?? 1;
+    
+    return storyUsage.story_count < storyLimit;
   };
 
   const getRemainingStories = (): number => {
@@ -377,7 +419,10 @@ export function SubscriptionProvider({
     if (tier !== 'free') return Infinity;
 
     const { storyUsage } = state;
-    if (!storyUsage) return 5;
+    if (!storyUsage) return 1; // Default to 1 free story
+    
+    // Get story limit from subscription plan
+    const storyLimit = state.subscription?.subscription_plans?.story_limit ?? 1;
 
     const resetDate = storyUsage.reset_date
       ? new Date(storyUsage.reset_date)
@@ -386,10 +431,10 @@ export function SubscriptionProvider({
     monthAgo.setMonth(monthAgo.getMonth() - 1);
 
     if (!resetDate || resetDate < monthAgo) {
-      return 5;
+      return storyLimit;
     }
 
-    return Math.max(0, 5 - storyUsage.story_count);
+    return Math.max(0, storyLimit - storyUsage.story_count);
   };
 
   const incrementStoryCount = async (): Promise<void> => {
@@ -431,18 +476,25 @@ export function SubscriptionProvider({
   const hasFeature = (feature: string): boolean => {
     if (!state.subscription || !state.subscription.subscription_plans)
       return false;
+    
     const features = state.subscription.subscription_plans.features;
-    return features ? features[feature] === true : false;
+    return features ? features.includes(feature) : false;
   };
 
   const fetchSubscription = async () => {
-    const userId = auth.state.user?.id;
-
-    if (!userId) {
+    // Don't fetch if no user ID
+    if (!auth.state.user?.id) {
+      console.log('[DEBUG] No user ID found, clearing subscription');
       dispatch({
         type: 'SET_SUBSCRIPTION',
         payload: null,
       });
+      return;
+    }
+
+    // If already loading, prevent duplicate requests
+    if (state.isLoading) {
+      console.log('[DEBUG] Subscription fetch already in progress, skipping');
       return;
     }
 
@@ -451,141 +503,152 @@ export function SubscriptionProvider({
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null }); // Clear any previous errors
 
+      console.log('[DEBUG] Making request to /api/subscriptions');
       const response = await fetch('/api/subscriptions', {
         credentials: 'include',
+        cache: 'no-store', // Prevent caching to ensure fresh data
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
 
+      console.log('[DEBUG] Response status:', response.status);
       if (!response.ok) {
-        const error = await response.json();
-        // Only log detailed errors in development mode
-        if (process.env.NODE_ENV === 'development') {
+        let errorMessage = response.statusText || 'Unknown error';
+        let errorData: any = {};
+        
+        try {
+          errorData = await response.json();
           console.error('Subscription fetch failed:', {
             status: response.status,
             statusText: response.statusText,
-            error,
+            error: errorData,
           });
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          console.error('Response status:', response.status, response.statusText);
         }
-        throw new Error(error.error || 'Failed to fetch subscription');
+        
+        // Use a more descriptive error message
+        errorMessage = errorData && typeof errorData === 'object' && 'error' in errorData 
+          ? String(errorData.error) // Explicitly convert to string
+          : `HTTP Error ${response.status}: ${response.statusText || 'Unknown error'}`;
+          
+        dispatch({ type: 'SET_ERROR', payload: `Failed to fetch subscription: ${errorMessage}` });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
       }
 
-      const data = await response.json();
+      let data: any;
+      try {
+        data = await response.json();
+        console.log('[DEBUG] Raw subscription data:', data);
+      } catch (parseError) {
+        console.error('Error parsing subscription data:', parseError);
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to parse subscription data' });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
+      }
+      
+      // If no subscription data is returned, use the initial free tier data
+      const subscriptionData = data || {
+        subscription_plans: { 
+          id: 1,
+          tier: 'free' as SubscriptionTier, 
+          name: 'Free Tier',
+          description: 'Basic story creation',
+          price_monthly: 0,
+          story_limit: 1, 
+          features: ['Basic story generation'] 
+        },
+        user_id: auth.state.user?.id || '',
+        status: 'active' as SubscriptionStatus
+      };
+      console.log('[DEBUG] Processed subscription data:', subscriptionData);
+
+      // Ensure subscription data has a price property if it doesn't already
+      if (subscriptionData && !subscriptionData.price) {
+        subscriptionData.price = null;
+      }
 
       dispatch({
         type: 'SET_SUBSCRIPTION',
-        payload: data,
+        payload: subscriptionData,
       });
+      
+      // Mark as initialized to prevent repeated fetches
+      if (!state.isInitialized) {
+        // Ensure availablePlans has the proper structure with prices array
+        const updatedAvailablePlans = state.availablePlans?.map(plan => ({
+          ...plan,
+          prices: Array.isArray(plan.prices) ? plan.prices : []
+        })) || [];
+
+        dispatch({ 
+          type: 'INITIALIZE', 
+          payload: {
+            subscription: subscriptionData,
+            storyUsage: state.storyUsage,
+            isInitialized: true,
+            availablePlans: updatedAvailablePlans
+          }
+        });
+      }
+      
+      dispatch({ type: 'SET_LOADING', payload: false });
     } catch (error) {
       // Only log errors in development mode
-      if (process.env.NODE_ENV === 'development') {
-        console.error(
-          'Error fetching subscription:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to fetch subscription';
-
+      console.error('Error fetching subscription:', error instanceof Error ? error.message : 'Unknown error');
+      
       dispatch({
         type: 'SET_ERROR',
-        payload: errorMessage,
+        payload: error instanceof Error ? error.message : 'Failed to fetch subscription'
       });
-
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
+      
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
-  const createSubscription = async (tier: SubscriptionTier) => {
-    const userId = auth.state.user?.id;
-
-    if (!userId || !auth.state.isAuthenticated) {
-      // User must be authenticated to create a subscription
+  const createSubscription = async (tier: SubscriptionTier): Promise<void> => {
+    if (!auth.state.user) {
       toast({
-        title: 'Error',
-        description: 'You must be logged in to create a subscription',
+        title: 'Authentication required',
+        description: 'Please sign in to manage your subscription',
         variant: 'destructive',
       });
       return;
     }
 
     try {
-      // Start loading state while creating subscription
       dispatch({ type: 'SET_LOADING', payload: true });
-      dispatch({ type: 'SET_ERROR', payload: null }); // Clear any previous errors
 
-      // Get the current session
-      const {
-        data: { session },
-        error,
-      } = await supabase().auth.getSession();
-
-      if (error) {
-        console.error('Error getting session:', error);
-        throw new Error('Failed to retrieve session');
-      }
-
-      if (!session) {
-        throw new Error('No active session found');
+      // Validate tier
+      if (!['free', 'story_creator', 'family'].includes(tier)) {
+        throw new Error('Invalid subscription tier');
       }
 
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
         },
-        credentials: 'include',
         body: JSON.stringify({ tier }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        // Only log detailed errors in development mode
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Subscription creation failed:', {
-            status: response.status,
-            statusText: response.statusText,
-            error,
-          });
-        }
-        throw new Error(error.error || 'Failed to create subscription');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create subscription');
       }
 
-      const data = await response.json();
-      // Successfully created subscription
-
-      dispatch({
-        type: 'SET_SUBSCRIPTION',
-        payload: data,
-      });
+      // Refresh subscription data
+      await fetchSubscription();
 
       toast({
-        title: 'Success',
-        description: 'Subscription created successfully',
+        title: 'Subscription updated',
+        description: `Your subscription has been updated to ${tier}`,
       });
-
-      router.push('/dashboard');
     } catch (error) {
-      // Only log errors in development mode
-      if (process.env.NODE_ENV === 'development') {
-        console.error(
-          'Error creating subscription:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-      dispatch({
-        type: 'SET_ERROR',
-        payload:
-          error instanceof Error
-            ? error.message
-            : 'Failed to create subscription',
-      });
+      console.error('Error creating subscription:', error);
       toast({
         title: 'Error',
         description:
