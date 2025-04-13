@@ -11,7 +11,12 @@ import { PRICING_PLANS } from '@/constants/pricing';
 // Define types
 export type SubscriptionTier = 'free' | 'story_creator' | 'family';
 
-export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid';
+export type SubscriptionStatus =
+  | 'active'
+  | 'canceled'
+  | 'past_due'
+  | 'unpaid'
+  | 'trialing';
 
 export interface StoryUsage {
   id: string;
@@ -48,6 +53,10 @@ export interface Subscription {
   status: SubscriptionStatus;
   current_period_start: string;
   current_period_end: string;
+  subscription_start: string;
+  subscription_end: string;
+  trial_end: string | null;
+  payment_provider: string | null;
   created_at: string;
   updated_at: string;
   subscription_plans: SubscriptionPlan;

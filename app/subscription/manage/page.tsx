@@ -40,6 +40,7 @@ import {
   useSubscription,
   type SubscriptionStatus,
 } from '@/contexts/subscription-context';
+import { PRICING_PLANS } from '@/constants/pricing';
 
 export default function ManageSubscriptionPage() {
   const router = useRouter();
@@ -390,14 +391,14 @@ export default function ManageSubscriptionPage() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    {subscriptionState.availablePlans
-                      .find((plan) => plan.tier === currentTier)
-                      ?.features.map((feature, index) => (
-                        <li key={index} className="flex items-start">
-                          <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                          <span>{feature.name}</span>
-                        </li>
-                      ))}
+                    {PRICING_PLANS[
+                      currentTier.toLowerCase() as keyof typeof PRICING_PLANS
+                    ]?.features.map((feature, index) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
                   </ul>
                 </CardContent>
               </Card>
