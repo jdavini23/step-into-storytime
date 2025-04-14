@@ -197,7 +197,7 @@ export default function ManageSubscriptionPage() {
               variant="ghost"
               size="sm"
               onClick={() => router.back()}
-              className="mb-4"
+              className="mb-4 focus:ring-2 focus:ring-violet-400"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
@@ -218,7 +218,7 @@ export default function ManageSubscriptionPage() {
           {/* Removed redundant Subscription Status Banner */}
 
           {!subscriptionState.subscription ? (
-            <Card>
+            <Card className="mb-8 shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-2xl border border-slate-200 bg-white/90 dark:bg-slate-900/90 p-2 sm:p-6 animate-slide-fade-in">
               <CardHeader>
                 <CardTitle>No Active Subscription</CardTitle>
                 <CardDescription>
@@ -236,9 +236,9 @@ export default function ManageSubscriptionPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex flex-col sm:flex-row gap-4 mt-4">
                 <Button
-                  className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                  className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 hover:scale-105 active:scale-95 hover:brightness-105 focus:ring-2 focus:ring-violet-400 min-h-[44px] min-w-[44px] transition-transform"
                   onClick={() => router.push('/subscription')}
                 >
                   View Subscription Plans
@@ -247,7 +247,7 @@ export default function ManageSubscriptionPage() {
             </Card>
           ) : (
             <>
-              <Card className="mb-8">
+              <Card className="mb-8 shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-2xl border border-slate-200 bg-white/90 dark:bg-slate-900/90 p-2 sm:p-6 animate-slide-fade-in">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Subscription Details</CardTitle>
@@ -262,7 +262,7 @@ export default function ManageSubscriptionPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-1">
                         <p className="text-sm text-slate-500">Plan</p>
-                        <p className="font-medium text-lg capitalize">
+                        <p className="font-medium text-lg capitalize bg-gradient-to-r from-violet-700 to-indigo-500 bg-clip-text text-transparent">
                           {effectiveTier} Plan
                         </p>
                       </div>
@@ -323,7 +323,7 @@ export default function ManageSubscriptionPage() {
                           </p>
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 text-slate-400 mr-2" />
-                            <p>
+                            <p className="font-semibold text-indigo-700 dark:text-indigo-300 text-lg">
                               {formatDate(
                                 subscriptionState.subscription.subscription_end
                               )}
@@ -356,10 +356,10 @@ export default function ManageSubscriptionPage() {
                     )}
                   </div>
                 </CardContent>
-                <CardFooter className="flex flex-col sm:flex-row gap-4">
+                <CardFooter className="flex flex-col sm:flex-row gap-4 mt-4">
                   <Button
                     variant="outline"
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto hover:scale-105 active:scale-95 hover:ring-2 hover:ring-violet-400 focus:ring-2 focus:ring-violet-400 min-h-[44px] min-w-[44px] transition-transform"
                     onClick={() => router.push('/subscription')}
                   >
                     {ACTION_LABELS.upgrade}
@@ -368,7 +368,7 @@ export default function ManageSubscriptionPage() {
                   {effectiveStatus === 'active' && (
                     <Button
                       variant="destructive"
-                      className="w-full sm:w-auto"
+                      className="w-full sm:w-auto hover:scale-105 active:scale-95 hover:ring-2 hover:ring-red-300 focus:ring-2 focus:ring-red-400 min-h-[44px] min-w-[44px] transition-transform"
                       disabled={isCancelling}
                       onClick={() => setShowCancelDialog(true)}
                     >
@@ -387,7 +387,7 @@ export default function ManageSubscriptionPage() {
 
               {/* Plan Card Section - Modularized */}
               {subscriptionState.availablePlans && subscriptionState.availablePlans.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 animate-slide-fade-in">
                   {subscriptionState.availablePlans.map((plan) => {
                     const price = plan.prices && plan.prices.length > 0 ? plan.prices[0] : undefined;
                     // Only render if price exists (or adjust PlanCard to handle undefined price)
@@ -407,9 +407,11 @@ export default function ManageSubscriptionPage() {
                 </div>
               )}
 
-              <Card>
+              <div className="h-1 w-full bg-gradient-to-r from-violet-200/0 via-violet-300 to-violet-200/0 my-8 rounded-full" />
+
+              <Card className="shadow-md rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white dark:from-slate-800 dark:to-slate-900 mt-8 animate-slide-fade-in">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center text-xl font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-slate-800 rounded-lg px-3 py-2 mb-2">
                     <Shield className="h-5 w-5 text-violet-500 mr-2" />
                     Subscription Benefits
                   </CardTitle>
@@ -438,6 +440,22 @@ export default function ManageSubscriptionPage() {
           />
         </div>
       )}
+      <style jsx global>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(24px); }
+          to { opacity: 1; transform: none; }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        @keyframes slide-fade-in {
+          from { opacity: 0; transform: translateY(32px); }
+          to { opacity: 1; transform: none; }
+        }
+        .animate-slide-fade-in {
+          animation: slide-fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+      `}</style>
     </div>
   );
 }
