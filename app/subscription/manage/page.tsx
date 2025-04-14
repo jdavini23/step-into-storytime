@@ -22,6 +22,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import PlanCard from '../components/PlanCard';
+import StatusBanner from '../components/StatusBanner';
+import ConfirmationDialog from '../components/ConfirmationDialog';
+import SubscriptionBoundary from '../components/SubscriptionBoundary';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +47,11 @@ import {
   type Price,
 } from '@/contexts/subscription-context';
 import { PRICING_PLANS } from '@/constants/pricing';
+import { PLAN_STATUS_LABELS, ERROR_MESSAGES, ACTION_LABELS } from '@/lib/constants/subscription';
+import { fetchSubscription, switchPlan, cancelSubscription as cancelSubscriptionApi } from '@/lib/api/subscription';
+import FeatureList from '../components/FeatureList';
+import { usePlanSwitching } from '../hooks/usePlanSwitching';
+import { useCancelSubscription } from '../hooks/useCancelSubscription';
 
 export default function ManageSubscriptionPage() {
   const router = useRouter();
@@ -55,9 +64,29 @@ export default function ManageSubscriptionPage() {
     getRemainingDays,
   } = useSubscription();
 
-  const [isCancelling, setIsCancelling] = useState(false);
+  const currentTier = getSubscriptionTier();
+  const {
+    isSwitching,
+    error: switchError,
+    switchPlan,
+    retry: retrySwitchPlan,
+    optimisticTier,
+  } = usePlanSwitching(currentTier);
+
+  const subscriptionStatus = subscriptionState.subscription?.status as SubscriptionStatus;
+  const {
+    isCancelling,
+    error: cancelError,
+    cancelSubscription: cancelSubscriptionHook,
+    retry: retryCancel,
+    optimisticStatus,
+  } = useCancelSubscription(subscriptionStatus);
+
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [currentPrice, setCurrentPrice] = useState<Price | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!authState.isLoading && !authState.isAuthenticated) {
@@ -96,7 +125,6 @@ export default function ManageSubscriptionPage() {
     }
   }, [subscriptionState.subscription, subscriptionState.availablePlans]);
 
-  const currentTier = getSubscriptionTier();
   const remainingDays = getRemainingDays();
 
   const formatDate = (dateString: string | null | undefined) => {
@@ -129,15 +157,12 @@ export default function ManageSubscriptionPage() {
     }
   };
 
-  const handleCancelSubscription = async () => {
-    setIsCancelling(true);
-    try {
-      await cancelSubscription();
-    } catch (error) {
-      console.error('Error cancelling subscription:', error);
-    } finally {
-      setIsCancelling(false);
-    }
+  const effectiveTier = optimisticTier || currentTier;
+  const effectiveStatus = optimisticStatus || subscriptionStatus;
+
+  const onCancel = async () => {
+    await cancelSubscriptionHook();
+    setShowCancelDialog(false);
   };
 
   if (
@@ -146,21 +171,7 @@ export default function ManageSubscriptionPage() {
     !subscriptionState.isInitialized
   ) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-violet-600 mx-auto" />
-          <p className="mt-4 text-lg text-slate-600">
-            Loading subscription details...
-          </p>
-          <p className="mt-2 text-sm text-slate-500">
-            {!authState.isInitialized
-              ? 'Initializing auth...'
-              : !subscriptionState.isInitialized
-              ? 'Loading subscription...'
-              : 'Please wait...'}
-          </p>
-        </div>
-      </div>
+      <SubscriptionBoundary isLoading={true} children={undefined} />
     );
   }
 
@@ -199,6 +210,13 @@ export default function ManageSubscriptionPage() {
             </p>
           </div>
 
+          {/* Error Banner */}
+          {error && <StatusBanner status="canceled" message={error} />}
+          {switchError && <StatusBanner status="canceled" message={switchError} />}
+          {cancelError && <StatusBanner status="canceled" message={cancelError} />}
+
+          {/* Removed redundant Subscription Status Banner */}
+
           {!subscriptionState.subscription ? (
             <Card>
               <CardHeader>
@@ -233,7 +251,7 @@ export default function ManageSubscriptionPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Subscription Details</CardTitle>
-                    {getStatusBadge(subscriptionState.subscription.status)}
+                    {getStatusBadge(effectiveStatus)}
                   </div>
                   <CardDescription>
                     Your current subscription information
@@ -245,21 +263,20 @@ export default function ManageSubscriptionPage() {
                       <div className="space-y-1">
                         <p className="text-sm text-slate-500">Plan</p>
                         <p className="font-medium text-lg capitalize">
-                          {currentTier} Plan
+                          {effectiveTier} Plan
                         </p>
                       </div>
 
                       <div className="space-y-1">
                         <p className="text-sm text-slate-500">Status</p>
                         <div className="flex items-center">
-                          {subscriptionState.subscription.status ===
-                          'active' ? (
+                          {effectiveStatus === 'active' ? (
                             <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
                           ) : (
                             <AlertCircle className="h-5 w-5 text-orange-500 mr-2" />
                           )}
                           <p className="font-medium capitalize">
-                            {subscriptionState.subscription.status}
+                            {effectiveStatus}
                           </p>
                         </div>
                       </div>
@@ -280,7 +297,7 @@ export default function ManageSubscriptionPage() {
                         </div>
                       </div>
 
-                      {subscriptionState.subscription.status === 'trialing' ? (
+                      {effectiveStatus === 'trialing' ? (
                         <div className="space-y-1">
                           <p className="text-sm text-slate-500">Trial Ends</p>
                           <div className="flex items-center">
@@ -300,8 +317,7 @@ export default function ManageSubscriptionPage() {
                       ) : (
                         <div className="space-y-1">
                           <p className="text-sm text-slate-500">
-                            {subscriptionState.subscription.status ===
-                            'canceled'
+                            {effectiveStatus === 'canceled'
                               ? 'Ends'
                               : 'Renews'}
                           </p>
@@ -346,49 +362,60 @@ export default function ManageSubscriptionPage() {
                     className="w-full sm:w-auto"
                     onClick={() => router.push('/subscription')}
                   >
-                    Change Plan
+                    {ACTION_LABELS.upgrade}
                   </Button>
 
-                  {subscriptionState.subscription.status === 'active' && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          className="w-full sm:w-auto"
-                          disabled={isCancelling}
-                        >
-                          {isCancelling ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Cancelling...
-                            </>
-                          ) : (
-                            'Cancel Subscription'
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will cancel your subscription. You'll still
-                            have access until the end of your current billing
-                            period, but you won't be charged again.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>
-                            No, keep my subscription
-                          </AlertDialogCancel>
-                          <AlertDialogAction onClick={handleCancelSubscription}>
-                            Yes, cancel subscription
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                  {effectiveStatus === 'active' && (
+                    <>
+                      <Button
+                        variant="destructive"
+                        className="w-full sm:w-auto"
+                        disabled={isCancelling}
+                        onClick={() => setShowCancelDialog(true)}
+                      >
+                        {isCancelling ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Cancelling...
+                          </>
+                        ) : (
+                          ACTION_LABELS.cancel
+                        )}
+                      </Button>
+                      <ConfirmationDialog
+                        open={showCancelDialog}
+                        title="Are you sure?"
+                        description="This will cancel your subscription. You'll still have access until the end of your current billing period, but you won't be charged again."
+                        onCancel={() => setShowCancelDialog(false)}
+                        onConfirm={onCancel}
+                        isLoading={isCancelling}
+                      />
+                    </>
                   )}
                 </CardFooter>
               </Card>
+
+              {/* Plan Card Section - Modularized */}
+              {subscriptionState.availablePlans && subscriptionState.availablePlans.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {subscriptionState.availablePlans.map((plan) => {
+                    const price = plan.prices && plan.prices.length > 0 ? plan.prices[0] : undefined;
+                    // Only render if price exists (or adjust PlanCard to handle undefined price)
+                    if (!price) return null;
+                    // Only allow valid SubscriptionStatus values
+                    return (
+                      <PlanCard
+                        key={plan.id}
+                        product={plan}
+                        price={price}
+                        status={effectiveStatus}
+                        isCurrent={plan.tier === effectiveTier}
+                        onSelect={() => switchPlan(plan.id)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
 
               <Card>
                 <CardHeader>
@@ -398,76 +425,11 @@ export default function ManageSubscriptionPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
-                    {(() => {
-                      const plans = subscriptionState.availablePlans || [];
-                      const currentTier = getSubscriptionTier();
-
-                      // Find the plan matching current tier
-                      const currentPlan = plans.find(
-                        (plan) => plan.tier === currentTier
-                      ) || {
-                        tier: 'free',
-                        features: PRICING_PLANS.free.features,
-                      };
-
-                      // Ensure features is always an array of strings
-                      let features: string[] = [];
-
-                      if (Array.isArray(currentPlan.features)) {
-                        // If it's already an array, make sure each item is a string
-                        features = currentPlan.features.map((feature) =>
-                          typeof feature === 'string'
-                            ? feature
-                            : JSON.stringify(feature)
-                        );
-                      } else if (currentPlan.features) {
-                        if (typeof currentPlan.features === 'string') {
-                          // If it's a single string
-                          features = [currentPlan.features];
-                        } else if (typeof currentPlan.features === 'object') {
-                          // If it's an object, convert to array of strings
-                          features = Object.entries(currentPlan.features).map(
-                            ([key, value]) => `${key}: ${value}`
-                          );
-                        }
-                      }
-
-                      // Render features
-                      return features.map((feature, index) => (
-                        <li key={index} className="flex items-start">
-                          <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                          <span>{feature}</span>
-                        </li>
-                      ));
-                    })()}
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Current Plan Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Current Plan</h3>
-                    {currentProduct && currentPrice ? (
-                      <>
-                        <p>
-                          You are currently subscribed to the{' '}
-                          <b>{currentProduct.name}</b> plan, which costs{' '}
-                          <b>
-                            {currentPrice.unit_amount / 100}{' '}
-                            {currentPrice.currency}
-                          </b>{' '}
-                          per {currentPrice.recurring.interval}.
-                        </p>
-                      </>
-                    ) : (
-                      <p>Loading plan details...</p> // Or handle case where product/price not found
-                    )}
-                  </div>
+                  <FeatureList
+                    plans={subscriptionState.availablePlans}
+                    currentTier={effectiveTier}
+                    PRICING_PLANS={PRICING_PLANS}
+                  />
                 </CardContent>
               </Card>
             </>
