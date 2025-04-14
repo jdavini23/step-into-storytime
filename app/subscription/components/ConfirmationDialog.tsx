@@ -6,9 +6,10 @@ interface ConfirmationDialogProps {
   description: string;
   onConfirm: () => void;
   onCancel: () => void;
+  isLoading?: boolean;
 }
 
-const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({ open, title, description, onConfirm, onCancel }) => {
+const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({ open, title, description, onConfirm, onCancel, isLoading }) => {
   // TODO: Implement confirmation dialog UI
   // Accessibility: Dialog semantics
   const dialogRef = React.useRef<HTMLDivElement>(null);
@@ -30,8 +31,10 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({ open, title, de
     >
       <h2 id="dialog-title">{title}</h2>
       <p id="dialog-desc">{description}</p>
-      <button onClick={onCancel}>Cancel</button>
-      <button onClick={onConfirm}>Confirm</button>
+      <button onClick={onCancel} disabled={isLoading}>Cancel</button>
+      <button onClick={onConfirm} disabled={isLoading}>
+        {isLoading ? 'Loading...' : 'Confirm'}
+      </button>
     </div>
   );
 };

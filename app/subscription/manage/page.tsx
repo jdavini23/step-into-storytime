@@ -426,7 +426,7 @@ export default function ManageSubscriptionPage() {
                 </CardHeader>
                 <CardContent>
                   <FeatureList
-                    plans={subscriptionState.availablePlans}
+                    plans={subscriptionState.availablePlans ?? []}
                     currentTier={effectiveTier}
                     PRICING_PLANS={PRICING_PLANS}
                   />

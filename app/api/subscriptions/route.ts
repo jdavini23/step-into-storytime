@@ -258,9 +258,11 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (createPlanError) {
-          throw new Error(
-            `Failed to create subscription plan: ${createPlanError.message}`
-          );
+          return NextResponse.json<ErrorResponse>({
+            error: `Failed to create subscription plan`,
+            code: 'DB_ERROR',
+            details: createPlanError.message,
+          }, { status: 500 });
         }
 
         console.log('[DEBUG] Created new plan:', newPlan);
@@ -274,9 +276,11 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (planError || !plan) {
-        throw new Error(
-          `Failed to fetch subscription plan: ${planError?.message}`
-        );
+        return NextResponse.json<ErrorResponse>({
+          error: `Failed to fetch subscription plan`,
+          code: 'DB_ERROR',
+          details: planError?.message,
+        }, { status: 500 });
       }
 
       // Check for existing active subscription
@@ -288,19 +292,70 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (existingSubError && existingSubError.code !== 'PGRST116') {
-        throw new Error(
-          `Failed to check existing subscription: ${existingSubError.message}`
-        );
+        return NextResponse.json<ErrorResponse>({
+          error: `Failed to check existing subscription`,
+          code: 'DB_ERROR',
+          details: existingSubError.message,
+        }, { status: 500 });
       }
 
+      // If an active subscription exists
       if (existingSub) {
-        return NextResponse.json<ErrorResponse>(
-          {
-            error: 'User already has an active subscription',
+        // If the user is on the Free tier, allow upgrade by updating the subscription
+        if (existingSub.plan_id && plan.tier === 'free') {
+          return NextResponse.json<ErrorResponse>({
+            error: 'Already on Free plan',
+            code: 'ALREADY_FREE',
+          }, { status: 400 });
+        }
+        // If current plan is free, allow upgrade
+        const { data: currentPlan, error: currentPlanError } = await supabase
+          .from('subscription_plans')
+          .select('*')
+          .eq('id', existingSub.plan_id)
+          .single();
+        if (currentPlanError) {
+          return NextResponse.json<ErrorResponse>({
+            error: `Failed to fetch current subscription plan`,
+            code: 'DB_ERROR',
+            details: currentPlanError.message,
+          }, { status: 500 });
+        }
+        if (currentPlan.tier === 'free') {
+          // Update existing subscription to new plan
+          const now = new Date();
+          const endDate = new Date(now);
+          endDate.setDate(endDate.getDate() + 30);
+          const { data: updatedSub, error: updateError } = await supabase
+            .from('subscriptions')
+            .update({
+              plan_id: plan.id.toString(),
+              updated_at: now.toISOString(),
+              start_date: now.toISOString(),
+              end_date: endDate.toISOString(),
+              status: 'active',
+            })
+            .eq('id', existingSub.id)
+            .select()
+            .single();
+          if (updateError) {
+            return NextResponse.json<ErrorResponse>({
+              error: `Failed to upgrade subscription`,
+              code: 'DB_ERROR',
+              details: updateError.message,
+            }, { status: 500 });
+          }
+          return NextResponse.json({
+            message: 'Subscription upgraded successfully',
+            subscription: updatedSub,
+          });
+        } else {
+          // Already has an active paid subscription
+          return NextResponse.json<ErrorResponse>({
+            error: 'User already has an active paid subscription',
             code: 'DUPLICATE_SUBSCRIPTION',
-          },
-          { status: 400 }
-        );
+          }, { status: 400 });
+        }
       }
 
       const now = new Date();
@@ -317,18 +372,18 @@ export async function POST(request: NextRequest) {
             user_id: user.id,
             status: 'active',
             plan_id: plan.id.toString(),
-            subscription_start: now.toISOString(),
-            subscription_end: endDate.toISOString(),
-            trial_end: null,
-            payment_provider: null,
-            payment_provider_id: null,
+            start_date: now.toISOString(),
+            end_date: endDate.toISOString(),
           },
         ])
         .select()
         .single();
-
       if (subError) {
-        throw new Error(`Failed to create subscription: ${subError.message}`);
+        return NextResponse.json<ErrorResponse>({
+          error: `Failed to create subscription`,
+          code: 'DB_ERROR',
+          details: subError.message,
+        }, { status: 500 });
       }
 
       // Update the user's profile with the new subscription tier
@@ -346,6 +401,7 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id);
 
       if (profileError) {
+        console.error('[DEBUG] Profile update failed:', profileError);
         // If profile update fails, delete the subscription to maintain consistency
         const { error: deleteError } = await supabase
           .from('subscriptions')
@@ -359,7 +415,11 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        throw new Error(`Failed to update profile: ${profileError.message}`);
+        return NextResponse.json<ErrorResponse>({
+          error: `Failed to update profile`,
+          code: 'DB_ERROR',
+          details: profileError.message,
+        }, { status: 500 });
       }
 
       console.log(
@@ -367,7 +427,11 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json<SubscriptionResponse>(subscription);
     } catch (error) {
-      throw error;
+      console.error('[POST /api/subscriptions] Unhandled error:', error);
+      return NextResponse.json<ErrorResponse>({
+        error: error instanceof Error ? error.message : 'Internal Server Error',
+        code: 'INTERNAL_ERROR',
+      }, { status: 500 });
     }
   } catch (error) {
     console.error(
