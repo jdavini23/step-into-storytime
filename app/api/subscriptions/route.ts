@@ -222,13 +222,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[DEBUG] Starting POST /api/subscriptions');
     const supabase = await createClient();
+    
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error('[DEBUG] Auth error:', authError);
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
         { status: 401 }
@@ -237,6 +240,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { tier } = body;
+
+    console.log('[DEBUG] Received subscription request:', { tier, userId: user.id });
 
     if (!tier) {
       return NextResponse.json(
@@ -253,14 +258,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the plan ID for the requested tier
-    const { data: plan, error: planError } = await supabase
+    // First, ensure subscription plan exists
+    const { data: existingPlan, error: planCheckError } = await supabase
       .from('subscription_plans')
-      .select('id')
+      .select('*')
       .eq('tier', tier)
       .single();
 
-    if (planError) {
+    if (planCheckError) {
+      console.log('[DEBUG] Plan does not exist, creating default plan');
+      // Create the plan if it doesn't exist
+      const defaultPlan = {
+        tier,
+        name: tier === 'free' ? 'Free Tier' : 
+              tier === 'story_creator' ? 'Story Creator' : 'Family Plan',
+        description: tier === 'free' ? 'Basic story creation' :
+                    tier === 'story_creator' ? 'Advanced story creation' : 'Family story creation',
+        price_monthly: tier === 'free' ? 0 :
+                      tier === 'story_creator' ? 9.99 : 19.99,
+        story_limit: tier === 'free' ? 1 :
+                    tier === 'story_creator' ? 10 : 30,
+        features: tier === 'free' ? ['Basic story generation'] :
+                 tier === 'story_creator' ? ['Advanced story generation', 'Audio narration'] :
+                 ['Family story generation', 'Audio narration', 'Multiple profiles']
+      };
+
+      const { data: newPlan, error: createPlanError } = await supabase
+        .from('subscription_plans')
+        .insert([defaultPlan])
+        .select()
+        .single();
+
+      if (createPlanError) {
+        console.error('[DEBUG] Error creating plan:', createPlanError);
+        return NextResponse.json(
+          { error: 'Failed to create subscription plan' },
+          { status: 500 }
+        );
+      }
+
+      console.log('[DEBUG] Created new plan:', newPlan);
+    }
+
+    // Now get the plan (either existing or newly created)
+    const { data: plan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('tier', tier)
+      .single();
+
+    if (planError || !plan) {
       console.error('[DEBUG] Error fetching plan:', planError);
       return NextResponse.json(
         { error: 'Failed to fetch subscription plan' },
@@ -268,36 +315,82 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check for existing active subscription
+    const { data: existingSub, error: existingSubError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .single();
+
+    if (existingSubError && existingSubError.code !== 'PGRST116') {
+      console.error('[DEBUG] Error checking existing subscription:', existingSubError);
+      return NextResponse.json(
+        { error: 'Failed to check existing subscription' },
+        { status: 500 }
+      );
+    }
+
+    if (existingSub) {
+      return NextResponse.json(
+        { error: 'User already has an active subscription' },
+        { status: 400 }
+      );
+    }
+
     const now = new Date().toISOString();
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 30);
 
+    console.log('[DEBUG] Creating subscription with plan:', plan);
+
+    // Start a transaction
     const { data: subscription, error: subError } = await supabase
       .from('subscriptions')
       .insert([
         {
           user_id: user.id,
           status: 'active',
+          plan_id: plan.id.toString(),
           subscription_start: now,
           subscription_end: endDate.toISOString(),
-          plan_id: plan.id,
+          trial_end: null,
           payment_provider: null,
-          payment_provider_id: null,
-        },
+          payment_provider_id: null
+        }
       ])
       .select()
       .single();
 
     if (subError) {
+      console.error('[DEBUG] Error creating subscription:', subError);
       return NextResponse.json(
         { error: subError.message || 'Failed to create subscription' },
         { status: 500 }
       );
     }
 
+    // Update the user's profile with the new subscription tier
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ 
+        subscription_tier: tier === 'story_creator' ? 'premium' : 
+                          tier === 'family' ? 'premium' : 'basic',
+        updated_at: now
+      })
+      .eq('id', user.id);
+
+    if (profileError) {
+      console.error('[DEBUG] Error updating profile:', profileError);
+      // Don't fail the request, but log the error
+      console.warn('[DEBUG] Profile update failed but subscription was created');
+    }
+
+    console.log('[DEBUG] Successfully created subscription and updated profile');
     return NextResponse.json(subscription);
+
   } catch (error) {
-    console.error('Error in POST /api/subscriptions:', error);
+    console.error('[DEBUG] Unexpected error in POST /api/subscriptions:', error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }
