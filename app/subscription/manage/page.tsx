@@ -52,6 +52,11 @@ import { fetchSubscription, switchPlan, cancelSubscription as cancelSubscription
 import FeatureList from '../components/FeatureList';
 import { usePlanSwitching } from '../hooks/usePlanSwitching';
 import { useCancelSubscription } from '../hooks/useCancelSubscription';
+import { useToast } from '@/components/ui/use-toast';
+import { Toaster } from '@/components/ui/toaster';
+import { Tooltip } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Info } from 'lucide-react';
 
 export default function ManageSubscriptionPage() {
   const router = useRouter();
@@ -87,6 +92,9 @@ export default function ManageSubscriptionPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [benefitsOpen, setBenefitsOpen] = useState(true);
 
   useEffect(() => {
     if (!authState.isLoading && !authState.isAuthenticated) {
@@ -160,18 +168,35 @@ export default function ManageSubscriptionPage() {
   const effectiveTier = optimisticTier || currentTier;
   const effectiveStatus = optimisticStatus || subscriptionStatus;
 
-  const onCancel = async () => {
-    await cancelSubscriptionHook();
-    setShowCancelDialog(false);
+  const handleCancel = async () => {
+    try {
+      await cancelSubscriptionHook();
+      toast({ title: 'Subscription canceled', description: 'Your subscription has been canceled. You will retain access until the end of the billing period.' });
+    } catch (e) {
+      toast({ title: 'Error', description: e?.message || 'An error occurred.' });
+    }
   };
 
-  if (
-    subscriptionState.isLoading ||
-    authState.isLoading ||
-    !subscriptionState.isInitialized
-  ) {
+  const showOnboardingNudge = !subscriptionState.subscription || effectiveTier === 'free';
+
+  const quotaUsed = (subscriptionState as any).usage?.storiesUsed || 0;
+  const quotaTotal = (subscriptionState as any).usage?.storiesQuota || 1;
+  const showUpgradeBanner = effectiveTier === 'free' && quotaUsed / quotaTotal > 0.8;
+
+  const userName =
+    typeof authState.user?.name === 'string'
+      ? authState.user.name
+      : typeof authState.user?.user_metadata?.name === 'string'
+        ? authState.user.user_metadata.name
+        : authState.user?.email?.split('@')[0];
+
+  if (subscriptionState.isLoading) {
     return (
-      <SubscriptionBoundary isLoading={true} children={undefined} />
+      <div className="max-w-3xl mx-auto py-12">
+        <Skeleton className="h-32 w-full rounded-xl mb-6" />
+        <Skeleton className="h-32 w-full rounded-xl mb-6" />
+        <Skeleton className="h-20 w-full rounded-xl" />
+      </div>
     );
   }
 
@@ -187,6 +212,11 @@ export default function ManageSubscriptionPage() {
               Step Into Storytime
             </span>
           </Link>
+          {userName && (
+            <h2 className="text-lg font-semibold text-violet-700 dark:text-violet-300 mt-2 mb-4">
+              Hi, {userName}!
+            </h2>
+          )}
         </div>
       </header>
 
@@ -211,9 +241,43 @@ export default function ManageSubscriptionPage() {
           </div>
 
           {/* Error Banner */}
-          {error && <StatusBanner status="canceled" message={error} />}
-          {switchError && <StatusBanner status="canceled" message={switchError} />}
-          {cancelError && <StatusBanner status="canceled" message={cancelError} />}
+          {(error || switchError || cancelError) && (
+            <StatusBanner status="canceled" message={String(error || switchError || cancelError)} />
+          )}
+          {(error || switchError || cancelError) && (
+            <button
+              className="text-xs text-violet-700 underline mt-1 mb-4 focus:ring-2 focus:ring-violet-400"
+              onClick={() => setShowErrorDetails((v) => !v)}
+              aria-expanded={showErrorDetails}
+            >
+              {showErrorDetails ? 'Hide details' : 'Show details'}
+            </button>
+          )}
+          {showErrorDetails && (
+            <pre className="bg-slate-100 text-xs text-slate-800 rounded-lg p-3 mb-4 overflow-x-auto">
+              {JSON.stringify(error || switchError || cancelError, null, 2)}
+            </pre>
+          )}
+
+          {/* Onboarding Nudge */}
+          {showOnboardingNudge && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-xl mb-6 flex items-center gap-3 animate-slide-fade-in">
+              <Info className="h-5 w-5 text-yellow-500" />
+              <span>
+                Unlock more features by upgrading your plan! <button className="underline font-semibold hover:text-violet-700 ml-1" onClick={() => router.push('/subscription')}>See plans</button>
+              </span>
+            </div>
+          )}
+
+          {/* Upgrade Suggestion Banner */}
+          {showUpgradeBanner && (
+            <div className="bg-violet-50 border-l-4 border-violet-400 text-violet-800 p-4 rounded-xl mb-6 flex items-center gap-3 animate-slide-fade-in">
+              <Info className="h-5 w-5 text-violet-500 animate-bounce" />
+              <span>
+                You’re close to your monthly story limit. <button className="underline font-semibold hover:text-violet-700 ml-1" onClick={() => router.push('/subscription')}>Upgrade now</button> for unlimited stories!
+              </span>
+            </div>
+          )}
 
           {/* Removed redundant Subscription Status Banner */}
 
@@ -410,20 +474,33 @@ export default function ManageSubscriptionPage() {
               <div className="h-1 w-full bg-gradient-to-r from-violet-200/0 via-violet-300 to-violet-200/0 my-8 rounded-full" />
 
               <Card className="shadow-md rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white dark:from-slate-800 dark:to-slate-900 mt-8 animate-slide-fade-in">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center text-xl font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-slate-800 rounded-lg px-3 py-2 mb-2">
-                    <Shield className="h-5 w-5 text-violet-500 mr-2" />
+                    <Shield className="h-5 w-5 text-violet-500 mr-2 animate-spin-slow" />
                     Subscription Benefits
                   </CardTitle>
+                  <button
+                    className="ml-2 px-2 py-1 rounded focus:ring-2 focus:ring-violet-400 text-violet-700 dark:text-violet-300 text-sm font-medium hover:bg-violet-100 dark:hover:bg-slate-700 transition"
+                    aria-expanded={benefitsOpen}
+                    onClick={() => setBenefitsOpen((v) => !v)}
+                  >
+                    {benefitsOpen ? 'Hide' : 'Show'}
+                  </button>
                 </CardHeader>
-                <CardContent>
-                  <FeatureList
-                    plans={subscriptionState.availablePlans ?? []}
-                    currentTier={effectiveTier}
-                    PRICING_PLANS={PRICING_PLANS}
-                  />
-                </CardContent>
+                {benefitsOpen && (
+                  <CardContent>
+                    <FeatureList
+                      plans={subscriptionState.availablePlans ?? []}
+                      currentTier={effectiveTier}
+                      PRICING_PLANS={PRICING_PLANS}
+                    />
+                  </CardContent>
+                )}
               </Card>
+
+              <div className="flex justify-end mt-4">
+                <a href="/faq" className="text-xs underline text-slate-500 hover:text-violet-700 focus:ring-2 focus:ring-violet-400">Need help? Visit our FAQ</a>
+              </div>
             </>
           )}
         </div>
@@ -435,11 +512,12 @@ export default function ManageSubscriptionPage() {
             title="Are you sure?"
             description="This will cancel your subscription. You'll still have access until the end of your current billing period, but you won't be charged again."
             onCancel={() => setShowCancelDialog(false)}
-            onConfirm={onCancel}
+            onConfirm={handleCancel}
             isLoading={isCancelling}
           />
         </div>
       )}
+      <Toaster />
       <style jsx global>{`
         @keyframes fade-in {
           from { opacity: 0; transform: translateY(24px); }
@@ -454,6 +532,13 @@ export default function ManageSubscriptionPage() {
         }
         .animate-slide-fade-in {
           animation: slide-fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        @keyframes spin-slow {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+          animation: spin-slow 2.5s linear infinite;
         }
       `}</style>
     </div>
