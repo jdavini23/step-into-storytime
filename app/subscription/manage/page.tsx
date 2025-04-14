@@ -366,31 +366,21 @@ export default function ManageSubscriptionPage() {
                   </Button>
 
                   {effectiveStatus === 'active' && (
-                    <>
-                      <Button
-                        variant="destructive"
-                        className="w-full sm:w-auto"
-                        disabled={isCancelling}
-                        onClick={() => setShowCancelDialog(true)}
-                      >
-                        {isCancelling ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Cancelling...
-                          </>
-                        ) : (
-                          ACTION_LABELS.cancel
-                        )}
-                      </Button>
-                      <ConfirmationDialog
-                        open={showCancelDialog}
-                        title="Are you sure?"
-                        description="This will cancel your subscription. You'll still have access until the end of your current billing period, but you won't be charged again."
-                        onCancel={() => setShowCancelDialog(false)}
-                        onConfirm={onCancel}
-                        isLoading={isCancelling}
-                      />
-                    </>
+                    <Button
+                      variant="destructive"
+                      className="w-full sm:w-auto"
+                      disabled={isCancelling}
+                      onClick={() => setShowCancelDialog(true)}
+                    >
+                      {isCancelling ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Cancelling...
+                        </>
+                      ) : (
+                        ACTION_LABELS.cancel
+                      )}
+                    </Button>
                   )}
                 </CardFooter>
               </Card>
@@ -436,6 +426,18 @@ export default function ManageSubscriptionPage() {
           )}
         </div>
       </main>
+      {showCancelDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 transition-opacity">
+          <ConfirmationDialog
+            open={showCancelDialog}
+            title="Are you sure?"
+            description="This will cancel your subscription. You'll still have access until the end of your current billing period, but you won't be charged again."
+            onCancel={() => setShowCancelDialog(false)}
+            onConfirm={onCancel}
+            isLoading={isCancelling}
+          />
+        </div>
+      )}
     </div>
   );
 }
