@@ -1,0 +1,26 @@
+Step Into Storytime - Product Requirements Document
+
+This document outlines the requirements for Step Into Storytime, an AI-powered platform for generating personalized children's stories.
+
+Core Features:
+1. Story Generation
+- Allow users to customize characters, settings, and themes
+- Generate unique stories using AI
+- Support text and audio output formats
+
+2. User Management
+- User authentication via Supabase
+- Support for multiple child profiles
+- Story saving and favorites
+
+3. Technical Requirements
+- React frontend with TailwindCSS
+- Supabase backend
+- OpenAI integration
+- Text-to-speech capability
+
+4. Database Structure
+- Users table
+- Child_Profiles table
+- Stories table
+- Subscription_Plans table 

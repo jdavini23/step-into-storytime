@@ -1,23 +1,32 @@
 import { Database } from './supabase';
 
 // Re-export database types
-export type SubscriptionPlan = Database['public']['Tables']['subscription_plans']['Row'];
-export type Subscription = Database['public']['Tables']['subscriptions']['Row'] & {
-  subscription_plans?: SubscriptionPlan;
-  // Add properties used in context fallback/defaults
-  current_period_start?: string | null;
-  current_period_end?: string | null;
-  subscription_start?: string | null;
-  subscription_end?: string | null;
-  trial_end?: string | null;
-  payment_provider?: string | null;
-  payment_provider_id?: string | null;
-};
+export type SubscriptionPlan =
+  Database['public']['Tables']['subscription_plans']['Row'];
+export type Subscription =
+  Database['public']['Tables']['subscriptions']['Row'] & {
+    subscription_plans?: SubscriptionPlan;
+    // Add properties used in context fallback/defaults
+    current_period_start?: string | null;
+    current_period_end?: string | null;
+    subscription_start?: string | null;
+    subscription_end?: string | null;
+    trial_end?: string | null;
+    payment_provider?: string | null;
+    payment_provider_id?: string | null;
+  };
 export type StoryUsage = Database['public']['Tables']['story_usage']['Row'];
 
 // Context-specific types
 export type SubscriptionTier = 'free' | 'story_creator' | 'family';
-export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid';
+export type SubscriptionStatus =
+  | 'active'
+  | 'canceled'
+  | 'past_due'
+  | 'unpaid'
+  | 'trialing'
+  | 'incomplete'
+  | 'incomplete_expired';
 
 export interface Price {
   id: string;
@@ -46,7 +55,15 @@ export type SubscriptionState = {
 };
 
 export type SubscriptionAction =
-  | { type: 'INITIALIZE'; payload: { subscription: Subscription | null; storyUsage: StoryUsage | null; isInitialized: boolean; availablePlans?: Product[] } }
+  | {
+      type: 'INITIALIZE';
+      payload: {
+        subscription: Subscription | null;
+        storyUsage: StoryUsage | null;
+        isInitialized: boolean;
+        availablePlans?: Product[];
+      };
+    }
   | { type: 'SET_SUBSCRIPTION'; payload: Subscription | null }
   | { type: 'SET_STORY_USAGE'; payload: StoryUsage | null }
   | { type: 'INCREMENT_STORY_COUNT' }

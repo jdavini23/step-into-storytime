@@ -86,7 +86,7 @@ export default function ManageSubscriptionPage() {
     if (subscriptionState.subscription && subscriptionState.availablePlans) {
       const product = subscriptionState.availablePlans.find(
         (plan) =>
-          plan.tier === subscriptionState.subscription?.subscription_plans.tier
+          plan.tier === subscriptionState.subscription?.subscription_plans?.tier
       );
 
       if (product?.prices?.length) {

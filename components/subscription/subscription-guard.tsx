@@ -103,7 +103,7 @@ export function SubscriptionGuard({
   const requiredTier =
     currentTier === 'free'
       ? 'Story Creator'
-      : currentTier === 'unlimited'
+      : currentTier === 'story_creator'
       ? 'Family'
       : 'Family';
 

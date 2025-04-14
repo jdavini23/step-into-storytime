@@ -1,7 +1,13 @@
 'use client';
 
 import type React from 'react';
-import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+  useCallback,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from '@/hooks/use-toast';
@@ -24,6 +30,9 @@ import {
   StoryUsage,
   SubscriptionTier,
   Product,
+  Price,
+  SubscriptionStatus,
+  SubscriptionPlan,
 } from '@/types/subscription';
 import {
   getSubscriptionTier as getSubscriptionTierUtil,
@@ -33,12 +42,22 @@ import {
   getRemainingDays as getRemainingDaysUtil,
 } from '@/hooks/use-subscription-utils';
 import { PRICING_PLANS } from '@/constants/pricing'; // Assuming PRICING_PLANS defines the structure for availablePlans
-import { error } from 'console';
 import { type } from 'os';
 import { title } from 'process';
 import { string } from 'zod';
 
-// Define types - Moved to types/subscription.ts
+// Re-export subscription types
+export type {
+  SubscriptionState,
+  SubscriptionAction,
+  Subscription,
+  StoryUsage,
+  SubscriptionTier,
+  Product,
+  Price,
+  SubscriptionStatus,
+  SubscriptionPlan,
+};
 
 // Initial state remains, but uses imported types and potentially simplifies availablePlans logic
 const initialState: SubscriptionState = {
@@ -162,7 +181,10 @@ export function SubscriptionProvider({
   // --- Initialization --- //
   const initialize = useCallback(async () => {
     if (!auth.state.user?.id) {
-      dispatch({ type: 'INITIALIZE', payload: { ...initialState, isInitialized: true } });
+      dispatch({
+        type: 'INITIALIZE',
+        payload: { ...initialState, isInitialized: true },
+      });
       return;
     }
 
@@ -180,7 +202,7 @@ export function SubscriptionProvider({
         // Use default free tier if fetch fails but user exists
       }
       if (usageResult.error && usageResult.error.code !== 'PGRST116') {
-         // Log error if it's not 'not found'
+        // Log error if it's not 'not found'
         console.error('Error fetching story usage:', usageResult.error);
       }
 
@@ -188,45 +210,53 @@ export function SubscriptionProvider({
       let finalSubscription = subResult.data;
       if (!finalSubscription) {
         // Look for the predefined free plan or use a hardcoded fallback
-        const freePlan = state.availablePlans?.find(p => p.tier === 'free');
-        const freePlanStoryLimit = PRICING_PLANS.free.features.includes('5 story generations per month') ? 5 : 1; // Or get from a dedicated field if exists
+        const freePlan = state.availablePlans?.find((p) => p.tier === 'free');
+        const freePlanStoryLimit = PRICING_PLANS.free.features.includes(
+          '5 story generations per month'
+        )
+          ? 5
+          : 1; // Or get from a dedicated field if exists
 
         finalSubscription = {
-            id: '', // Placeholder ID
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            user_id: auth.state.user.id,
-            status: 'active',
-            plan_id: "free", // Use string ID for free plan
-            subscription_plans: freePlan ? { 
-              id: 1, // Use assumed numeric ID for free plan
-              tier: freePlan.tier as SubscriptionTier,
-              name: freePlan.name,
-              description: PRICING_PLANS.free.description || '', // Add description if available in PRICING_PLANS
-              price_monthly: 0,
-              story_limit: freePlanStoryLimit, // Use consistent limit
-              features: freePlan.features,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-             } : {
-              // Fallback plan details (ensure this matches SubscriptionPlan type)
-              id: 1, // Use assumed numeric ID for free plan
-              tier: 'free',
-              name: 'Free Tier',
-              description: 'Basic plan',
-              price_monthly: 0,
-              story_limit: 1, // Fallback story limit
-              features: [],
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            current_period_start: new Date().toISOString(),
-            current_period_end: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Example: 1 year end
-            subscription_start: new Date().toISOString(),
-            subscription_end: null, // Use null instead of ''
-            trial_end: null,
-            payment_provider: null,
-            payment_provider_id: null,
+          id: '', // Placeholder ID
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_id: auth.state.user.id,
+          status: 'active',
+          plan_id: 'free', // Use string ID for free plan
+          subscription_plans: freePlan
+            ? {
+                id: 1, // Use assumed numeric ID for free plan
+                tier: freePlan.tier as SubscriptionTier,
+                name: freePlan.name,
+                description: PRICING_PLANS.free.description || '', // Add description if available in PRICING_PLANS
+                price_monthly: 0,
+                story_limit: freePlanStoryLimit, // Use consistent limit
+                features: freePlan.features,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }
+            : {
+                // Fallback plan details (ensure this matches SubscriptionPlan type)
+                id: 1, // Use assumed numeric ID for free plan
+                tier: 'free',
+                name: 'Free Tier',
+                description: 'Basic plan',
+                price_monthly: 0,
+                story_limit: 1, // Fallback story limit
+                features: [],
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+          current_period_start: new Date().toISOString(),
+          current_period_end: new Date(
+            new Date().setFullYear(new Date().getFullYear() + 1)
+          ).toISOString(), // Example: 1 year end
+          subscription_start: new Date().toISOString(),
+          subscription_end: null, // Use null instead of ''
+          trial_end: null,
+          payment_provider: null,
+          payment_provider_id: null,
         };
       }
 
@@ -235,14 +265,14 @@ export function SubscriptionProvider({
       if (!finalUsage && usageResult.error?.code === 'PGRST116') {
         // Create a default usage record if none exists
         finalUsage = {
-            id: 0, // Use placeholder numeric ID (assuming number type)
-            user_id: auth.state.user.id,
-            story_count: 0,
-            reset_date: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+          id: 0, // Use placeholder numeric ID (assuming number type)
+          user_id: auth.state.user.id,
+          story_count: 0,
+          reset_date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
-         // Optionally: insert this default record into the DB asynchronously
+        // Optionally: insert this default record into the DB asynchronously
         // Do not await here to avoid blocking initialization
         // createDefaultStoryUsage(auth.state.user.id);
       }
@@ -258,9 +288,15 @@ export function SubscriptionProvider({
       });
     } catch (error) {
       console.error('Subscription initialization failed:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to initialize subscription' });
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'Failed to initialize subscription',
+      });
       // Initialize with defaults even on error to unblock UI
-      dispatch({ type: 'INITIALIZE', payload: { ...initialState, isInitialized: true } }); // Remove error field
+      dispatch({
+        type: 'INITIALIZE',
+        payload: { ...initialState, isInitialized: true },
+      }); // Remove error field
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -285,9 +321,12 @@ export function SubscriptionProvider({
     return getRemainingStoriesUtil(state.subscription, state.storyUsage);
   }, [state.subscription, state.storyUsage]);
 
-  const hasFeature = useCallback((feature: string) => {
-    return hasFeatureUtil(state.subscription, feature);
-  }, [state.subscription]);
+  const hasFeature = useCallback(
+    (feature: string) => {
+      return hasFeatureUtil(state.subscription, feature);
+    },
+    [state.subscription]
+  );
 
   const getRemainingDays = useCallback(() => {
     return getRemainingDaysUtil(state.subscription);
@@ -301,7 +340,11 @@ export function SubscriptionProvider({
     updateState?: (data: T) => void
   ): Promise<void> => {
     if (!auth.state.user) {
-      toast({ title: 'Authentication required', description: 'Please sign in.', variant: 'destructive' });
+      toast({
+        title: 'Authentication required',
+        description: 'Please sign in.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -310,15 +353,18 @@ export function SubscriptionProvider({
 
     try {
       const { data, error } = await serviceCall();
-      
+
       if (error) {
         console.error(`${errorMessageBase}:`, error);
-        toast({ 
-          title: errorMessageBase, 
-          description: error.message || 'An unexpected error occurred', 
-          variant: 'destructive' 
+        toast({
+          title: errorMessageBase,
+          description: error.message || 'An unexpected error occurred',
+          variant: 'destructive',
         });
-        dispatch({ type: 'SET_ERROR', payload: error.message || 'An unexpected error occurred' });
+        dispatch({
+          type: 'SET_ERROR',
+          payload: error.message || 'An unexpected error occurred',
+        });
         return;
       }
 
@@ -327,17 +373,18 @@ export function SubscriptionProvider({
       }
 
       updateState?.(data);
-      toast({ 
+      toast({
         title: successMessage,
-        variant: 'default'
+        variant: 'default',
       });
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('An unexpected error occurred');
+      const error =
+        err instanceof Error ? err : new Error('An unexpected error occurred');
       console.error(`${errorMessageBase}:`, error);
-      toast({ 
-        title: errorMessageBase, 
-        description: error.message, 
-        variant: 'destructive' 
+      toast({
+        title: errorMessageBase,
+        description: error.message,
+        variant: 'destructive',
       });
       dispatch({ type: 'SET_ERROR', payload: error.message });
     } finally {
@@ -350,31 +397,35 @@ export function SubscriptionProvider({
   // Memoize the handler using useCallback
   const handleApiCall = useCallback(apiCallHandler, [
     auth.state.user, // Need user state for the check inside apiCallHandler
-    dispatch,        // Need dispatch for state updates
+    dispatch, // Need dispatch for state updates
     // router is not directly used in apiCallHandler, but might be if uncommenting redirection
     // Add router here if redirection is used, otherwise it can be omitted
   ]);
 
   const fetchSubscription = useCallback(async () => {
     // Use the initializer logic for fetching/refreshing
-     if (state.isInitialized) { // Only fetch if already initialized
-        await initialize();
-     }
+    if (state.isInitialized) {
+      // Only fetch if already initialized
+      await initialize();
+    }
   }, [initialize, state.isInitialized]);
 
-  const createSubscription = useCallback(async (tier: SubscriptionTier) => {
-    return apiCallHandler(
-      () => createSubscriptionService(tier),
-      'Subscription created successfully',
-      'Failed to create subscription',
-      (data) => {
-        if (data) {
-          dispatch({ type: 'SET_SUBSCRIPTION', payload: data });
-          router.push('/dashboard');
+  const createSubscription = useCallback(
+    async (tier: SubscriptionTier) => {
+      return apiCallHandler(
+        () => createSubscriptionService(tier),
+        'Subscription created successfully',
+        'Failed to create subscription',
+        (data) => {
+          if (data) {
+            dispatch({ type: 'SET_SUBSCRIPTION', payload: data });
+            router.push('/dashboard');
+          }
         }
-      }
-    );
-  }, [apiCallHandler, dispatch, router]);
+      );
+    },
+    [apiCallHandler, dispatch, router]
+  );
 
   const cancelSubscription = useCallback(() => {
     // Pass router explicitly if needed for redirection after success
@@ -383,24 +434,27 @@ export function SubscriptionProvider({
       'Subscription canceled successfully.',
       'Failed to cancel subscription',
       (data: Subscription | null) => {
-          dispatch({ type: 'SET_SUBSCRIPTION', payload: data });
-          router.push('/dashboard'); // Redirect after cancel
+        dispatch({ type: 'SET_SUBSCRIPTION', payload: data });
+        router.push('/dashboard'); // Redirect after cancel
       }
     );
   }, [handleApiCall, router]); // Keep router dependency here as it's used in the callback
 
-  const updateSubscription = useCallback((tier: SubscriptionTier) => {
-    // Pass router explicitly if needed for redirection after success
-    return handleApiCall(
-      () => updateSubscriptionService(tier),
-      'Subscription updated successfully.',
-      'Failed to update subscription',
-      (data: Subscription | null) => {
+  const updateSubscription = useCallback(
+    (tier: SubscriptionTier) => {
+      // Pass router explicitly if needed for redirection after success
+      return handleApiCall(
+        () => updateSubscriptionService(tier),
+        'Subscription updated successfully.',
+        'Failed to update subscription',
+        (data: Subscription | null) => {
           dispatch({ type: 'SET_SUBSCRIPTION', payload: data });
           router.push('/dashboard'); // Redirect after update
-      }
-    );
-  }, [handleApiCall, router]); // Keep router dependency here as it's used in the callback
+        }
+      );
+    },
+    [handleApiCall, router]
+  ); // Keep router dependency here as it's used in the callback
 
   const incrementStoryCount = useCallback(async () => {
     if (!auth.state.user?.id) return;
@@ -412,21 +466,31 @@ export function SubscriptionProvider({
     // dispatch({ type: 'INCREMENT_STORY_COUNT' });
 
     try {
-      const { success, error } = await incrementStoryUsageService(auth.state.user.id);
+      const { success, error } = await incrementStoryUsageService(
+        auth.state.user.id
+      );
       if (error) throw error;
 
       if (success) {
         // Confirm optimistic update or fetch latest usage
-         dispatch({ type: 'INCREMENT_STORY_COUNT' }); // Update state after confirmation
-         // OR: await fetchStoryUsage(); // Fetch latest count
+        dispatch({ type: 'INCREMENT_STORY_COUNT' }); // Update state after confirmation
+        // OR: await fetchStoryUsage(); // Fetch latest count
       } else {
         // Revert optimistic update if needed
-        toast({ title: 'Story limit reached', description: 'Please upgrade.', variant: 'destructive' });
+        toast({
+          title: 'Story limit reached',
+          description: 'Please upgrade.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error updating story count:', error);
-      toast({ title: 'Error', description: 'Failed to update story count', variant: 'destructive' });
-       // Revert optimistic update if implemented
+      toast({
+        title: 'Error',
+        description: 'Failed to update story count',
+        variant: 'destructive',
+      });
+      // Revert optimistic update if implemented
     }
     // Adjusted dependencies: getSubscriptionTier is derived from state, auth.state.user.id is needed
   }, [auth.state.user?.id, dispatch, getSubscriptionTier]);
@@ -457,16 +521,29 @@ export function SubscriptionProvider({
 export function useSubscription() {
   const context = useContext(SubscriptionContext);
   if (context === undefined) {
-    throw new Error('useSubscription must be used within a SubscriptionProvider');
+    throw new Error(
+      'useSubscription must be used within a SubscriptionProvider'
+    );
   }
   return context;
 }
 
-  function async<T>(serviceCall: () => Promise<{ data: T | null; error: Error | null }>, arg1: () => any, successMessage: any, string: (params?: import("zod").RawCreateParams & { coerce?: true; }) => import("zod").ZodString, errorMessageBase: any, string1: (params?: import("zod").RawCreateParams & { coerce?: true; }) => import("zod").ZodString, arg6: any) {
-    throw new Error('Function not implemented.');
-  }
+function async<T>(
+  serviceCall: () => Promise<{ data: T | null; error: Error | null }>,
+  arg1: () => any,
+  successMessage: any,
+  string: (
+    params?: import('zod').RawCreateParams & { coerce?: true }
+  ) => import('zod').ZodString,
+  errorMessageBase: any,
+  string1: (
+    params?: import('zod').RawCreateParams & { coerce?: true }
+  ) => import('zod').ZodString,
+  arg6: any
+) {
+  throw new Error('Function not implemented.');
+}
 
-
-  function updateState(data: any) {
-    throw new Error('Function not implemented.');
-  }
+function updateState(data: any) {
+  throw new Error('Function not implemented.');
+}
