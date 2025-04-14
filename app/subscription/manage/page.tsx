@@ -47,8 +47,16 @@ import {
   type Price,
 } from '@/contexts/subscription-context';
 import { PRICING_PLANS } from '@/constants/pricing';
-import { PLAN_STATUS_LABELS, ERROR_MESSAGES, ACTION_LABELS } from '@/lib/constants/subscription';
-import { fetchSubscription, switchPlan, cancelSubscription as cancelSubscriptionApi } from '@/lib/api/subscription';
+import {
+  PLAN_STATUS_LABELS,
+  ERROR_MESSAGES,
+  ACTION_LABELS,
+} from '@/lib/constants/subscription';
+import {
+  fetchSubscription,
+  switchPlan,
+  cancelSubscription as cancelSubscriptionApi,
+} from '@/lib/api/subscription';
 import FeatureList from '../components/FeatureList';
 import { usePlanSwitching } from '../hooks/usePlanSwitching';
 import { useCancelSubscription } from '../hooks/useCancelSubscription';
@@ -78,7 +86,8 @@ export default function ManageSubscriptionPage() {
     optimisticTier,
   } = usePlanSwitching(currentTier);
 
-  const subscriptionStatus = subscriptionState.subscription?.status as SubscriptionStatus;
+  const subscriptionStatus = subscriptionState.subscription
+    ?.status as SubscriptionStatus;
   const {
     isCancelling,
     error: cancelError,
@@ -171,24 +180,31 @@ export default function ManageSubscriptionPage() {
   const handleCancel = async () => {
     try {
       await cancelSubscriptionHook();
-      toast({ title: 'Subscription canceled', description: 'Your subscription has been canceled. You will retain access until the end of the billing period.' });
-    } catch (e) {
-      toast({ title: 'Error', description: e?.message || 'An error occurred.' });
+      toast({
+        title: 'Subscription canceled',
+        description:
+          'Your subscription has been canceled. You will retain access until the end of the billing period.',
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Error',
+        description: e?.message || 'An error occurred.',
+      });
     }
   };
 
-  const showOnboardingNudge = !subscriptionState.subscription || effectiveTier === 'free';
+  const showOnboardingNudge =
+    !subscriptionState.subscription || effectiveTier === 'free';
 
   const quotaUsed = (subscriptionState as any).usage?.storiesUsed || 0;
   const quotaTotal = (subscriptionState as any).usage?.storiesQuota || 1;
-  const showUpgradeBanner = effectiveTier === 'free' && quotaUsed / quotaTotal > 0.8;
+  const showUpgradeBanner =
+    effectiveTier === 'free' && quotaUsed / quotaTotal > 0.8;
 
   const userName =
-    typeof authState.user?.name === 'string'
-      ? authState.user.name
-      : typeof authState.user?.user_metadata?.name === 'string'
-        ? authState.user.user_metadata.name
-        : authState.user?.email?.split('@')[0];
+    typeof authState.user?.user_metadata?.name === 'string'
+      ? authState.user.user_metadata.name
+      : authState.user?.email?.split('@')[0];
 
   if (subscriptionState.isLoading) {
     return (
@@ -242,7 +258,10 @@ export default function ManageSubscriptionPage() {
 
           {/* Error Banner */}
           {(error || switchError || cancelError) && (
-            <StatusBanner status="canceled" message={String(error || switchError || cancelError)} />
+            <StatusBanner
+              status="canceled"
+              message={String(error || switchError || cancelError)}
+            />
           )}
           {(error || switchError || cancelError) && (
             <button
@@ -264,7 +283,13 @@ export default function ManageSubscriptionPage() {
             <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-xl mb-6 flex items-center gap-3 animate-slide-fade-in">
               <Info className="h-5 w-5 text-yellow-500" />
               <span>
-                Unlock more features by upgrading your plan! <button className="underline font-semibold hover:text-violet-700 ml-1" onClick={() => router.push('/subscription')}>See plans</button>
+                Unlock more features by upgrading your plan!{' '}
+                <button
+                  className="underline font-semibold hover:text-violet-700 ml-1"
+                  onClick={() => router.push('/subscription')}
+                >
+                  See plans
+                </button>
               </span>
             </div>
           )}
@@ -274,7 +299,14 @@ export default function ManageSubscriptionPage() {
             <div className="bg-violet-50 border-l-4 border-violet-400 text-violet-800 p-4 rounded-xl mb-6 flex items-center gap-3 animate-slide-fade-in">
               <Info className="h-5 w-5 text-violet-500 animate-bounce" />
               <span>
-                You’re close to your monthly story limit. <button className="underline font-semibold hover:text-violet-700 ml-1" onClick={() => router.push('/subscription')}>Upgrade now</button> for unlimited stories!
+                You're close to your monthly story limit.{' '}
+                <button
+                  className="underline font-semibold hover:text-violet-700 ml-1"
+                  onClick={() => router.push('/subscription')}
+                >
+                  Upgrade now
+                </button>{' '}
+                for unlimited stories!
               </span>
             </div>
           )}
@@ -381,9 +413,7 @@ export default function ManageSubscriptionPage() {
                       ) : (
                         <div className="space-y-1">
                           <p className="text-sm text-slate-500">
-                            {effectiveStatus === 'canceled'
-                              ? 'Ends'
-                              : 'Renews'}
+                            {effectiveStatus === 'canceled' ? 'Ends' : 'Renews'}
                           </p>
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 text-slate-400 mr-2" />
@@ -450,26 +480,30 @@ export default function ManageSubscriptionPage() {
               </Card>
 
               {/* Plan Card Section - Modularized */}
-              {subscriptionState.availablePlans && subscriptionState.availablePlans.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 animate-slide-fade-in">
-                  {subscriptionState.availablePlans.map((plan) => {
-                    const price = plan.prices && plan.prices.length > 0 ? plan.prices[0] : undefined;
-                    // Only render if price exists (or adjust PlanCard to handle undefined price)
-                    if (!price) return null;
-                    // Only allow valid SubscriptionStatus values
-                    return (
-                      <PlanCard
-                        key={plan.id}
-                        product={plan}
-                        price={price}
-                        status={effectiveStatus}
-                        isCurrent={plan.tier === effectiveTier}
-                        onSelect={() => switchPlan(plan.id)}
-                      />
-                    );
-                  })}
-                </div>
-              )}
+              {subscriptionState.availablePlans &&
+                subscriptionState.availablePlans.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 animate-slide-fade-in">
+                    {subscriptionState.availablePlans.map((plan) => {
+                      const price =
+                        plan.prices && plan.prices.length > 0
+                          ? plan.prices[0]
+                          : undefined;
+                      // Only render if price exists (or adjust PlanCard to handle undefined price)
+                      if (!price) return null;
+                      // Only allow valid SubscriptionStatus values
+                      return (
+                        <PlanCard
+                          key={plan.id}
+                          product={plan}
+                          price={price}
+                          status={effectiveStatus}
+                          isCurrent={plan.tier === effectiveTier}
+                          onSelect={() => switchPlan(plan.id)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
 
               <div className="h-1 w-full bg-gradient-to-r from-violet-200/0 via-violet-300 to-violet-200/0 my-8 rounded-full" />
 
@@ -499,7 +533,12 @@ export default function ManageSubscriptionPage() {
               </Card>
 
               <div className="flex justify-end mt-4">
-                <a href="/faq" className="text-xs underline text-slate-500 hover:text-violet-700 focus:ring-2 focus:ring-violet-400">Need help? Visit our FAQ</a>
+                <a
+                  href="/faq"
+                  className="text-xs underline text-slate-500 hover:text-violet-700 focus:ring-2 focus:ring-violet-400"
+                >
+                  Need help? Visit our FAQ
+                </a>
               </div>
             </>
           )}
@@ -520,22 +559,38 @@ export default function ManageSubscriptionPage() {
       <Toaster />
       <style jsx global>{`
         @keyframes fade-in {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: none; }
+          from {
+            opacity: 0;
+            transform: translateY(24px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
         }
         .animate-fade-in {
           animation: fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1);
         }
         @keyframes slide-fade-in {
-          from { opacity: 0; transform: translateY(32px); }
-          to { opacity: 1; transform: none; }
+          from {
+            opacity: 0;
+            transform: translateY(32px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
         }
         .animate-slide-fade-in {
           animation: slide-fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1);
         }
         @keyframes spin-slow {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
         }
         .animate-spin-slow {
           animation: spin-slow 2.5s linear infinite;
