@@ -228,11 +228,6 @@ export default function ManageSubscriptionPage() {
               Step Into Storytime
             </span>
           </Link>
-          {userName && (
-            <h2 className="text-lg font-semibold text-violet-700 dark:text-violet-300 mt-2 mb-4">
-              Hi, {userName}!
-            </h2>
-          )}
         </div>
       </header>
 

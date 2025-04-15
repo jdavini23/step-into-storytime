@@ -14,6 +14,7 @@ interface MobileMenuProps {
   onDashboard: () => void;
   onSignUp: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
+  userName?: string;
 }
 
 const MobileMenu = ({
@@ -27,6 +28,7 @@ const MobileMenu = ({
   onDashboard,
   onSignUp,
   onKeyDown,
+  userName,
 }: MobileMenuProps) => {
   return (
     <AnimatePresence mode="wait">
@@ -116,6 +118,11 @@ const MobileMenu = ({
                 },
               }}
             >
+              {userName && (
+                <span className="text-base font-medium text-violet-700 dark:text-violet-300 mb-2 whitespace-nowrap">
+                  Hi, {userName}!
+                </span>
+              )}
               <AuthButtons
                 isAuthenticated={isAuthenticated}
                 isNavigating={isNavigating}

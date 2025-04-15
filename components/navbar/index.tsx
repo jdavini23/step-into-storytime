@@ -158,6 +158,12 @@ export default function Navbar() {
     }
   };
 
+  // Compute userName for header bar
+  const userName =
+    typeof authState.user?.user_metadata?.name === 'string'
+      ? authState.user.user_metadata.name
+      : authState.user?.email?.split('@')[0];
+
   return (
     <>
       {/* Skip to main content link */}
@@ -231,6 +237,7 @@ export default function Navbar() {
               onLogout={handleLogout}
               onDashboard={() => handleNavigation('/dashboard')}
               onSignUp={() => handleNavigation('/sign-up')}
+              userName={userName}
             />
 
             {/* Mobile Menu Button */}
@@ -289,6 +296,7 @@ export default function Navbar() {
                 handleNavigation('/sign-up');
               }}
               onKeyDown={handleMobileMenuKeyDown}
+              userName={userName}
             />
           )}
         </Suspense>
