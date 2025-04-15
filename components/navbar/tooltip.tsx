@@ -1,14 +1,35 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, cloneElement, isValidElement } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export interface TooltipProps {
   text: string;
   children: React.ReactNode;
+  id?: string; // Optional id for aria-describedby
 }
 
-const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
+let tooltipIdCounter = 0;
+
+const Tooltip: React.FC<TooltipProps> = ({ text, children, id }) => {
   const [show, setShow] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  // Generate a unique id if not provided
+  const tooltipId = id || `navbar-tooltip-${++tooltipIdCounter}`;
+
+  // Clone the child to add aria-describedby and tabIndex if needed
+  let trigger = children;
+  if (isValidElement(children)) {
+    const childProps: any = {
+      'aria-describedby': tooltipId,
+    };
+    // If the child is not focusable, add tabIndex
+    if (
+      typeof children.type === 'string' &&
+      !['a', 'button', 'input', 'textarea', 'select'].includes(children.type)
+    ) {
+      childProps.tabIndex = 0;
+    }
+    trigger = cloneElement(children, childProps);
+  }
 
   return (
     <div
@@ -18,11 +39,12 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
       onFocus={() => setShow(true)}
       onBlur={() => setShow(false)}
     >
-      {children}
+      {trigger}
       <AnimatePresence>
         {show && (
           <motion.div
             ref={tooltipRef}
+            id={tooltipId}
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 5 }}
