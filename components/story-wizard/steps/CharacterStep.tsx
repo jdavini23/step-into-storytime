@@ -8,6 +8,7 @@ import {
   ReactElement,
   ReactNode,
   useState,
+  useRef,
 } from 'react';
 import { useStepManager } from '../StepManager';
 import { Button } from '@/components/ui/button';
@@ -16,18 +17,40 @@ import { Label } from '@/components/ui/label';
 import { characterTraits } from '@/lib/constants';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import StepHelperText from '../StepHelperText';
 
 const MAX_TRAITS = 3;
+const BUTTON_SOUND_URL = '/sounds/button-press.mp3'; // Place a cartoon-like sound in public/sounds/
+
+interface CharacterState {
+  name: string;
+  age: string;
+  gender: 'Male' | 'Female' | '';
+  traits: string[];
+  appearance?: string;
+}
 
 export function CharacterStep() {
   const { state, dispatch } = useStepManager();
-  const [character, setCharacter] = useState({
+  const [character, setCharacter] = useState<CharacterState>({
     name: state.storyData.character?.name || '',
-    age: state.storyData.character?.age || '',
+    age: state.storyData.character?.age
+      ? String(state.storyData.character?.age)
+      : '',
+    gender: (state.storyData.character?.gender as 'Male' | 'Female') || '',
     traits: state.storyData.character?.traits || [],
     appearance: state.storyData.character?.appearance || '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [muted, setMuted] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const playButtonSound = () => {
+    if (!muted && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play();
+    }
+  };
 
   const handleTraitToggle = (trait: string) => {
     setError(null);
@@ -54,18 +77,21 @@ export function CharacterStep() {
       setError('Please enter a character name');
       return;
     }
-
+    if (!character.gender) {
+      setError('Please select a gender');
+      return;
+    }
     if (character.traits.length === 0) {
       setError('Please select at least one trait');
       return;
     }
-
     dispatch({
       type: 'UPDATE_STORY_DATA',
       payload: {
         character: {
           name: character.name,
           age: character.age ? Number(character.age) : undefined,
+          gender: character.gender,
           traits: character.traits,
         },
       },
@@ -74,7 +100,8 @@ export function CharacterStep() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-full flex flex-col">
+      <StepHelperText message="Let's pick your hero's name and look!" />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -119,24 +146,86 @@ export function CharacterStep() {
               </div>
 
               <div className="space-y-2">
+                <Label>Gender</Label>
+                <div className="flex gap-4">
+                  {['Male', 'Female'].map((g) => (
+                    <motion.div
+                      key={g}
+                      whileTap={{ scale: 1.15, rotate: -5 }}
+                      whileHover={{ scale: 1.08 }}
+                      transition={{ type: 'spring', stiffness: 300 }}
+                      className="inline-block"
+                    >
+                      <Button
+                        variant={character.gender === g ? 'default' : 'outline'}
+                        size="lg"
+                        onClick={() => {
+                          setError(null);
+                          setCharacter((prev) => ({
+                            ...prev,
+                            gender: g as 'Male' | 'Female',
+                          }));
+                          playButtonSound();
+                        }}
+                        className={`rounded-full px-10 py-4 text-xl font-bold shadow-lg border-2 ${
+                          character.gender === g
+                            ? 'bg-pink-200 border-pink-400 text-pink-900'
+                            : 'bg-yellow-100 border-yellow-300 text-yellow-700'
+                        }`}
+                        aria-pressed={character.gender === g}
+                      >
+                        {g}
+                      </Button>
+                    </motion.div>
+                  ))}
+                </div>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    className="text-xs underline text-gray-500 hover:text-gray-700"
+                    onClick={() => setMuted((m) => !m)}
+                  >
+                    {muted ? 'Unmute sound effects' : 'Mute sound effects'}
+                  </button>
+                </div>
+                <audio ref={audioRef} src={BUTTON_SOUND_URL} preload="auto" />
+              </div>
+
+              <div className="space-y-2">
                 <Label>Character Traits (Select 1-{MAX_TRAITS})</Label>
                 <div className="flex flex-wrap gap-2">
                   {characterTraits.map((trait: string) => (
-                    <Button
+                    <motion.div
                       key={trait}
-                      variant={
-                        character.traits.includes(trait) ? 'default' : 'outline'
-                      }
-                      size="sm"
-                      onClick={() => handleTraitToggle(trait)}
-                      className="rounded-full"
-                      disabled={
-                        !character.traits.includes(trait) &&
-                        character.traits.length >= MAX_TRAITS
-                      }
+                      whileTap={{ scale: 1.15, rotate: 5 }}
+                      whileHover={{ scale: 1.08 }}
+                      transition={{ type: 'spring', stiffness: 300 }}
+                      className="inline-block"
                     >
-                      {trait}
-                    </Button>
+                      <Button
+                        variant={
+                          character.traits.includes(trait)
+                            ? 'default'
+                            : 'outline'
+                        }
+                        size="lg"
+                        onClick={() => {
+                          handleTraitToggle(trait);
+                          playButtonSound();
+                        }}
+                        className={`rounded-full px-8 py-3 text-lg font-bold shadow-md border-2 ${
+                          character.traits.includes(trait)
+                            ? 'bg-blue-200 border-blue-400 text-blue-900'
+                            : 'bg-green-100 border-green-300 text-green-700'
+                        }`}
+                        disabled={
+                          !character.traits.includes(trait) &&
+                          character.traits.length >= MAX_TRAITS
+                        }
+                      >
+                        {trait}
+                      </Button>
+                    </motion.div>
                   ))}
                 </div>
                 {error && (
@@ -169,6 +258,11 @@ export function CharacterStep() {
                 {character.age && (
                   <p className="text-sm text-gray-600">Age: {character.age}</p>
                 )}
+                {character.gender && (
+                  <p className="text-sm text-gray-600">
+                    Gender: {character.gender}
+                  </p>
+                )}
                 {character.traits.length > 0 && (
                   <p className="text-sm text-gray-600 mt-2">
                     {character.traits.join(' • ')}
@@ -179,28 +273,6 @@ export function CharacterStep() {
           </div>
         </div>
       </motion.div>
-
-      {/* Fixed Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t shadow-lg z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <Button
-              variant="outline"
-              onClick={() => dispatch({ type: 'PREV_STEP' })}
-              className="px-8 shadow-sm"
-            >
-              Back
-            </Button>
-            <Button
-              onClick={handleNext}
-              disabled={!character.name || character.traits.length === 0}
-              className="px-8 shadow-sm"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

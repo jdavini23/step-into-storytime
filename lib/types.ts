@@ -37,9 +37,10 @@ export const characterSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   age: z
     .string()
-    .regex(/^\d+$/, 'Age must be a number')
+    .regex(/^[0-9]+$/, 'Age must be a number')
     .transform(Number)
     .optional(),
+  gender: z.enum(['Male', 'Female'], { required_error: 'Gender is required' }),
   traits: z.array(z.string()).min(1, 'At least one trait is required'),
   appearance: z.string().optional(),
 });

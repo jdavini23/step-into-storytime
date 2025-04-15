@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { Story, StoryPrompt, Character } from '@/lib/types';
 import { storySettings } from '@/lib/constants';
+import StepHelperText from '../StepHelperText';
 
 interface PreviewStepProps {
   onComplete: (story: Story) => void;
@@ -72,68 +73,71 @@ export default function PreviewStep({ onComplete, onError }: PreviewStepProps) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="space-y-8"
-    >
-      <Card className="p-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            {setting && (
-              <>
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
-                  {setting.icon}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">{setting.label}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {setting.description}
-                  </p>
-                </div>
-              </>
+    <div className="min-h-screen flex flex-col">
+      <StepHelperText message="Ready? Let's make your magical story!" />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className="space-y-8"
+      >
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              {setting && (
+                <>
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
+                    {setting.icon}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">{setting.label}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {setting.description}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {storyData.character && (
+              <div>
+                <h3 className="font-semibold">Main Character</h3>
+                <p>
+                  {storyData.character.name} -{' '}
+                  {storyData.character.traits.join(', ')}
+                  {storyData.character.age &&
+                    ` - Age: ${storyData.character.age}`}
+                </p>
+              </div>
+            )}
+
+            {storyData.theme && (
+              <div>
+                <h3 className="font-semibold">Theme</h3>
+                <p>{storyData.theme}</p>
+              </div>
+            )}
+
+            {storyData.length && (
+              <div>
+                <h3 className="font-semibold">Story Length</h3>
+                <p>{storyData.length}</p>
+              </div>
             )}
           </div>
+        </Card>
 
-          {storyData.character && (
-            <div>
-              <h3 className="font-semibold">Main Character</h3>
-              <p>
-                {storyData.character.name} -{' '}
-                {storyData.character.traits.join(', ')}
-                {storyData.character.age &&
-                  ` - Age: ${storyData.character.age}`}
-              </p>
-            </div>
-          )}
+        {error && <div className="text-red-500 text-sm">{error}</div>}
 
-          {storyData.theme && (
-            <div>
-              <h3 className="font-semibold">Theme</h3>
-              <p>{storyData.theme}</p>
-            </div>
-          )}
-
-          {storyData.length && (
-            <div>
-              <h3 className="font-semibold">Story Length</h3>
-              <p>{storyData.length}</p>
-            </div>
-          )}
+        <div className="flex justify-between gap-4">
+          <Button variant="outline" onClick={handleBack}>
+            Back
+          </Button>
+          <Button onClick={handleGenerateStory} disabled={isGenerating}>
+            {isGenerating ? 'Generating...' : 'Generate Story'}
+          </Button>
         </div>
-      </Card>
-
-      {error && <div className="text-red-500 text-sm">{error}</div>}
-
-      <div className="flex justify-between gap-4">
-        <Button variant="outline" onClick={handleBack}>
-          Back
-        </Button>
-        <Button onClick={handleGenerateStory} disabled={isGenerating}>
-          {isGenerating ? 'Generating...' : 'Generate Story'}
-        </Button>
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }

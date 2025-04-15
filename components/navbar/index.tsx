@@ -175,7 +175,7 @@ export default function Navbar() {
       </a>
 
       <motion.div
-        className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-violet-600 via-pink-400 via-30% via-yellow-300 via-60% to-indigo-600 origin-left z-50 shadow-[0_0_8px_rgba(124,58,237,0.5)]"
+        className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-violet-600 from-0% via-pink-400 via-30% to-indigo-600 to-100% origin-left z-50 shadow-[0_0_8px_rgba(124,58,237,0.5)]"
         style={{ scaleX }}
       />
 
