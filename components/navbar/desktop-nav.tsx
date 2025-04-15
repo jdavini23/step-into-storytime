@@ -13,6 +13,7 @@ interface DesktopNavProps {
   onLogout: () => void;
   onDashboard: () => void;
   onSignUp: () => void;
+  userName?: string;
 }
 
 export function DesktopNav({
@@ -24,6 +25,7 @@ export function DesktopNav({
   onLogout,
   onDashboard,
   onSignUp,
+  userName,
 }: DesktopNavProps) {
   const navRef = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
@@ -101,6 +103,11 @@ export function DesktopNav({
           onDashboard={onDashboard}
           onSignUp={onSignUp}
         />
+        {userName && (
+          <span className="ml-auto text-base font-medium text-violet-700 dark:text-violet-300 whitespace-nowrap">
+            Hi, {userName}!
+          </span>
+        )}
       </div>
     </div>
   );

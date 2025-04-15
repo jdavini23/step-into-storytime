@@ -1,7 +1,20 @@
 import type { Story } from '@/contexts/story-context';
 
 export async function generateStoryIllustrations(story: Story) {
-  const scenes = extractKeyScenes(story.content.en.join('\n\n'));
+  if (!story.content) {
+    return [];
+  }
+
+  const content =
+    typeof story.content === 'string'
+      ? story.content
+      : (story.content as { en: string[] }).en?.join('\n\n');
+
+  if (!content) {
+    return [];
+  }
+
+  const scenes = extractKeyScenes(content);
   const illustrations = [];
 
   for (const scene of scenes) {
@@ -58,7 +71,11 @@ function generateImagePrompt(scene: string, story: Story): string {
   const basePrompt = `Create a whimsical, child-friendly illustration for a children's story. The scene shows ${scene}`;
 
   // Add story context
-  const context = `The story is about ${story.character.name}, who is ${story.character.age} years old, and takes place in ${story.setting}.`;
+  const context = story.character?.name
+    ? `The story is about ${story.character.name}${
+        story.character.age ? `, who is ${story.character.age} years old,` : ''
+      } and takes place in ${story.setting || 'a magical place'}.`
+    : `The story takes place in ${story.setting || 'a magical place'}.`;
 
   // Add style guidance
   const style =

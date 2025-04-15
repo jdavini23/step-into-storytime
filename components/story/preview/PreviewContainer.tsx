@@ -4,7 +4,9 @@
 import { useReducer, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { FontSize, ThemeColors } from '../common/types';
+import type { FontSize } from '@/lib/types';
+import type { ThemeColors } from '@/lib/types';
+import type { StoryData, Story } from '@/lib/types';
 import StoryHeader from '../common/StoryHeader';
 import StoryText from '../common/StoryText';
 import AudioControls from '../common/AudioControls';
@@ -58,7 +60,7 @@ const previewReducer = (
 };
 
 interface PreviewContainerProps {
-  story: string;
+  story: Story;
   storyData: StoryData;
   onBack?: () => void;
   onSave?: () => Promise<void>;
@@ -75,32 +77,54 @@ export default function PreviewContainer({
   className,
 }: PreviewContainerProps) {
   const [state, dispatch] = useReducer(previewReducer, {
-    currentPage: 0,
+    currentPage: 1,
     fontSize: 'medium',
     soundEnabled: false,
     autoPlayEnabled: false,
-    theme: storyData?.metadata?.theme ?? 'default',
+    theme: 'default',
   });
 
-  const { paragraphs, totalPages } = formatStoryText(story);
+  const { paragraphs, totalPages } = formatStoryText(story.content || '');
+  const hasContent = paragraphs.length > 0;
 
-  const handleDownload = useCallback(() => {
-    const blob = new Blob([story], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${storyData.title.replace(/\s+/g, '-').toLowerCase()}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [story, storyData.title]);
+  const handleDownload = async () => {
+    if (!story) return;
+    const filename = `${
+      story.title || 'untitled'
+    }_${new Date().toISOString()}.pdf`;
+    const theme = story.theme || 'default';
+    const response = await fetch('/api/pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: story.title || 'Untitled Story',
+        content: story.content || '',
+        theme,
+      }),
+    });
+
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      console.error('Error downloading PDF');
+    }
+  };
 
   const handleShare = useCallback(() => {
     if (navigator.share) {
       navigator
         .share({
-          title: storyData.title,
+          title: storyData.title || 'My Story',
           text: 'Check out this story I created with Step Into Storytime!',
           url: window.location.href,
         })
@@ -123,9 +147,9 @@ export default function PreviewContainer({
       )}
     >
       <StoryHeader
-        title={storyData.title}
+        title={story.title || 'Untitled Story'}
         onBack={onBack}
-        theme={state.theme}
+        theme={story.theme || 'default'}
         className="border-b border-border/10 bg-card/50"
       />
 
@@ -163,18 +187,26 @@ export default function PreviewContainer({
           )}
         />
 
-        <NavigationControls
-          currentPage={state.currentPage}
-          totalPages={totalPages}
-          onPrevious={() =>
-            dispatch({ type: 'SET_PAGE', payload: state.currentPage - 1 })
-          }
-          onNext={() =>
-            dispatch({ type: 'SET_PAGE', payload: state.currentPage + 1 })
-          }
-          themeColors={themeColors}
-          className={cn('flex items-center gap-2', 'text-muted-foreground')}
-        />
+        {hasContent && totalPages > 1 && (
+          <NavigationControls
+            currentPage={state.currentPage}
+            totalPages={totalPages}
+            onPrevious={() =>
+              dispatch({
+                type: 'SET_PAGE',
+                payload: Math.max(1, state.currentPage - 1),
+              })
+            }
+            onNext={() =>
+              dispatch({
+                type: 'SET_PAGE',
+                payload: Math.min(totalPages, state.currentPage + 1),
+              })
+            }
+            themeColors={themeColors}
+            className={cn('flex items-center gap-2', 'text-muted-foreground')}
+          />
+        )}
 
         <ActionControls
           onDownload={handleDownload}

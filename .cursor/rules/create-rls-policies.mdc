@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: true
+---
+---
 description: Guidelines for writing Postgres Row Level Security policies
 globs: '**/*.sql'
 alwaysApply: false

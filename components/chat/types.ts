@@ -1,39 +1,48 @@
-import type { Story } from '@/components/story/common/types';
+import { Story, StoryData } from '@/lib/types';
+import { type StepId } from '@/lib/story-steps';
 
-export type MessageType = 'user' | 'ai';
+export type MessageType = 'user' | 'assistant' | 'system' | 'option';
 
 export interface Message {
   id: string;
   type: MessageType;
   content: string;
-  timestamp: number;
-  error?: boolean;
-  severity?: 'error' | 'warning' | 'info';
-  avatar?: string;
-  reactions?: string[];
-  status?: 'sent' | 'delivered' | 'seen';
-  isRepeat?: boolean;
+  quickReplies?: string[];
+  timestamp?: number;
 }
 
-export interface StoryDataState {
-  character?: {
-    name?: string;
-    age?: string;
-    traits?: string[];
-  };
-  setting?: string;
-  theme?: string;
-  length?: string;
+export interface ChatOption {
+  id: string;
+  label: string;
+  value: any;
+  icon?: React.ReactNode;
+  disabled?: boolean;
 }
 
 export interface ConversationState {
   messages: Message[];
-  storyData: Partial<StoryDataState>;
+  currentStep: StepId;
+  storyData: StoryData;
   isTyping: boolean;
-  editingMessageId: string | null;
+  error: string | null;
+}
+
+export type ConversationAction =
+  | { type: 'ADD_MESSAGE'; payload: Message }
+  | { type: 'SET_CURRENT_STEP'; payload: StepId }
+  | { type: 'UPDATE_STORY_DATA'; payload: Partial<StoryData> }
+  | { type: 'SET_TYPING'; payload: boolean };
+
+export interface ConversationContextType {
+  state: ConversationState;
+  sendMessage: (content: string | ChatOption) => void;
+  selectOption: (option: ChatOption) => void;
+  resetConversation: () => void;
+  goToStep: (step: StepId) => void;
 }
 
 export interface ChatContainerProps {
-  onComplete: (storyData: StoryDataState) => void;
+  onComplete: (story: Story) => void;
   onError: (error: string) => void;
+  className?: string;
 }
