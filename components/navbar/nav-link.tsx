@@ -25,8 +25,8 @@ export function NavLink({
       className={`relative px-4 py-2 rounded-lg font-medium transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-violet-500 ${
         active
           ? scrolled
-            ? 'text-violet-600'
-            : 'text-violet-600'
+            ? 'text-violet-600 font-extrabold bg-violet-100 dark:bg-violet-900/60 shadow-sm'
+            : 'text-violet-600 font-extrabold bg-violet-50 dark:bg-violet-900/40 shadow-sm'
           : scrolled
           ? 'text-slate-600 hover:text-violet-600'
           : 'text-slate-700 hover:text-violet-600'

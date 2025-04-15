@@ -175,7 +175,7 @@ export default function Navbar() {
       </a>
 
       <motion.div
-        className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-600 origin-left z-50 shadow-[0_0_8px_rgba(124,58,237,0.5)]"
+        className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-violet-600 via-pink-400 via-30% via-yellow-300 via-60% to-indigo-600 origin-left z-50 shadow-[0_0_8px_rgba(124,58,237,0.5)]"
         style={{ scaleX }}
       />
 
@@ -212,11 +212,66 @@ export default function Navbar() {
                 }
               }}
             >
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mr-3 shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:rotate-3 group-active:scale-95">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center mr-3 shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:rotate-3 group-active:scale-95 relative overflow-visible">
                 <BookOpen
                   className="h-5 w-5 text-white transition-transform group-hover:scale-110"
                   aria-hidden="true"
                 />
+                {/* Sparkle animation on hover */}
+                <span className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g>
+                      <circle cx="9" cy="9" r="2" fill="#FDE68A">
+                        <animate
+                          attributeName="r"
+                          values="2;4;2"
+                          dur="0.8s"
+                          repeatCount="indefinite"
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="1;0.5;1"
+                          dur="0.8s"
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+                      <circle cx="9" cy="3" r="1" fill="#F472B6">
+                        <animate
+                          attributeName="r"
+                          values="1;2;1"
+                          dur="0.8s"
+                          repeatCount="indefinite"
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="1;0.5;1"
+                          dur="0.8s"
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+                      <circle cx="15" cy="9" r="1" fill="#60A5FA">
+                        <animate
+                          attributeName="r"
+                          values="1;2;1"
+                          dur="0.8s"
+                          repeatCount="indefinite"
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="1;0.5;1"
+                          dur="0.8s"
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+                    </g>
+                  </svg>
+                </span>
               </div>
               <span
                 className={`text-base sm:text-lg font-bold transition-all duration-300 ${
@@ -305,16 +360,29 @@ export default function Navbar() {
       {/* Back to Top Button */}
       <AnimatePresence>
         {showBackToTop && (
-          <motion.button
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="fixed bottom-6 right-6 bg-violet-600 text-white p-3 rounded-full shadow-lg hover:bg-violet-700 transition-colors z-40"
-            aria-label="Back to top"
+            className="fixed bottom-6 right-6 z-40"
           >
-            <ArrowUp className="h-5 w-5" />
-          </motion.button>
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="bg-violet-600 text-white p-3 rounded-full shadow-lg hover:bg-violet-700 transition-colors relative group focus:outline-none focus:ring-2 focus:ring-violet-500"
+              aria-label="Back to top"
+              tabIndex={0}
+            >
+              <ArrowUp className="h-5 w-5" />
+              {/* Tooltip */}
+              <span
+                className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 rounded bg-slate-800 text-white text-xs opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-lg"
+                role="tooltip"
+                id="back-to-top-tooltip"
+              >
+                Back to top
+              </span>
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </>
