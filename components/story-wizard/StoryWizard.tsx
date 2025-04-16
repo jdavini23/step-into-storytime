@@ -27,9 +27,22 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
       const response = await fetch('/api/story/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(wizardData),
+        body: JSON.stringify({
+          prompt: {
+            character: wizardData.character,
+            setting: wizardData.setting,
+            theme: wizardData.theme,
+            length: wizardData.length,
+            readingLevel: 'beginner',
+            language: 'en',
+            style: 'bedtime',
+          },
+        }),
       });
-      if (!response.ok) throw new Error('API error');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'API error');
+      }
       const story = await response.json();
       setLoading(false);
       setCelebrate(true);
@@ -40,7 +53,7 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
     } catch (e: any) {
       setLoading(false);
       setError('Failed to generate story. Please try again.');
-      onError('Failed to generate story.');
+      onError(e.message || 'Failed to generate story.');
     }
   };
 
@@ -48,10 +61,10 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
     <div className="relative">
       <WizardContainer
         steps={[
-          <CharacterStep key="character" />, 
-          <SettingStep key="setting" />, 
-          <ThemeStep key="theme" />, 
-          <LengthStep key="length" />
+          <CharacterStep key="character" />,
+          <SettingStep key="setting" />,
+          <ThemeStep key="theme" />,
+          <LengthStep key="length" />,
         ]}
         onFinish={handleFinish}
       />
@@ -59,7 +72,9 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
         <div className="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-black/60 z-50 rounded-xl">
           <div className="flex flex-col items-center gap-4">
             <span className="loader border-4 border-primary border-t-transparent rounded-full w-12 h-12 animate-spin"></span>
-            <span className="text-primary font-semibold">Generating your story...</span>
+            <span className="text-primary font-semibold">
+              Generating your story...
+            </span>
           </div>
         </div>
       )}

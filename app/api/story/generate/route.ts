@@ -1,6 +1,6 @@
-import { OpenAI } from "openai";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { Story, StoryPrompt, StoryBranch } from "@/lib/types";
+import { OpenAI } from 'openai';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { Story, StoryPrompt, StoryBranch } from '@/lib/types';
 
 // Initialize OpenAI client with API key from environment variable
 const openai = new OpenAI({
@@ -9,134 +9,146 @@ const openai = new OpenAI({
 
 // Remove edge runtime config
 // export const runtime = 'edge';
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    console.log("Starting story generation...");
+    console.log('Starting story generation...');
 
     const supabase = await createServerSupabaseClient();
-    console.log("Supabase client created");
+    console.log('Supabase client created');
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    console.log("User auth checked:", { userId: user?.id });
+    console.log('User auth checked:', { userId: user?.id });
 
     if (!user) {
-      return new Response("Unauthorized", { status: 401 });
+      return new Response('Unauthorized', { status: 401 });
     }
 
     const body = await request.json();
-    console.log("Request body:", JSON.stringify(body, null, 2));
+    console.log('Request body:', JSON.stringify(body, null, 2));
 
     if (!body.prompt) {
-      console.error("No prompt in request body");
-      return new Response(JSON.stringify({ error: "No prompt provided" }), {
+      console.error('No prompt in request body');
+      return new Response(JSON.stringify({ error: 'No prompt provided' }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     const { prompt }: { prompt: StoryPrompt } = body;
-    console.log("Prompt extracted:", JSON.stringify(prompt, null, 2));
+    console.log('Prompt extracted:', JSON.stringify(prompt, null, 2));
 
     // Validate required prompt fields
     if (!prompt.character?.name || !prompt.setting || !prompt.theme) {
       return new Response(
         JSON.stringify({
-          error: "Missing required fields in prompt",
-          details: "Character name, setting, and theme are required",
+          error: 'Missing required fields in prompt',
+          details: 'Character name, setting, and theme are required',
         }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" },
+          headers: { 'Content-Type': 'application/json' },
         }
       );
     }
 
     // Generate story content using OpenAI
-    console.log("Calling OpenAI API...");
+    console.log('Calling OpenAI API...');
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: 'gpt-4',
       messages: [
         {
-          role: "system",
+          role: 'system',
           content:
             "You are a creative children's story writer. Write engaging, age-appropriate stories that are fun and educational.",
         },
         {
-          role: "user",
-          content: `Write a children's story with the following details:\n- Main character: ${prompt.character.name}, age ${
-            prompt.character.age || 8
-          }\n- Gender: ${prompt.character.gender || "Male"}\n- Character traits: ${
-            prompt.character.traits?.join(", ") || "friendly"
-          }\n- Setting: ${prompt.setting}\n- Theme: ${prompt.theme}\n- Length: ${prompt.length || 10} minutes\n- Reading level: ${
-            prompt.readingLevel || "beginner"
-          }\n- Language: ${prompt.language === "es" ? "Spanish" : "English"}\n- Style: ${
-            prompt.style || "bedtime"
+          role: 'user',
+          content: `Write a children's story with the following details:\n- Main character: ${
+            prompt.character.name
+          }, age ${prompt.character.age || 8}\n- Gender: ${
+            prompt.character.gender || 'Male'
+          }\n- Character traits: ${
+            prompt.character.traits?.join(', ') || 'friendly'
+          }\n- Setting: ${prompt.setting}\n- Theme: ${
+            prompt.theme
+          }\n- Length: ${prompt.length || 10} minutes\n- Reading level: ${
+            prompt.readingLevel || 'beginner'
+          }\n- Language: ${
+            prompt.language === 'es' ? 'Spanish' : 'English'
+          }\n- Style: ${
+            prompt.style || 'bedtime'
           }\n\nThe story should be engaging, age-appropriate, and divided into paragraphs.`,
         },
       ],
       temperature: 0.7,
       max_tokens: 2000,
     });
-    console.log("OpenAI API response received");
+    console.log('OpenAI API response received');
 
     const storyContent = completion.choices[0].message.content;
     if (!storyContent) {
-      throw new Error("Failed to generate story content");
+      throw new Error('Failed to generate story content');
     }
 
     // Split content into paragraphs
     const paragraphs = storyContent
-      .split("\n")
+      .split('\n')
       .filter((p) => p.trim().length > 0);
 
     // Create story object
-    const story: Story = {
+    const story = {
       user_id: user.id,
+      title: `${prompt.character.name}'s Adventure in ${prompt.setting}`,
       character: {
         name: prompt.character.name,
-        age: Number(prompt.character.age || 8),
-        traits: prompt.character.traits || ["friendly"],
-        gender: prompt.character.gender || "Male",
+        age: Number(prompt.character.age),
+        traits: prompt.character.traits || ['friendly'],
+        appearance: prompt.character.appearance || '',
+        gender: prompt.character.gender || 'Male',
       },
       setting: prompt.setting,
       theme: prompt.theme,
-      length: prompt.length || 10,
-      readingLevel: prompt.readingLevel || "beginner",
-      language: prompt.language === "es" ? "Spanish" : "English",
-      style: prompt.style || "bedtime",
-      content: paragraphs,
+      length: 10, // Default to 10 minutes
+      readingLevel: prompt.readingLevel || 'beginner',
+      language: prompt.language === 'es' ? 'Spanish' : 'English',
+      style: prompt.style || 'bedtime',
+      content: Array.isArray(paragraphs) ? paragraphs.join('\n\n') : paragraphs,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    console.log("Story object created");
+    console.log('Story object created');
 
     // Save story to database
-    console.log("Saving to database...");
-    const { error } = await supabase.from("stories").insert(story);
+    console.log('Saving to database...');
+    const { data, error } = await supabase
+      .from('stories')
+      .insert(story)
+      .select()
+      .single();
 
     if (error) {
-      console.error("Database error:", error);
+      console.error('Database error:', error);
       throw error;
     }
-    console.log("Story saved successfully");
+    console.log('Story saved successfully');
 
-    return new Response(JSON.stringify(story), {
-      headers: { "Content-Type": "application/json" },
+    return new Response(JSON.stringify(data), {
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error("Error generating story:", error);
+    console.error('Error generating story:', error);
     return new Response(
       JSON.stringify({
-        error: "Failed to generate story",
+        error: 'Failed to generate story',
         details: error instanceof Error ? error.message : String(error),
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       }
     );
   }

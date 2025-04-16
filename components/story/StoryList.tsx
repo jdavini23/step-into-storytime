@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import {
 import { Story } from './common/types';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreVertical, Edit, Trash, Share, Star } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 interface StoryListProps {
   stories: Story[];

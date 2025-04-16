@@ -130,7 +130,9 @@ export interface StoryParagraph {
 
 // Story prompt type for AI generation
 export interface StoryPrompt {
+  length: number;
   character: {
+    gender: string;
     name: string;
     age: string;
     traits: string[];

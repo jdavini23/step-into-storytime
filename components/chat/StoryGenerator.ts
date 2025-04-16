@@ -39,18 +39,21 @@ export async function generateStory(
       storyData
     ) as ValidatedStoryData;
 
-    const payload = {
-      title: `${validatedData.character.name}'s Adventure in the ${validatedData.setting}`,
-      character: validatedData.character,
-      setting: validatedData.setting,
-      theme: validatedData.theme,
-      length: validatedData.length,
+    const prompt = {
+      ...validatedData,
+      character: {
+        name: validatedData.character?.name || '',
+        age: validatedData.character?.age || 8,
+        traits: validatedData.character?.traits || ['friendly'],
+        appearance: validatedData.character?.appearance || '',
+        gender: validatedData.character?.gender || 'Male',
+      },
     };
 
-    const response = await fetch('/api/generate-story/', {
+    const response = await fetch('/api/story/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ prompt }),
     });
 
     if (!response.ok) {
@@ -63,7 +66,7 @@ export async function generateStory(
     // Create story in database
     const storyPayload = {
       id: crypto.randomUUID(),
-      title: payload.title,
+      title: data.title,
       content: JSON.stringify(data.content),
       character: validatedData.character,
       setting: validatedData.setting,

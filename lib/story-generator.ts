@@ -2,26 +2,22 @@ import type { Story, StoryData } from '@/lib/types';
 
 export async function generateStory(storyData: StoryData): Promise<Story> {
   try {
-    const response = await fetch('/api/generate-story', {
+    const prompt = {
+      ...storyData,
+      character: {
+        name: storyData.character?.name || '',
+        age: storyData.character?.age || 8,
+        traits: storyData.character?.traits || ['friendly'],
+        appearance: storyData.character?.appearance || '',
+        gender: storyData.character?.gender || 'Male',
+      },
+    };
+    const response = await fetch('/api/story/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        prompt: {
-          character: {
-            name: storyData.character?.name || '',
-            traits: storyData.character?.traits || [],
-            appearance: '',
-          },
-          theme: storyData.theme || '',
-          setting: storyData.setting || '',
-          targetAge: 8,
-          readingLevel: 'beginner',
-          language: 'en',
-          style: 'bedtime',
-        },
-      }),
+      body: JSON.stringify({ prompt }),
     });
 
     if (!response.ok) {

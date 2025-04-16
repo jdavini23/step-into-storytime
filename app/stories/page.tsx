@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import type { Story } from '@/contexts/story-context';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function StoriesPage() {
   const router = useRouter();
@@ -26,7 +27,21 @@ export default function StoriesPage() {
     const fetchStories = async () => {
       console.log('[DEBUG] Starting to fetch stories in StoriesPage');
       try {
-        const response = await fetch('/api/stories');
+        const supabase = createClientComponentClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const access_token = session?.access_token;
+        if (!access_token) {
+          toast.error('You must be logged in to view stories');
+          setIsLoading(false);
+          return;
+        }
+        const response = await fetch('/api/stories', {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        });
         console.log('[DEBUG] Stories API response:', {
           status: response.status,
           statusText: response.statusText,
