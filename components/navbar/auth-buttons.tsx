@@ -1,7 +1,5 @@
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
-import type { TooltipProps } from './tooltip';
-import Tooltip from './tooltip';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from './loading-spinner';
 
@@ -53,26 +51,22 @@ const AuthButtonsComponent: React.FC<AuthButtonsProps> = ({
           isMobile ? 'flex-col space-y-3' : 'items-center space-x-3'
         }`}
       >
-        <Tooltip text="Go to your dashboard">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className={primaryButtonClasses}
-            onClick={onDashboard}
-          >
-            Dashboard
-          </motion.button>
-        </Tooltip>
-        <Tooltip text="Sign out of your account">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className={secondaryButtonClasses}
-            onClick={onLogout}
-          >
-            Sign Out
-          </motion.button>
-        </Tooltip>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={primaryButtonClasses}
+          onClick={onDashboard}
+        >
+          Dashboard
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={secondaryButtonClasses}
+          onClick={onLogout}
+        >
+          Sign Out
+        </motion.button>
       </div>
     );
   }
@@ -83,31 +77,24 @@ const AuthButtonsComponent: React.FC<AuthButtonsProps> = ({
         isMobile ? 'flex-col space-y-3' : 'items-center space-x-3'
       }`}
     >
-      <Tooltip text="Sign in to your account">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className={secondaryButtonClasses}
-          onClick={onLogin}
-        >
-          Sign In
-        </motion.button>
-      </Tooltip>
-      <Tooltip text="Create a new account">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className={primaryButtonClasses}
-          onClick={onSignUp}
-        >
-          Sign Up
-        </motion.button>
-      </Tooltip>
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className={secondaryButtonClasses}
+        onClick={onLogin}
+      >
+        Sign In
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className={primaryButtonClasses}
+        onClick={onSignUp}
+      >
+        Sign Up
+      </motion.button>
     </div>
   );
 };
 
 export const AuthButtons = memo(AuthButtonsComponent);
-
-// Re-export Tooltip
-export { default as Tooltip } from './tooltip';

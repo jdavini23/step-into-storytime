@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { NavLink } from './nav-link';
 import { AuthButtons } from './auth-buttons';
 import { motion, AnimatePresence } from 'framer-motion';
-import Tooltip from './tooltip';
 
 interface DesktopNavProps {
   activeSection: string;
@@ -30,15 +29,11 @@ export function DesktopNav({
   const navRef = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const navItems = [
-    { href: '/#home', label: 'Home', tooltip: 'Back to homepage' },
-    { href: '/#features', label: 'Features', tooltip: 'Explore our features' },
-    {
-      href: '/#how-it-works',
-      label: 'How It Works',
-      tooltip: 'Learn how it works',
-    },
-    { href: '/#stories', label: 'Stories', tooltip: 'Browse stories' },
-    { href: '/#pricing', label: 'Pricing', tooltip: 'View pricing plans' },
+    { href: '/#home', label: 'Home' },
+    { href: '/#features', label: 'Features' },
+    { href: '/#how-it-works', label: 'How It Works' },
+    { href: '/#stories', label: 'Stories' },
+    { href: '/#pricing', label: 'Pricing' },
   ];
 
   useEffect(() => {
@@ -79,17 +74,16 @@ export function DesktopNav({
         role="navigation"
         aria-label="Desktop navigation"
       >
-        {navItems.map(({ href, label, tooltip }, index) => (
-          <Tooltip key={href} text={tooltip}>
-            <NavLink
-              href={href}
-              active={activeSection === href.replace('/#', '')}
-              scrolled={scrolled}
-              onFocus={() => setFocusedIndex(index)}
-            >
-              {label}
-            </NavLink>
-          </Tooltip>
+        {navItems.map(({ href, label }, index) => (
+          <NavLink
+            key={href}
+            href={href}
+            active={activeSection === href.replace('/#', '')}
+            scrolled={scrolled}
+            onFocus={() => setFocusedIndex(index)}
+          >
+            {label}
+          </NavLink>
         ))}
       </nav>
 
