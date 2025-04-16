@@ -8,7 +8,6 @@ import {
   ReactElement,
   ReactNode,
   useState,
-  useRef,
 } from 'react';
 import { useStepManager } from '../StepManager';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,6 @@ import { AlertCircle } from 'lucide-react';
 import StepHelperText from '../StepHelperText';
 
 const MAX_TRAITS = 3;
-const BUTTON_SOUND_URL = '/sounds/button-press.mp3'; // Place a cartoon-like sound in public/sounds/
 
 interface CharacterState {
   name: string;
@@ -42,15 +40,6 @@ export function CharacterStep() {
     appearance: state.storyData.character?.appearance || '',
   });
   const [error, setError] = useState<string | null>(null);
-  const [muted, setMuted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  const playButtonSound = () => {
-    if (!muted && audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play();
-    }
-  };
 
   const handleTraitToggle = (trait: string) => {
     setError(null);
@@ -165,7 +154,6 @@ export function CharacterStep() {
                             ...prev,
                             gender: g as 'Male' | 'Female',
                           }));
-                          playButtonSound();
                         }}
                         className={`rounded-full px-10 py-4 text-xl font-bold shadow-lg border-2 ${
                           character.gender === g
@@ -179,16 +167,6 @@ export function CharacterStep() {
                     </motion.div>
                   ))}
                 </div>
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    className="text-xs underline text-gray-500 hover:text-gray-700"
-                    onClick={() => setMuted((m) => !m)}
-                  >
-                    {muted ? 'Unmute sound effects' : 'Mute sound effects'}
-                  </button>
-                </div>
-                <audio ref={audioRef} src={BUTTON_SOUND_URL} preload="auto" />
               </div>
 
               <div className="space-y-2">
@@ -211,7 +189,6 @@ export function CharacterStep() {
                         size="lg"
                         onClick={() => {
                           handleTraitToggle(trait);
-                          playButtonSound();
                         }}
                         className={`rounded-full px-8 py-3 text-lg font-bold shadow-md border-2 ${
                           character.traits.includes(trait)
