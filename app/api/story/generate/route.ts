@@ -1,6 +1,11 @@
 import { OpenAI } from 'openai';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import {
+  createServerSupabaseClient,
+  getServerSession,
+} from '@/lib/supabase/server';
 import { Story, StoryPrompt, StoryBranch } from '@/lib/types';
+import { generateStory } from '@/utils/ai/story-generator';
+import { cookies } from 'next/headers';
 
 // Initialize OpenAI client with API key from environment variable
 const openai = new OpenAI({
@@ -11,145 +16,196 @@ const openai = new OpenAI({
 // export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
+  console.log('[Story API] Starting story generation request...');
+
   try {
-    console.log('Starting story generation...');
+    // Log available cookies for debugging
+    const cookieStore = await cookies();
+    const authCookie = cookieStore.get('sb-access-token');
+    const refreshCookie = cookieStore.get('sb-refresh-token');
+
+    console.log('[Story API] Auth cookies present:', {
+      hasAccessToken: !!authCookie,
+      hasRefreshToken: !!refreshCookie,
+    });
 
     const supabase = await createServerSupabaseClient();
-    console.log('Supabase client created');
+    console.log('[Story API] Supabase client created, getting session...');
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    console.log('User auth checked:', { userId: user?.id });
+    const session = await getServerSession();
 
-    if (!user) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+    console.log('[Story API] Session check:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      timestamp: new Date().toISOString(),
+    });
 
-    const body = await request.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
-
-    if (!body.prompt) {
-      console.error('No prompt in request body');
-      return new Response(JSON.stringify({ error: 'No prompt provided' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { prompt }: { prompt: StoryPrompt } = body;
-    console.log('Prompt extracted:', JSON.stringify(prompt, null, 2));
-
-    // Validate required prompt fields
-    if (!prompt.character?.name || !prompt.setting || !prompt.theme) {
+    if (!session?.user?.id) {
+      console.error('[Story API] No authenticated user found');
       return new Response(
         JSON.stringify({
-          error: 'Missing required fields in prompt',
-          details: 'Character name, setting, and theme are required',
+          error: 'Authentication required',
+          details: 'No valid session found. Please sign in again.',
         }),
         {
-          status: 400,
+          status: 401,
           headers: { 'Content-Type': 'application/json' },
         }
       );
     }
 
-    // Generate story content using OpenAI
-    console.log('Calling OpenAI API...');
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content:
-            "You are a creative children's story writer. Write engaging, age-appropriate stories that are fun and educational.",
-        },
-        {
-          role: 'user',
-          content: `Write a children's story with the following details:\n- Main character: ${
-            prompt.character.name
-          }, age ${prompt.character.age || 8}\n- Gender: ${
-            prompt.character.gender || 'Male'
-          }\n- Character traits: ${
-            prompt.character.traits?.join(', ') || 'friendly'
-          }\n- Setting: ${prompt.setting}\n- Theme: ${
-            prompt.theme
-          }\n- Length: ${prompt.length || 10} minutes\n- Reading level: ${
-            prompt.readingLevel || 'beginner'
-          }\n- Language: ${
-            prompt.language === 'es' ? 'Spanish' : 'English'
-          }\n- Style: ${
-            prompt.style || 'bedtime'
-          }\n\nThe story should be engaging, age-appropriate, and divided into paragraphs.`,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
-    console.log('OpenAI API response received');
+    // Verify the session is still valid
+    console.log('[Story API] Verifying user...');
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    const storyContent = completion.choices[0].message.content;
-    if (!storyContent) {
+    if (userError) {
+      console.error('[Story API] User verification failed:', userError);
+      return new Response(
+        JSON.stringify({
+          error: 'Session validation failed',
+          details: userError.message,
+        }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (!user || user.id !== session.user.id) {
+      console.error('[Story API] Session/User mismatch:', {
+        sessionUserId: session.user.id,
+        userId: user?.id,
+      });
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid session',
+          details: 'User ID mismatch. Please sign in again.',
+        }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('[Story API] User authenticated successfully:', {
+      userId: user.id,
+    });
+
+    const prompt = await req.json();
+
+    // Validate required prompt fields
+    const requiredFields = [
+      'character',
+      'theme',
+      'setting',
+      'targetAge',
+      'readingLevel',
+    ];
+    const missingFields = requiredFields.filter((field) => !prompt[field]);
+
+    if (missingFields.length > 0) {
+      return new Response(
+        JSON.stringify({
+          error: `Missing required fields: ${missingFields.join(', ')}`,
+          fields: missingFields,
+        }),
+        { status: 400 }
+      );
+    }
+
+    // Validate character object
+    const requiredCharacterFields = ['name', 'age', 'traits'];
+    const missingCharacterFields = requiredCharacterFields.filter(
+      (field) => !prompt.character[field]
+    );
+
+    if (missingCharacterFields.length > 0) {
+      return new Response(
+        JSON.stringify({
+          error: `Missing required character fields: ${missingCharacterFields.join(
+            ', '
+          )}`,
+          fields: missingCharacterFields,
+        }),
+        { status: 400 }
+      );
+    }
+
+    // Validate reading level
+    const validReadingLevels = ['beginner', 'intermediate', 'advanced'];
+    if (!validReadingLevels.includes(prompt.readingLevel)) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'Invalid reading level. Must be one of: beginner, intermediate, advanced',
+          field: 'readingLevel',
+        }),
+        { status: 400 }
+      );
+    }
+
+    // Validate target age
+    const age = parseInt(prompt.targetAge);
+    if (isNaN(age) || age < 3 || age > 12) {
+      return new Response(
+        JSON.stringify({
+          error: 'Target age must be a number between 3 and 12',
+          field: 'targetAge',
+        }),
+        { status: 400 }
+      );
+    }
+
+    console.log(
+      'Generating story with prompt:',
+      JSON.stringify(prompt, null, 2)
+    );
+
+    const story = await generateStory(prompt);
+
+    if (!story.title || !story.content) {
       throw new Error('Failed to generate story content');
     }
 
-    // Split content into paragraphs
-    const paragraphs = storyContent
-      .split('\n')
-      .filter((p) => p.trim().length > 0);
-
-    // Create story object
-    const story = {
-      user_id: user.id,
-      title: `${prompt.character.name}'s Adventure in ${prompt.setting}`,
-      character: {
-        name: prompt.character.name,
-        age: Number(prompt.character.age),
-        traits: prompt.character.traits || ['friendly'],
-        appearance: prompt.character.appearance || '',
-        gender: prompt.character.gender || 'Male',
-      },
-      setting: prompt.setting,
-      theme: prompt.theme,
-      length: 10, // Default to 10 minutes
-      readingLevel: prompt.readingLevel || 'beginner',
-      language: prompt.language === 'es' ? 'Spanish' : 'English',
-      style: prompt.style || 'bedtime',
-      content: Array.isArray(paragraphs) ? paragraphs.join('\n\n') : paragraphs,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    console.log('Story object created');
-
-    // Save story to database
-    console.log('Saving to database...');
-    const { data, error } = await supabase
+    const { data: savedStory, error: saveError } = await supabase
       .from('stories')
-      .insert(story)
+      .insert([
+        {
+          user_id: session.user.id,
+          title: story.title,
+          content: story.content,
+          prompt: prompt,
+          created_at: new Date().toISOString(),
+        },
+      ])
       .select()
       .single();
 
-    if (error) {
-      console.error('Database error:', error);
-      throw error;
+    if (saveError) {
+      console.error('Error saving story:', saveError);
+      throw new Error('Failed to save story to database');
     }
-    console.log('Story saved successfully');
 
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(savedStory), {
+      status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error generating story:', error);
+    console.error('Error in story generation:', error);
     return new Response(
       JSON.stringify({
-        error: 'Failed to generate story',
-        details: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred',
       }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
+      { status: 500 }
     );
   }
 }

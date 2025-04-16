@@ -33,6 +33,7 @@ export async function generateStory(storyData: StoryData): Promise<Story> {
         name: storyData.character?.name || '',
         age: storyData.character?.age || 0,
         traits: storyData.character?.traits || [],
+        gender: 'Male',
       },
       setting: storyData.setting || '',
       theme: storyData.theme || '',

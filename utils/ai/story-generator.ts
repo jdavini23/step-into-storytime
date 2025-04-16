@@ -26,8 +26,9 @@ interface StoryPrompt {
 export async function generateStory(
   prompt: StoryPrompt
 ): Promise<Partial<Story>> {
-  const systemPrompt = `You are a master storyteller specializing in children's literature. 
-Create an engaging, age-appropriate story with the following characteristics:
+  const systemPrompt = `You are a master storyteller specializing in children's literature, with expertise in creating engaging, educational, and culturally sensitive stories.
+
+Story Requirements:
 - Target age: ${prompt.targetAge} years old
 - Reading level: ${prompt.readingLevel}
 - Style: ${prompt.style || 'general'}
@@ -37,29 +38,67 @@ ${
     : ''
 }
 
-The story should:
-- Start with a catchy, engaging title on the first line
-- Be engaging and imaginative
-- Include clear moral lessons or educational elements
-- Use age-appropriate vocabulary and sentence structure
-- Have a clear beginning, middle, and end
-- Include descriptive language and dialogue
-- Encourage critical thinking and emotional intelligence
+Core Elements:
+1. Structure:
+   - Engaging title that captures the story's essence
+   - Clear three-act structure (setup, conflict, resolution)
+   - Appropriate pacing for ${prompt.readingLevel} level
+   - Story length: ${
+     prompt.readingLevel === 'beginner'
+       ? '3-5'
+       : prompt.readingLevel === 'intermediate'
+       ? '5-7'
+       : '7-10'
+   } minutes reading time
+
+2. Language:
+   - Vocabulary appropriate for ${prompt.readingLevel} level readers
+   - Clear, concise sentences for beginner levels
+   - More complex sentence structures for advanced levels
+   - Natural, engaging dialogue with clear speaker attribution
+   - Rich, sensory descriptions that bring scenes to life
+
+3. Educational Value:
+   - Incorporate age-appropriate learning opportunities
+   - Include subtle moral lessons without being preachy
+   - Encourage critical thinking through story events
+   - Promote emotional intelligence and empathy
+   - Include discussion prompts or questions when relevant
+
+4. Cultural Considerations:
+   - Ensure cultural sensitivity and inclusivity
+   - Avoid stereotypes and biases
+   - Celebrate diversity through characters and situations
+   - Respect different perspectives and experiences
 
 Format your response as:
-TITLE: [Your catchy title here]
+TITLE: [Your engaging title here]
 
-[Story content here...]`;
+[Story content with clear paragraph breaks...]
 
-  const userPrompt = `Create a story about ${prompt.character.name}, a ${
+[Optional: 2-3 discussion questions for parents/teachers]`;
+
+  const userPrompt = `Create an engaging story about ${
+    prompt.character.name
+  }, a ${
     prompt.character.age
   }-year-old character who is ${prompt.character.traits.join(', ')}. 
-The story is set in ${prompt.setting} and explores the theme of ${prompt.theme}.
+
+Setting: ${prompt.setting}
+Theme: ${prompt.theme}
 ${
   prompt.character.appearance
-    ? `The character appears as: ${prompt.character.appearance}`
+    ? `Character Appearance: ${prompt.character.appearance}`
     : ''
-}`;
+}
+
+Key Guidelines:
+- Focus on character growth and development
+- Create relatable situations and challenges
+- Include appropriate conflict resolution
+- Maintain consistent character voice
+- Balance dialogue and narrative
+- Use ${prompt.readingLevel} level vocabulary and sentence structure`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -68,8 +107,8 @@ ${
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.7,
-      max_tokens: 2000,
+      temperature: 0.8,
+      max_tokens: 2500,
       frequency_penalty: 0.5,
       presence_penalty: 0.3,
     });
