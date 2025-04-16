@@ -1,4 +1,4 @@
-import React, { useState, useRef, cloneElement, isValidElement } from 'react';
+import React, { useState, useRef, cloneElement, isValidElement, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export interface TooltipProps {
@@ -7,13 +7,18 @@ export interface TooltipProps {
   id?: string; // Optional id for aria-describedby
 }
 
-let tooltipIdCounter = 0;
-
 const Tooltip: React.FC<TooltipProps> = ({ text, children, id }) => {
   const [show, setShow] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  // Generate a unique id if not provided
-  const tooltipId = id || `navbar-tooltip-${++tooltipIdCounter}`;
+  // Use SSR-safe deterministic id
+  const tooltipId = id || useId();
+  // Debug log for verification (remove after confirming fix)
+  if (typeof window !== 'undefined') {
+    console.log('TooltipID (client):', tooltipId);
+  } else {
+    // This will only log on server/SSR
+    console.log('TooltipID (server):', tooltipId);
+  }
 
   // Clone the child to add aria-describedby and tabIndex if needed
   let trigger = children;

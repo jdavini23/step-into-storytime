@@ -67,21 +67,21 @@ export async function POST(request: Request) {
         },
         {
           role: 'user',
-          content: `Write a children's story with the following details:
-            - Main character: ${prompt.character.name}, age ${
-            prompt.character.age || 8
-          }
-            - Character traits: ${
-              prompt.character.traits?.join(', ') || 'friendly'
-            }
-            - Setting: ${prompt.setting}
-            - Theme: ${prompt.theme}
-            - Target age: ${prompt.targetAge || 8}
-            - Reading level: ${prompt.readingLevel || 'beginner'}
-            - Language: ${prompt.language === 'es' ? 'Spanish' : 'English'}
-            - Style: ${prompt.style || 'bedtime'}
-
-            The story should be engaging, age-appropriate, and divided into paragraphs.`,
+          content: `Write a children's story with the following details:\n- Main character: ${
+            prompt.character.name
+          }, age ${prompt.character.age || 8}\n- Gender: ${
+            prompt.character.gender || 'Male'
+          }\n- Character traits: ${
+            prompt.character.traits?.join(', ') || 'friendly'
+          }\n- Setting: ${prompt.setting}\n- Theme: ${
+            prompt.theme
+          }\n- Length: ${prompt.length || 10} minutes\n- Reading level: ${
+            prompt.readingLevel || 'beginner'
+          }\n- Language: ${
+            prompt.language === 'es' ? 'Spanish' : 'English'
+          }\n- Style: ${
+            prompt.style || 'bedtime'
+          }\n\nThe story should be engaging, age-appropriate, and divided into paragraphs.`,
         },
       ],
       temperature: 0.7,
@@ -100,21 +100,23 @@ export async function POST(request: Request) {
       .filter((p) => p.trim().length > 0);
 
     // Create story object
-    const story: Story = {
-      id: crypto.randomUUID(),
-      title: `${prompt.character.name}'s Adventure`,
-      content: storyContent,
+    const story = {
+      user_id: user.id,
+      title: `${prompt.character.name}'s Adventure in ${prompt.setting}`,
       character: {
         name: prompt.character.name,
-        age: Number(prompt.character.age || 8),
+        age: Number(prompt.character.age),
         traits: prompt.character.traits || ['friendly'],
+        appearance: prompt.character.appearance || '',
+        gender: prompt.character.gender || 'Male',
       },
       setting: prompt.setting,
       theme: prompt.theme,
-      plot_elements: [],
-      is_published: false,
-      user_id: user.id,
-      thumbnail_url: null,
+      length: 10, // Default to 10 minutes
+      readingLevel: prompt.readingLevel || 'beginner',
+      language: prompt.language === 'es' ? 'Spanish' : 'English',
+      style: prompt.style || 'bedtime',
+      content: Array.isArray(paragraphs) ? paragraphs.join('\n\n') : paragraphs,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -122,7 +124,11 @@ export async function POST(request: Request) {
 
     // Save story to database
     console.log('Saving to database...');
-    const { error } = await supabase.from('stories').insert(story);
+    const { data, error } = await supabase
+      .from('stories')
+      .insert(story)
+      .select()
+      .single();
 
     if (error) {
       console.error('Database error:', error);
@@ -130,7 +136,7 @@ export async function POST(request: Request) {
     }
     console.log('Story saved successfully');
 
-    return new Response(JSON.stringify(story), {
+    return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
@@ -148,79 +154,4 @@ export async function POST(request: Request) {
   }
 }
 
-async function generateBranch(
-  storyData: Story,
-  previousContent: string,
-  choiceText: string
-): Promise<StoryBranch> {
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4-turbo-preview',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a children's story writer continuing an interactive branching narrative.
-        Create the next part of the story based on the reader's choice.
-        The content should be 2-3 paragraphs and provide 2-3 new choices unless it's a story ending.`,
-      },
-      {
-        role: 'user',
-        content: `Continue the story with these elements:
-        - Previous content: ${previousContent}
-        - Chosen path: ${choiceText}
-        - Main character: ${storyData.character?.name || 'Unknown'}
-        - Setting: ${storyData.setting}
-        - Theme: ${storyData.theme}
-        
-        Provide the next scene and 2-3 choices for what happens next, or conclude the story if this branch reaches a natural ending.`,
-      },
-    ],
-    temperature: 0.7,
-    max_tokens: 1000,
-  });
-
-  const branchContent = response.choices[0]?.message?.content;
-  if (!branchContent) {
-    throw new Error('Failed to generate story branch');
-  }
-
-  const { content, choices } = parseStoryResponse(branchContent);
-  const branchId = `branch-${Math.random().toString(36).substr(2, 9)}`;
-
-  return {
-    id: branchId,
-    content,
-    choices: await generateChoices(choices),
-  };
-}
-
-async function generateChoices(
-  choiceTexts: string[]
-): Promise<{ text: string; nextBranchId: string }[]> {
-  return choiceTexts.map((text) => ({
-    text,
-    nextBranchId: `branch-${Math.random().toString(36).substr(2, 9)}`,
-  }));
-}
-
-function parseStoryResponse(response: string): {
-  content: { en: string[]; es: string[] };
-  choices: string[];
-} {
-  // Split the response into content and choices
-  const parts = response.split(/\n*Choices:\n*/i);
-  const contentText = parts[0].trim();
-  const choices = parts[1]
-    ? parts[1]
-        .split('\n')
-        .map((choice) => choice.replace(/^[-*]\s*/, '').trim())
-        .filter(Boolean)
-    : [];
-
-  return {
-    content: {
-      en: contentText.split('\n').filter(Boolean),
-      es: [],
-    },
-    choices,
-  };
-}
+// --- (Other helper functions for branching, parsing, etc. can be copied here if needed) ---

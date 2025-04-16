@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -7,10 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Story } from './common/types';
+import type { Story } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreVertical, Edit, Trash, Share, Star } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 interface StoryListProps {
   stories: Story[];
@@ -88,7 +89,14 @@ export function StoryList({
               <div className="space-y-1">
                 <h3 className="text-lg font-semibold">{story.title}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {story.description}
+                  {typeof story.content === 'string'
+                    ? story.content.slice(0, 100)
+                    : story.content &&
+                      typeof story.content === 'object' &&
+                      'en' in story.content &&
+                      Array.isArray((story.content as { en: string[] }).en)
+                    ? (story.content as { en: string[] }).en[0]?.slice(0, 100)
+                    : ''}
                 </p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>Created {formatDate(story.created_at)}</span>

@@ -10,9 +10,10 @@ import {
   useState,
   useMemo,
 } from 'react';
-import { Story } from '@/lib/types';
+import type { Story } from '@/lib/types';
 import { generateStoryIllustrations } from '@/lib/image-generation';
 import { useAuth } from '@/contexts/auth-context';
+import { fetchWithAuth } from '@/lib/api';
 
 // Define types
 export type StoryBranch = {
@@ -339,12 +340,20 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
   const generateStoryContent = useCallback(
     async (storyData: Story): Promise<{ en: string[]; es: string[] }> => {
       try {
-        const response = await fetch('/api/generate-story', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        const prompt = {
+          ...storyData,
+          character: {
+            name: storyData.character?.name || '',
+            age: storyData.character?.age || 8,
+            traits: storyData.character?.traits || ['friendly'],
+            appearance: storyData.character?.appearance || '',
+            gender: storyData.character?.gender || 'Male',
           },
-          body: JSON.stringify(storyData),
+        };
+        const response = await fetch('/api/story/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
         });
 
         if (!response.ok) {
