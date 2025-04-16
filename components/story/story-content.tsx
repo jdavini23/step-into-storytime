@@ -6,6 +6,7 @@ import { useStory } from '@/contexts/story-context';
 import Loading from '@/components/loading';
 import StoryHeader from './story-header';
 import { cn } from '@/lib/utils';
+import type { Story } from '@/lib/types';
 
 interface StoryContentProps {
   storyId: string;
@@ -69,11 +70,9 @@ function StoryDisplay({ className }: { className?: string }) {
   const { currentStory } = useStory().state;
   if (!currentStory) return null;
 
-  const authorName =
-    currentStory.author ||
-    (currentStory.character?.name
-      ? `Created by ${currentStory.character.name}'s family`
-      : 'Anonymous');
+  const authorName = currentStory.character?.name
+    ? `Created by ${currentStory.character.name}'s family`
+    : 'Anonymous';
 
   let paragraphs: string[] = [];
   const rawContent = currentStory.content;
@@ -128,16 +127,18 @@ function StoryDisplay({ className }: { className?: string }) {
         <StoryHeader
           title={currentStory.title}
           author={authorName}
-          date={new Date(
-            currentStory.createdAt || Date.now()
-          ).toLocaleDateString()}
-          theme={currentStory.theme}
+          date={
+            currentStory.created_at
+              ? new Date(currentStory.created_at).toLocaleDateString()
+              : ''
+          }
+          theme={currentStory.theme ?? ''}
         />
 
         <div className="mt-8">
           <StoryIllustration
             title={currentStory.title}
-            illustrations={currentStory.illustrations}
+            illustrations={(currentStory as any).illustrations}
           />
           <StoryText paragraphs={paragraphs} />
         </div>

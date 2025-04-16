@@ -6,7 +6,9 @@ import {
   themeSchema,
   lengthSchema,
   type StoryData,
+  type Story,
 } from '@/lib/types';
+import { fetchWithAuth } from '@/lib/api';
 
 // Story data validation schema
 const storyDataSchema = z.object({
@@ -50,7 +52,7 @@ export async function generateStory(
       },
     };
 
-    const response = await fetch('/api/story/generate', {
+    const response = await fetchWithAuth('/api/story/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt }),
@@ -79,7 +81,7 @@ export async function generateStory(
       updated_at: new Date().toISOString(),
     };
 
-    const storyResponse = await fetch('/api/stories', {
+    const storyResponse = await fetchWithAuth('/api/stories', {
       method: 'POST',
       credentials: 'include',
       headers: {

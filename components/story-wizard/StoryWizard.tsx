@@ -8,6 +8,7 @@ import ThemeStep from '../wizard-ui/steps/ThemeStep';
 import LengthStep from '../wizard-ui/steps/LengthStep';
 import ConfettiCelebration from './ConfettiCelebration';
 import type { Story } from '@/lib/types';
+import { fetchWithAuth } from '@/lib/api';
 
 interface StoryWizardProps {
   onComplete: (story: Story) => void;
@@ -24,7 +25,7 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/story/generate', {
+      const response = await fetchWithAuth('/api/story/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

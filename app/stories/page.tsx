@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner';
 import type { Story } from '@/contexts/story-context';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { fetchWithAuth } from '@/lib/api';
 
 export default function StoriesPage() {
   const router = useRouter();
@@ -27,21 +28,7 @@ export default function StoriesPage() {
     const fetchStories = async () => {
       console.log('[DEBUG] Starting to fetch stories in StoriesPage');
       try {
-        const supabase = createClientComponentClient();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const access_token = session?.access_token;
-        if (!access_token) {
-          toast.error('You must be logged in to view stories');
-          setIsLoading(false);
-          return;
-        }
-        const response = await fetch('/api/stories', {
-          headers: {
-            Authorization: `Bearer ${access_token}`,
-          },
-        });
+        const response = await fetchWithAuth('/api/stories');
         console.log('[DEBUG] Stories API response:', {
           status: response.status,
           statusText: response.statusText,
@@ -85,7 +72,7 @@ export default function StoriesPage() {
 
   const handleDelete = async (storyId: string) => {
     try {
-      const response = await fetch(`/api/stories/${storyId}`, {
+      const response = await fetchWithAuth(`/api/stories/${storyId}`, {
         method: 'DELETE',
       });
 
@@ -116,7 +103,7 @@ export default function StoriesPage() {
 
   const handleFavorite = async (storyId: string, isFavorite: boolean) => {
     try {
-      const response = await fetch(`/api/stories/${storyId}/favorite`, {
+      const response = await fetchWithAuth(`/api/stories/${storyId}/favorite`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

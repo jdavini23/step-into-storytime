@@ -10,9 +10,10 @@ import {
   useState,
   useMemo,
 } from 'react';
-import { Story } from '@/lib/types';
+import type { Story } from '@/lib/types';
 import { generateStoryIllustrations } from '@/lib/image-generation';
 import { useAuth } from '@/contexts/auth-context';
+import { fetchWithAuth } from '@/lib/api';
 
 // Define types
 export type StoryBranch = {

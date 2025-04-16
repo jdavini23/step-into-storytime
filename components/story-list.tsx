@@ -10,16 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-
-interface Story {
-  id: string;
-  title: string;
-  mainCharacter?: {
-    name: string;
-  };
-  setting?: string;
-  createdAt?: string;
-}
+import type { Story } from '@/lib/types';
 
 interface StoryListProps {
   stories: Story[];
@@ -78,12 +69,12 @@ export function StoryList({ stories }: StoryListProps) {
           </CardHeader>
           <CardContent className="flex-grow">
             <p className="text-muted-foreground mb-2">
-              {story.mainCharacter?.name}'s adventure in {story.setting}
+              {story.character?.name}'s adventure in {story.setting}
             </p>
             <p className="text-sm text-muted-foreground">
               Created{' '}
-              {story.createdAt
-                ? new Date(story.createdAt).toLocaleDateString()
+              {story.created_at
+                ? new Date(story.created_at).toLocaleDateString()
                 : 'recently'}
             </p>
           </CardContent>

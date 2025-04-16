@@ -1,6 +1,7 @@
 import { BookOpen, Calendar, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import type { Story } from '@/lib/types';
 
 interface StoryHeaderProps {
   title: string;
