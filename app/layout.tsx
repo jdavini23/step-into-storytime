@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/react';
 
 // Initialize font
 const inter = Inter({
