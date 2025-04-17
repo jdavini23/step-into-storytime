@@ -8,6 +8,7 @@ import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // Initialize font
 const inter = Inter({
@@ -73,6 +74,7 @@ export default function RootLayout({
                 <StoryProvider>
                   {children}
                   <Toaster />
+                  <SpeedInsights />
                 </StoryProvider>
               </SubscriptionProvider>
             </AuthProvider>
