@@ -61,7 +61,7 @@ export async function GET(
     if (dbError) {
       console.error('Database error:', dbError);
       return NextResponse.json(
-        { error: dbError.message || 'Failed to fetch story' },
+        { error: 'Failed to fetch story' },
         { status: 500 }
       );
     }

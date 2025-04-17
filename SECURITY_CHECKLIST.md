@@ -21,8 +21,9 @@ This document lists prioritized security recommendations for the Step-Into-Story
 5. **No Sensitive Data in Browser**  
    ✅ Completed
    - Production code never stores tokens/PII in browser storage. Dev fallback uses localStorage only if Supabase is not configured.
-6. **Proper Error Handling**
-   - Never leak stack traces or sensitive info to users. Log errors server-side only.
+6. **Proper Error Handling**  
+   ✅ Completed
+   - All API/server errors return only generic messages to the client. Full details are logged server-side. No stack traces or sensitive info are leaked.
 
 ---
 

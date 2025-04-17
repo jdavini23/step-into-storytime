@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
       if (error) {
         console.error('Error saving story:', error);
         return NextResponse.json(
-          { error: 'Failed to save story', details: error.message },
+          { error: 'Failed to save story' },
           { status: 500 }
         );
       }
@@ -170,17 +170,14 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
       console.error('Error saving story:', error);
       return NextResponse.json(
-        {
-          error: 'Failed to save story',
-          details: error.message,
-        },
+        { error: 'Failed to save story' },
         { status: 500 }
       );
     }
   } catch (error: any) {
     console.error('Error in story creation endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal Server Error', details: error.message },
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }

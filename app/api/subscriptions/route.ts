@@ -29,7 +29,6 @@ interface SubscriptionResponse {
 interface ErrorResponse {
   error: string;
   code?: string;
-  details?: unknown;
 }
 
 export async function GET(request: NextRequest) {
@@ -48,7 +47,6 @@ export async function GET(request: NextRequest) {
         {
           error: 'Unauthorized - Please sign in',
           code: 'AUTH_ERROR',
-          details: authError?.message,
         },
         { status: 401 }
       );
@@ -68,7 +66,6 @@ export async function GET(request: NextRequest) {
           {
             error: 'Failed to check subscriptions',
             code: 'DB_ERROR',
-            details: countError.message,
           },
           { status: 500 }
         );
@@ -111,7 +108,6 @@ export async function GET(request: NextRequest) {
           {
             error: 'Failed to fetch subscription details',
             code: 'DB_ERROR',
-            details: subError.message,
           },
           { status: 500 }
         );
@@ -130,9 +126,8 @@ export async function GET(request: NextRequest) {
       );
       return NextResponse.json<ErrorResponse>(
         {
-          error: dbError instanceof Error ? dbError.message : 'Database error',
+          error: 'Database error',
           code: 'DB_ERROR',
-          details: dbError,
         },
         { status: 500 }
       );
@@ -147,7 +142,6 @@ export async function GET(request: NextRequest) {
       {
         error: 'Internal Server Error',
         code: 'INTERNAL_ERROR',
-        details: error instanceof Error ? error.message : undefined,
       },
       { status: 500 }
     );
@@ -170,7 +164,6 @@ export async function POST(request: NextRequest) {
         {
           error: 'Unauthorized - Please sign in',
           code: 'AUTH_ERROR',
-          details: authError?.message,
         },
         { status: 401 }
       );
@@ -205,7 +198,6 @@ export async function POST(request: NextRequest) {
         {
           error: 'Invalid subscription tier',
           code: 'VALIDATION_ERROR',
-          details: `Valid tiers are: ${validTiers.join(', ')}`,
         },
         { status: 400 }
       );
@@ -259,9 +251,8 @@ export async function POST(request: NextRequest) {
 
         if (createPlanError) {
           return NextResponse.json<ErrorResponse>({
-            error: `Failed to create subscription plan`,
+            error: 'Failed to create subscription plan',
             code: 'DB_ERROR',
-            details: createPlanError.message,
           }, { status: 500 });
         }
 
@@ -277,9 +268,8 @@ export async function POST(request: NextRequest) {
 
       if (planError || !plan) {
         return NextResponse.json<ErrorResponse>({
-          error: `Failed to fetch subscription plan`,
+          error: 'Failed to fetch subscription plan',
           code: 'DB_ERROR',
-          details: planError?.message,
         }, { status: 500 });
       }
 
@@ -293,9 +283,8 @@ export async function POST(request: NextRequest) {
 
       if (existingSubError && existingSubError.code !== 'PGRST116') {
         return NextResponse.json<ErrorResponse>({
-          error: `Failed to check existing subscription`,
+          error: 'Failed to check existing subscription',
           code: 'DB_ERROR',
-          details: existingSubError.message,
         }, { status: 500 });
       }
 
@@ -316,9 +305,8 @@ export async function POST(request: NextRequest) {
           .single();
         if (currentPlanError) {
           return NextResponse.json<ErrorResponse>({
-            error: `Failed to fetch current subscription plan`,
+            error: 'Failed to fetch current subscription plan',
             code: 'DB_ERROR',
-            details: currentPlanError.message,
           }, { status: 500 });
         }
         if (currentPlan.tier === 'free') {
@@ -340,9 +328,8 @@ export async function POST(request: NextRequest) {
             .single();
           if (updateError) {
             return NextResponse.json<ErrorResponse>({
-              error: `Failed to upgrade subscription`,
+              error: 'Failed to upgrade subscription',
               code: 'DB_ERROR',
-              details: updateError.message,
             }, { status: 500 });
           }
           return NextResponse.json({
@@ -380,9 +367,8 @@ export async function POST(request: NextRequest) {
         .single();
       if (subError) {
         return NextResponse.json<ErrorResponse>({
-          error: `Failed to create subscription`,
+          error: 'Failed to create subscription',
           code: 'DB_ERROR',
-          details: subError.message,
         }, { status: 500 });
       }
 
@@ -416,9 +402,8 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json<ErrorResponse>({
-          error: `Failed to update profile`,
+          error: 'Failed to update profile',
           code: 'DB_ERROR',
-          details: profileError.message,
         }, { status: 500 });
       }
 
@@ -429,7 +414,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('[POST /api/subscriptions] Unhandled error:', error);
       return NextResponse.json<ErrorResponse>({
-        error: error instanceof Error ? error.message : 'Internal Server Error',
+        error: 'Internal Server Error',
         code: 'INTERNAL_ERROR',
       }, { status: 500 });
     }
@@ -442,7 +427,6 @@ export async function POST(request: NextRequest) {
       {
         error: 'Internal Server Error',
         code: 'INTERNAL_ERROR',
-        details: error instanceof Error ? error.message : undefined,
       },
       { status: 500 }
     );
@@ -489,7 +473,7 @@ export async function PUT(request: NextRequest) {
 
     if (subError) {
       return NextResponse.json(
-        { error: subError.message || 'Failed to update subscription' },
+        { error: 'Failed to update subscription' },
         { status: 500 }
       );
     }
