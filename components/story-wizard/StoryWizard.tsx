@@ -8,7 +8,7 @@ import ThemeStep from '../wizard-ui/steps/ThemeStep';
 import LengthStep from '../wizard-ui/steps/LengthStep';
 import ConfettiCelebration from './ConfettiCelebration';
 import type { Story } from '@/lib/types';
-import { fetchWithAuth } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 
 interface StoryWizardProps {
   onComplete: (story: Story) => void;
@@ -16,6 +16,7 @@ interface StoryWizardProps {
 }
 
 const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
+  const { fetchWithAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [celebrate, setCelebrate] = useState(false);
@@ -33,8 +34,8 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
             character: wizardData.character,
             setting: wizardData.setting,
             theme: wizardData.theme,
-            length: wizardData.length,
-            readingLevel: 'beginner',
+            targetAge: wizardData.targetAge || wizardData.character?.age,
+            readingLevel: wizardData.readingLevel || 'beginner',
             language: 'en',
             style: 'bedtime',
           },

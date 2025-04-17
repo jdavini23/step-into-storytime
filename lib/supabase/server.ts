@@ -29,6 +29,32 @@ export const createServerSupabaseClient = async () => {
   });
 };
 
+// Helper to create a Supabase client with a custom access token (for Bearer token auth)
+export const createServerSupabaseClientWithToken = (accessToken: string) => {
+  const client = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get: () => undefined,
+      set: () => {},
+      remove: () => {},
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+  // Set the Authorization header for all requests if possible
+  // @ts-ignore
+  if (client && client.realtime) {
+    // This is a hack; ideally, the library should support this natively
+    client.realtime.headers = {
+      ...client.realtime.headers,
+      Authorization: `Bearer ${accessToken}`,
+    };
+  }
+  return client;
+};
+
 // Export a function to get the session on the server side
 export async function getServerSession() {
   console.log('[Server] Starting getServerSession...');
