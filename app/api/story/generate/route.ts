@@ -1,6 +1,21 @@
+import { createClient } from '@supabase/supabase-js';
 import { OpenAI } from 'openai';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import {
+  createServerSupabaseClient,
+  getServerSession,
+  createServerSupabaseClientWithToken,
+} from '@/lib/supabase/server';
 import { Story, StoryPrompt, StoryBranch } from '@/lib/types';
+import { generateStory } from '@/utils/ai/story-generator';
+import { cookies } from 'next/headers';
+
+// Import the specific types
+import type {
+  WizardData,
+  CharacterData,
+  ReadingLevel,
+} from '@/components/wizard-ui/wizard-context';
+import type { StoryPrompt as GeneratorStoryPrompt } from '@/utils/ai/story-generator';
 
 // Initialize OpenAI client with API key from environment variable
 const openai = new OpenAI({
@@ -11,146 +26,370 @@ const openai = new OpenAI({
 // export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
+  console.log('[Story API] Starting story generation request...');
+
   try {
-    console.log('Starting story generation...');
+    // --- AUTHENTICATION HANDLING ---
+    // 1. Check for Bearer token in Authorization header
+    const authHeader =
+      req.headers.get('authorization') || req.headers.get('Authorization');
+    console.log(
+      '[Story API] Received Authorization header:',
+      authHeader
+        ? `${authHeader.slice(0, 12)}...${authHeader.slice(-4)}`
+        : 'none'
+    );
+    let supabase, session, user;
 
-    const supabase = await createServerSupabaseClient();
-    console.log('Supabase client created');
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    console.log('User auth checked:', { userId: user?.id });
-
-    if (!user) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-
-    const body = await request.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
-
-    if (!body.prompt) {
-      console.error('No prompt in request body');
-      return new Response(JSON.stringify({ error: 'No prompt provided' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const accessToken = authHeader.replace('Bearer ', '').trim();
+      console.log('[Story API] Using access token:', accessToken);
+      // Validate the token by calling Supabase REST API
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        },
       });
+      const userResText = await userRes.clone().text();
+      console.log(
+        '[Story API] Supabase REST API user response:',
+        userRes.status,
+        userResText
+      );
+      if (!userRes.ok) {
+        console.error(
+          '[Story API] Supabase REST API user validation failed:',
+          userRes.status,
+          userResText
+        );
+        return new Response(
+          JSON.stringify({
+            error: 'Authentication required',
+            details: 'Invalid or expired token. Please sign in again.',
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      const userData = JSON.parse(userResText);
+      user = userData;
+      session = { user };
+      // Create supabase client for DB operations WITH the token explicitly set
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          },
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        }
+      );
+      console.log(
+        '[Story API] Explicitly created Supabase client with token for DB ops.'
+      );
+
+      console.log('[Story API] Authenticated via Bearer token (REST API):', {
+        userId: user.id,
+      });
+      // --- Debug: Check what Supabase thinks the current user is ---
+      try {
+        // Use a direct SQL query to get auth.uid() as RPC('uid') might not exist
+        const { data: uidData, error: uidError } = await supabase.rpc(
+          'get_auth_uid'
+        );
+        // If get_auth_uid doesn't exist, you might need to create it:
+        // CREATE OR REPLACE FUNCTION public.get_auth_uid() RETURNS uuid LANGUAGE sql SECURITY DEFINER AS $$ SELECT auth.uid(); $$;
+        // GRANT EXECUTE ON FUNCTION public.get_auth_uid() TO authenticated;
+
+        console.log('[Story API] Supabase auth.uid() via RPC:', {
+          uidData,
+          uidError,
+        });
+      } catch (e) {
+        console.error(
+          '[Story API] Error calling supabase.rpc("get_auth_uid"):',
+          e
+        );
+        console.log(
+          '[Story API] Attempting auth.getUser() as fallback check...'
+        );
+        // Fallback check using auth.getUser on the client instance
+        const {
+          data: { user: clientUser },
+          error: clientUserError,
+        } = await supabase.auth.getUser();
+        console.log('[Story API] Result from supabase.auth.getUser():', {
+          clientUserId: clientUser?.id,
+          clientUserError,
+        });
+      }
+    } else {
+      // --- FALLBACK: Use cookies/session as before ---
+      const cookieStore = await cookies();
+      const authCookie = cookieStore.get('sb-access-token');
+      const refreshCookie = cookieStore.get('sb-refresh-token');
+
+      console.log('[Story API] Auth cookies present:', {
+        hasAccessToken: !!authCookie,
+        hasRefreshToken: !!refreshCookie,
+      });
+
+      supabase = await createServerSupabaseClient();
+      console.log('[Story API] Supabase client created, getting session...');
+
+      session = await getServerSession();
+
+      console.log('[Story API] Session check:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!session?.user?.id) {
+        console.error('[Story API] No authenticated user found');
+        return new Response(
+          JSON.stringify({
+            error: 'Authentication required',
+            details: 'No valid session found. Please sign in again.',
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Verify the session is still valid
+      console.log('[Story API] Verifying user...');
+      const {
+        data: { user: cookieUser },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error('[Story API] User verification failed:', userError);
+        return new Response(
+          JSON.stringify({
+            error: 'Session validation failed',
+            details: userError.message,
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!cookieUser || cookieUser.id !== session.user.id) {
+        console.error('[Story API] Session/User mismatch:', {
+          sessionUserId: session.user.id,
+          userId: cookieUser?.id,
+        });
+        return new Response(
+          JSON.stringify({
+            error: 'Invalid session',
+            details: 'User ID mismatch. Please sign in again.',
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      user = cookieUser;
+      console.log('[Story API] User authenticated successfully:', {
+        userId: user.id,
+      });
+      // --- Debug: Check what Supabase thinks the current user is ---
+      try {
+        // Use a direct SQL query to get auth.uid() as RPC('uid') might not exist
+        const { data: uidData, error: uidError } = await supabase.rpc(
+          'get_auth_uid'
+        );
+        // If get_auth_uid doesn't exist, you might need to create it:
+        // CREATE OR REPLACE FUNCTION public.get_auth_uid() RETURNS uuid LANGUAGE sql SECURITY DEFINER AS $$ SELECT auth.uid(); $$;
+        // GRANT EXECUTE ON FUNCTION public.get_auth_uid() TO authenticated;
+
+        console.log('[Story API] Supabase auth.uid() via RPC:', {
+          uidData,
+          uidError,
+        });
+      } catch (e) {
+        console.error(
+          '[Story API] Error calling supabase.rpc("get_auth_uid"):',
+          e
+        );
+        console.log(
+          '[Story API] Attempting auth.getUser() as fallback check...'
+        );
+        // Fallback check using auth.getUser on the client instance
+        const {
+          data: { user: clientUser },
+          error: clientUserError,
+        } = await supabase.auth.getUser();
+        console.log('[Story API] Result from supabase.auth.getUser():', {
+          clientUserId: clientUser?.id,
+          clientUserError,
+        });
+      }
     }
 
-    const { prompt }: { prompt: StoryPrompt } = body;
-    console.log('Prompt extracted:', JSON.stringify(prompt, null, 2));
+    // --- PARSE AND VALIDATE INCOMING WIZARD DATA ---
+    const body = await req.json();
+    // Log the raw body FIRST
+    console.log(
+      '[Story API] Raw request body received:',
+      JSON.stringify(body, null, 2)
+    );
 
-    // Validate required prompt fields
-    if (!prompt.character?.name || !prompt.setting || !prompt.theme) {
-      return new Response(
-        JSON.stringify({
-          error: 'Missing required fields in prompt',
-          details: 'Character name, setting, and theme are required',
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }
+    // Assuming frontend sends the data object directly or nested under 'prompt'
+    const wizardData: WizardData = body.prompt || body;
+    console.log(
+      '[Story API] Received wizard data:',
+      JSON.stringify(wizardData, null, 2)
+    );
+
+    // Validate required wizardData fields *before* mapping
+    if (
+      !wizardData.character?.name ||
+      !wizardData.character?.age ||
+      !wizardData.character?.traits?.length
+    )
+      throw new Error(
+        'Missing required character info (name, age, traits) in request.'
+      );
+    if (!wizardData.setting) throw new Error('Missing setting in request.');
+    if (!wizardData.theme) throw new Error('Missing theme in request.');
+    if (!wizardData.length) throw new Error('Missing length in request.');
+    if (!wizardData.readingLevel)
+      throw new Error('Missing readingLevel in request.');
+
+    // Validate character age
+    const ageNum = Number(wizardData.character.age);
+    if (isNaN(ageNum) || ageNum < 2 || ageNum > 12) {
+      throw new Error('Invalid character age. Must be between 2 and 12.');
+    }
+
+    // Validate reading level
+    const validReadingLevels: ReadingLevel[] = [
+      'beginner',
+      'intermediate',
+      'advanced',
+    ];
+    if (!validReadingLevels.includes(wizardData.readingLevel)) {
+      throw new Error(
+        'Invalid reading level. Must be beginner, intermediate, or advanced.'
       );
     }
 
-    // Generate story content using OpenAI
-    console.log('Calling OpenAI API...');
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content:
-            "You are a creative children's story writer. Write engaging, age-appropriate stories that are fun and educational.",
-        },
-        {
-          role: 'user',
-          content: `Write a children's story with the following details:\n- Main character: ${
-            prompt.character.name
-          }, age ${prompt.character.age || 8}\n- Gender: ${
-            prompt.character.gender || 'Male'
-          }\n- Character traits: ${
-            prompt.character.traits?.join(', ') || 'friendly'
-          }\n- Setting: ${prompt.setting}\n- Theme: ${
-            prompt.theme
-          }\n- Length: ${prompt.length || 10} minutes\n- Reading level: ${
-            prompt.readingLevel || 'beginner'
-          }\n- Language: ${
-            prompt.language === 'es' ? 'Spanish' : 'English'
-          }\n- Style: ${
-            prompt.style || 'bedtime'
-          }\n\nThe story should be engaging, age-appropriate, and divided into paragraphs.`,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
-    console.log('OpenAI API response received');
-
-    const storyContent = completion.choices[0].message.content;
-    if (!storyContent) {
-      throw new Error('Failed to generate story content');
+    // Validate length
+    const validLengths = [5, 10, 15];
+    if (!validLengths.includes(wizardData.length)) {
+      throw new Error('Invalid length. Must be 5, 10, or 15.');
     }
 
-    // Split content into paragraphs
-    const paragraphs = storyContent
-      .split('\n')
-      .filter((p) => p.trim().length > 0);
-
-    // Create story object
-    const story = {
-      user_id: user.id,
-      title: `${prompt.character.name}'s Adventure in ${prompt.setting}`,
+    // --- MAP WIZARD DATA TO GENERATOR PROMPT ---
+    const storyPromptForGenerator: GeneratorStoryPrompt = {
       character: {
-        name: prompt.character.name,
-        age: Number(prompt.character.age),
-        traits: prompt.character.traits || ['friendly'],
-        appearance: prompt.character.appearance || '',
-        gender: prompt.character.gender || 'Male',
+        name: wizardData.character.name,
+        age: String(wizardData.character.age), // Convert number age to string
+        gender: wizardData.character.gender, // Optional
+        traits: wizardData.character.traits,
+        // appearance: wizardData.character.appearance, // Omit for now
       },
-      setting: prompt.setting,
-      theme: prompt.theme,
-      length: 10, // Default to 10 minutes
-      readingLevel: prompt.readingLevel || 'beginner',
-      language: prompt.language === 'es' ? 'Spanish' : 'English',
-      style: prompt.style || 'bedtime',
-      content: Array.isArray(paragraphs) ? paragraphs.join('\n\n') : paragraphs,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      setting: wizardData.setting,
+      theme: wizardData.theme,
+      targetAge: ageNum, // Use the validated number age
+      readingLevel: wizardData.readingLevel,
+      durationMinutes: wizardData.length, // Map UI length to durationMinutes
+      language: 'en', // Defaulting to English for now, omit if not needed by generator
+      // Omit other optional fields not collected by UI:
+      // style: wizardData.style,
+      // educationalFocus: wizardData.educationalFocus,
     };
-    console.log('Story object created');
 
-    // Save story to database
-    console.log('Saving to database...');
-    const { data, error } = await supabase
+    console.log(
+      '[Story API] Mapped prompt for generator:',
+      JSON.stringify(storyPromptForGenerator, null, 2)
+    );
+
+    // --- CALL GENERATOR --- (Using the mapped prompt)
+    const generatedStoryData = await generateStory(storyPromptForGenerator);
+
+    if (!generatedStoryData.title || !generatedStoryData.content) {
+      throw new Error('Failed to generate story content or title from AI');
+    }
+
+    // --- SAVE TO DATABASE --- (Using validated wizardData and generatedStoryData)
+    console.log('[Story API] Inserting story with user_id:', user.id);
+    const { data: savedStory, error: saveError } = await supabase
       .from('stories')
-      .insert(story)
+      .insert([
+        {
+          user_id: user.id, // Use authenticated user ID
+          title: generatedStoryData.title,
+          content: generatedStoryData.content,
+          // Store original wizard inputs in the DB columns if needed
+          character: wizardData.character,
+          setting: wizardData.setting,
+          theme: wizardData.theme,
+          length: wizardData.length, // Store original length choice
+          readingLevel: wizardData.readingLevel, // Use camelCase column name
+          // Provide default values for required columns not yet in UI
+          language: wizardData.language || 'en', // Provide default
+          style: wizardData.style || 'general', // Provide default
+          created_at: new Date().toISOString(),
+          // Add other fields from generatedStoryData if schema allows/requires (e.g., plot_elements?)
+        },
+      ])
       .select()
       .single();
 
-    if (error) {
-      console.error('Database error:', error);
-      throw error;
+    if (saveError) {
+      console.error('[Story API] Error saving story:', saveError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to save story to database',
+          details: saveError.message, // Return only the message
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
-    console.log('Story saved successfully');
 
-    return new Response(JSON.stringify(data), {
+    console.log('[Story API] Story saved successfully:', savedStory.id);
+    return new Response(JSON.stringify(savedStory), {
+      status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error generating story:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'Failed to generate story',
-        details: error instanceof Error ? error.message : String(error),
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    console.error('[Story API] Error in POST handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'An unexpected error occurred';
+    // Avoid leaking internal details in production errors
+    const clientError =
+      errorMessage.startsWith('Missing') || errorMessage.startsWith('Invalid')
+        ? errorMessage
+        : 'Story generation failed.';
+
+    return new Response(JSON.stringify({ error: clientError }), {
+      status:
+        error instanceof Error &&
+        (errorMessage.startsWith('Missing') ||
+          errorMessage.startsWith('Invalid'))
+          ? 400
+          : 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
 

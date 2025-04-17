@@ -27,12 +27,31 @@ function getSupabaseClientInstance(): SupabaseClient<Database> {
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
-    cookieOptions: {
-      name: 'sb-auth-token',
-      domain: process.env.NEXT_PUBLIC_DOMAIN,
-      path: '/',
-      sameSite: 'lax',
-      secure: true,
+    cookies: {
+      get: (name: string) => {
+        const cookie = document.cookie
+          .split('; ')
+          .find((row) => row.startsWith(`${name}=`));
+        return cookie ? cookie.split('=')[1] : undefined;
+      },
+      set: (name: string, value: string, options: CookieOptions) => {
+        document.cookie = `${name}=${value}; path=${
+          options.path || '/'
+        }; max-age=${options.maxAge || 60 * 60 * 24 * 365}; domain=${
+          options.domain || window.location.hostname
+        }; ${options.sameSite ? `samesite=${options.sameSite}; ` : ''}${
+          options.secure ? 'secure; ' : ''
+        }`;
+      },
+      remove: (name: string, options: CookieOptions) => {
+        document.cookie = `${name}=; path=${
+          options.path || '/'
+        }; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=${
+          options.domain || window.location.hostname
+        }; ${options.sameSite ? `samesite=${options.sameSite}; ` : ''}${
+          options.secure ? 'secure; ' : ''
+        }`;
+      },
     },
   });
 

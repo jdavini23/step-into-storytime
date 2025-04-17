@@ -1,20 +1,20 @@
 import { createServerClient } from '@supabase/ssr';
+import { type SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
 import { type NextRequest, type NextResponse } from 'next/server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-if (!supabaseUrl) {
+if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing required Supabase environment variables.');
 }
 
+let serverClient: SupabaseClient<Database> | null = null;
+
 export const createServerSupabaseClient = async () => {
   const cookieStore = await cookies();
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables.');
-  }
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -29,19 +29,56 @@ export const createServerSupabaseClient = async () => {
   });
 };
 
+// Helper to create a Supabase client with a custom access token (for Bearer token auth)
+export const createServerSupabaseClientWithToken = (accessToken: string) => {
+  const client = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get: () => undefined,
+      set: () => {},
+      remove: () => {},
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+  // Set the Authorization header for all requests if possible
+  // @ts-ignore
+  if (client && client.realtime) {
+    // This is a hack; ideally, the library should support this natively
+    client.realtime.headers = {
+      ...client.realtime.headers,
+      Authorization: `Bearer ${accessToken}`,
+    };
+  }
+  return client;
+};
+
 // Export a function to get the session on the server side
 export async function getServerSession() {
+  console.log('[Server] Starting getServerSession...');
   const supabase = await createServerSupabaseClient();
   try {
+    console.log('[Server] Getting session from Supabase...');
     const {
       data: { session },
       error: sessionError,
     } = await supabase.auth.getSession();
 
     if (sessionError) {
-      console.error('Session error:', sessionError);
+      console.error('[Server] Session error:', sessionError);
       return null;
     }
+
+    if (!session) {
+      console.log('[Server] No session found');
+      return null;
+    }
+
+    console.log('[Server] Session found, verifying user...', {
+      userId: session.user.id,
+    });
 
     // Verify the user's authentication status
     const {
@@ -50,18 +87,32 @@ export async function getServerSession() {
     } = await supabase.auth.getUser();
 
     if (userError) {
-      console.error('User verification error:', userError);
+      console.error('[Server] User verification error:', userError);
+      return null;
+    }
+
+    if (!user) {
+      console.log('[Server] No user found during verification');
       return null;
     }
 
     // Only return session if both checks pass
     if (session && user && session.user.id === user.id) {
+      console.log('[Server] Session verified successfully', {
+        userId: user.id,
+        sessionId: session.user.id,
+        email: user.email,
+      });
       return session;
     }
 
+    console.log('[Server] Session/User mismatch', {
+      sessionUserId: session?.user?.id,
+      userId: user?.id,
+    });
     return null;
   } catch (error) {
-    console.error('Server session error:', error);
+    console.error('[Server] Server session error:', error);
     return null;
   }
 }
