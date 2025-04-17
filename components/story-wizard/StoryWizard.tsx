@@ -9,6 +9,7 @@ import LengthStep from '../wizard-ui/steps/LengthStep';
 import ConfettiCelebration from './ConfettiCelebration';
 import type { Story } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
+import type { WizardData } from '../wizard-ui/wizard-context';
 
 interface StoryWizardProps {
   onComplete: (story: Story) => void;
@@ -22,30 +23,56 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
   const [celebrate, setCelebrate] = useState(false);
 
   // API call for story generation
-  const handleFinish = async (wizardData: any) => {
+  const handleFinish = async (wizardData: WizardData) => {
     setLoading(true);
     setError(null);
+    console.log('[StoryWizard] handleFinish called with data:', wizardData);
+
+    // Basic validation before sending
+    if (
+      !wizardData.character ||
+      !wizardData.character.age ||
+      !wizardData.length ||
+      !wizardData.readingLevel
+    ) {
+      console.error(
+        '[StoryWizard] Missing essential data for API call:',
+        wizardData
+      );
+      setError(
+        'Oops! Some required information is missing. Please go back and check.'
+      );
+      onError('Missing required information.');
+      setLoading(false);
+      return;
+    }
+
+    // Construct the payload more carefully based on our plan
+    const payload = {
+      character: wizardData.character,
+      setting: wizardData.setting,
+      theme: wizardData.theme,
+      length: wizardData.length,
+      readingLevel: wizardData.readingLevel,
+    };
+
+    console.log('[StoryWizard] Sending payload to API:', payload);
+
     try {
+      // Use the specific wizardData fields to build the request
       const response = await fetchWithAuth('/api/story/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: {
-            character: wizardData.character,
-            setting: wizardData.setting,
-            theme: wizardData.theme,
-            targetAge: wizardData.targetAge || wizardData.character?.age,
-            readingLevel: wizardData.readingLevel || 'beginner',
-            language: 'en',
-            style: 'bedtime',
-          },
-        }),
+        body: JSON.stringify(payload),
       });
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('[StoryWizard] API Error Response:', errorData);
         throw new Error(errorData.error || 'API error');
       }
       const story = await response.json();
+      console.log('[StoryWizard] Story generated successfully:', story.id);
       setLoading(false);
       setCelebrate(true);
       setTimeout(() => {
@@ -53,8 +80,13 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
         onComplete(story);
       }, 2600); // allow confetti to finish
     } catch (e: any) {
+      console.error('[StoryWizard] Error during story generation:', e);
       setLoading(false);
-      setError('Failed to generate story. Please try again.');
+      // Provide more specific error message if possible
+      const message = e.message?.includes('required information')
+        ? e.message
+        : 'Failed to generate story. Please try again.';
+      setError(message);
       onError(e.message || 'Failed to generate story.');
     }
   };

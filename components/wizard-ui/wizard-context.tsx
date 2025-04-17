@@ -7,8 +7,25 @@ import React, {
   useMemo,
 } from 'react';
 
+// Define a more specific type for Wizard Data for better type safety
+export interface CharacterData {
+  name?: string;
+  age?: number | '';
+  gender?: string;
+  traits?: string[];
+}
+
+// Export the type alias
+export type ReadingLevel = 'beginner' | 'intermediate' | 'advanced';
+
 export interface WizardData {
-  [key: string]: any;
+  character?: CharacterData;
+  setting?: string;
+  theme?: string;
+  length?: number; // 5, 10, 15
+  readingLevel?: ReadingLevel;
+  // Add other potential future fields here as optional
+  [key: string]: any; // Keep index signature for flexibility if needed, but prefer explicit props
 }
 
 export interface WizardContextProps {
@@ -29,18 +46,18 @@ export interface WizardContextProps {
 }
 
 const defaultContext: WizardContextProps = {
-  data: {},
+  data: { length: 5 }, // Default length to 5 as in LengthStep
   updateData: () => {},
   currentStep: 0,
   goNext: () => {},
   goBack: () => {},
   goTo: () => {},
-  canGoNext: true,
+  canGoNext: false, // Default to false until first step validation runs
   setCanGoNext: () => {},
   errors: {},
   setError: () => {},
   clearError: () => {},
-  isStepValid: () => true,
+  isStepValid: () => false,
   isLoading: false,
   setIsLoading: () => {},
 };
@@ -54,20 +71,34 @@ export const WizardProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   // Initialize data from localStorage if available
   const [data, setData] = useState<WizardData>(() => {
-    if (typeof window === 'undefined') return {};
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {};
+    if (typeof window === 'undefined') return defaultContext.data; // Use default data server-side
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      // Merge saved data with defaults to ensure all keys exist if structure changes
+      const parsed = saved ? JSON.parse(saved) : {};
+      return { ...defaultContext.data, ...parsed };
+    } catch (e) {
+      console.error('Failed to parse wizard data from localStorage', e);
+      localStorage.removeItem(STORAGE_KEY); // Clear corrupted data
+      return defaultContext.data;
+    }
   });
 
   const [currentStep, setCurrentStep] = useState<number>(0);
-  const [canGoNext, setCanGoNext] = useState<boolean>(true);
+  // Initialize canGoNext based on the initial step and data
+  // Initialize with default false, useEffect below will set the correct initial value.
+  const [canGoNext, setCanGoNext] = useState<boolean>(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Persist data to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.error('Failed to save wizard data to localStorage', e);
+      }
     }
   }, [data]);
 
@@ -93,32 +124,52 @@ export const WizardProvider: React.FC<{ children: ReactNode }> = ({
     });
   }, []);
 
+  // Updated isStepValid function
   const isStepValid = useCallback(
-    (step: number): boolean => {
+    (step: number, currentData = data, currentErrors = errors): boolean => {
       switch (step) {
         case 0: // Character
+          // Add check for age and traits as well, based on CharacterStep logic
           return Boolean(
-            data.character?.name &&
-              data.character?.gender &&
-              !errors['character']
+            currentData.character?.name &&
+              currentData.character?.gender &&
+              currentData.character?.age && // Added age check
+              Number(currentData.character.age) >= 2 &&
+              Number(currentData.character.age) <= 12 &&
+              currentData.character?.traits && // Added traits check
+              currentData.character.traits.length > 0 &&
+              !currentErrors['character.name'] && // Example of more specific error keys
+              !currentErrors['character.age'] &&
+              !currentErrors['character.gender'] &&
+              !currentErrors['character.traits']
           );
         case 1: // Setting
-          return Boolean(data.setting && !errors['setting']);
+          return Boolean(currentData.setting && !currentErrors['setting']);
         case 2: // Theme
-          return Boolean(data.theme && !errors['theme']);
-        case 3: // Length
-          return Boolean(data.length && !errors['length']);
+          return Boolean(currentData.theme && !currentErrors['theme']);
+        case 3: // Length & Reading Level
+          return Boolean(
+            currentData.length &&
+              currentData.readingLevel && // Added readingLevel check
+              !currentErrors['length'] &&
+              !currentErrors['readingLevel']
+          );
         default:
+          // Assume subsequent steps (like preview/generate) are valid if prior ones are
+          // Or add specific logic if needed
           return true;
       }
     },
-    [data, errors]
+    [data, errors] // Keep dependencies
   );
 
-  // Reset canGoNext to true on step change
+  // Update canGoNext whenever the relevant data for the current step changes
+  // This effect will run after initial render and set the correct value
   useEffect(() => {
-    setCanGoNext(isStepValid(currentStep));
-  }, [currentStep, isStepValid]);
+    setCanGoNext(isStepValid(currentStep, data, errors));
+    // It might be better to run validation inside the specific step component
+    // and call setCanGoNext from there, rather than relying on this effect.
+  }, [currentStep, data, errors, isStepValid]);
 
   const contextValue = useMemo(
     () => ({

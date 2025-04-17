@@ -9,6 +9,14 @@ import { Story, StoryPrompt, StoryBranch } from '@/lib/types';
 import { generateStory } from '@/utils/ai/story-generator';
 import { cookies } from 'next/headers';
 
+// Import the specific types
+import type {
+  WizardData,
+  CharacterData,
+  ReadingLevel,
+} from '@/components/wizard-ui/wizard-context';
+import type { StoryPrompt as GeneratorStoryPrompt } from '@/utils/ai/story-generator';
+
 // Initialize OpenAI client with API key from environment variable
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -236,134 +244,152 @@ export async function POST(req: Request) {
       }
     }
 
+    // --- PARSE AND VALIDATE INCOMING WIZARD DATA ---
     const body = await req.json();
-    const prompt = body.prompt || body;
+    // Log the raw body FIRST
     console.log(
-      '[Story API] Received prompt:',
-      JSON.stringify(prompt, null, 2)
+      '[Story API] Raw request body received:',
+      JSON.stringify(body, null, 2)
     );
 
-    // Validate required prompt fields
-    const requiredFields = [
-      'character',
-      'theme',
-      'setting',
-      'targetAge',
-      'readingLevel',
-    ];
-    const missingFields = requiredFields.filter((field) => !prompt[field]);
-
-    if (missingFields.length > 0) {
-      return new Response(
-        JSON.stringify({
-          error: `Missing required fields: ${missingFields.join(', ')}`,
-          fields: missingFields,
-        }),
-        { status: 400 }
-      );
-    }
-
-    // Validate character object
-    const requiredCharacterFields = ['name', 'age', 'traits'];
-    const missingCharacterFields = requiredCharacterFields.filter(
-      (field) => !prompt.character[field]
+    // Assuming frontend sends the data object directly or nested under 'prompt'
+    const wizardData: WizardData = body.prompt || body;
+    console.log(
+      '[Story API] Received wizard data:',
+      JSON.stringify(wizardData, null, 2)
     );
 
-    if (missingCharacterFields.length > 0) {
-      return new Response(
-        JSON.stringify({
-          error: `Missing required character fields: ${missingCharacterFields.join(
-            ', '
-          )}`,
-          fields: missingCharacterFields,
-        }),
-        { status: 400 }
+    // Validate required wizardData fields *before* mapping
+    if (
+      !wizardData.character?.name ||
+      !wizardData.character?.age ||
+      !wizardData.character?.traits?.length
+    )
+      throw new Error(
+        'Missing required character info (name, age, traits) in request.'
       );
+    if (!wizardData.setting) throw new Error('Missing setting in request.');
+    if (!wizardData.theme) throw new Error('Missing theme in request.');
+    if (!wizardData.length) throw new Error('Missing length in request.');
+    if (!wizardData.readingLevel)
+      throw new Error('Missing readingLevel in request.');
+
+    // Validate character age
+    const ageNum = Number(wizardData.character.age);
+    if (isNaN(ageNum) || ageNum < 2 || ageNum > 12) {
+      throw new Error('Invalid character age. Must be between 2 and 12.');
     }
 
     // Validate reading level
-    const validReadingLevels = ['beginner', 'intermediate', 'advanced'];
-    if (!validReadingLevels.includes(prompt.readingLevel)) {
-      return new Response(
-        JSON.stringify({
-          error:
-            'Invalid reading level. Must be one of: beginner, intermediate, advanced',
-          field: 'readingLevel',
-        }),
-        { status: 400 }
+    const validReadingLevels: ReadingLevel[] = [
+      'beginner',
+      'intermediate',
+      'advanced',
+    ];
+    if (!validReadingLevels.includes(wizardData.readingLevel)) {
+      throw new Error(
+        'Invalid reading level. Must be beginner, intermediate, or advanced.'
       );
     }
 
-    // Validate target age
-    const age = parseInt(prompt.targetAge);
-    if (isNaN(age) || age < 3 || age > 12) {
-      return new Response(
-        JSON.stringify({
-          error: 'Target age must be a number between 3 and 12',
-          field: 'targetAge',
-        }),
-        { status: 400 }
-      );
+    // Validate length
+    const validLengths = [5, 10, 15];
+    if (!validLengths.includes(wizardData.length)) {
+      throw new Error('Invalid length. Must be 5, 10, or 15.');
     }
+
+    // --- MAP WIZARD DATA TO GENERATOR PROMPT ---
+    const storyPromptForGenerator: GeneratorStoryPrompt = {
+      character: {
+        name: wizardData.character.name,
+        age: String(wizardData.character.age), // Convert number age to string
+        gender: wizardData.character.gender, // Optional
+        traits: wizardData.character.traits,
+        // appearance: wizardData.character.appearance, // Omit for now
+      },
+      setting: wizardData.setting,
+      theme: wizardData.theme,
+      targetAge: ageNum, // Use the validated number age
+      readingLevel: wizardData.readingLevel,
+      durationMinutes: wizardData.length, // Map UI length to durationMinutes
+      language: 'en', // Defaulting to English for now, omit if not needed by generator
+      // Omit other optional fields not collected by UI:
+      // style: wizardData.style,
+      // educationalFocus: wizardData.educationalFocus,
+    };
 
     console.log(
-      'Generating story with prompt:',
-      JSON.stringify(prompt, null, 2)
+      '[Story API] Mapped prompt for generator:',
+      JSON.stringify(storyPromptForGenerator, null, 2)
     );
 
-    const story = await generateStory(prompt);
+    // --- CALL GENERATOR --- (Using the mapped prompt)
+    const generatedStoryData = await generateStory(storyPromptForGenerator);
 
-    if (!story.title || !story.content) {
-      throw new Error('Failed to generate story content');
+    if (!generatedStoryData.title || !generatedStoryData.content) {
+      throw new Error('Failed to generate story content or title from AI');
     }
 
-    console.log('[Story API] Inserting with user_id:', session.user.id);
+    // --- SAVE TO DATABASE --- (Using validated wizardData and generatedStoryData)
+    console.log('[Story API] Inserting story with user_id:', user.id);
     const { data: savedStory, error: saveError } = await supabase
       .from('stories')
       .insert([
         {
-          user_id: session.user.id,
-          title: story.title,
-          content: story.content,
-          character: prompt.character,
-          setting: prompt.setting,
-          theme: prompt.theme,
-          length: prompt.length || parseInt(prompt.targetAge) || 5,
-          readingLevel: prompt.readingLevel,
-          language: prompt.language || 'en',
-          style: prompt.style || 'default',
+          user_id: user.id, // Use authenticated user ID
+          title: generatedStoryData.title,
+          content: generatedStoryData.content,
+          // Store original wizard inputs in the DB columns if needed
+          character: wizardData.character,
+          setting: wizardData.setting,
+          theme: wizardData.theme,
+          length: wizardData.length, // Store original length choice
+          readingLevel: wizardData.readingLevel, // Use camelCase column name
+          // Provide default values for required columns not yet in UI
+          language: wizardData.language || 'en', // Provide default
+          style: wizardData.style || 'general', // Provide default
           created_at: new Date().toISOString(),
+          // Add other fields from generatedStoryData if schema allows/requires (e.g., plot_elements?)
         },
       ])
       .select()
       .single();
 
     if (saveError) {
-      console.error('Error saving story:', saveError);
+      console.error('[Story API] Error saving story:', saveError);
       return new Response(
         JSON.stringify({
           error: 'Failed to save story to database',
-          details: saveError,
+          details: saveError.message, // Return only the message
         }),
-        { status: 500 }
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('[Story API] Story saved successfully:', savedStory.id);
     return new Response(JSON.stringify(savedStory), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error in story generation:', error);
-    return new Response(
-      JSON.stringify({
-        error:
-          error instanceof Error
-            ? error.message
-            : 'An unexpected error occurred',
-      }),
-      { status: 500 }
-    );
+    console.error('[Story API] Error in POST handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'An unexpected error occurred';
+    // Avoid leaking internal details in production errors
+    const clientError =
+      errorMessage.startsWith('Missing') || errorMessage.startsWith('Invalid')
+        ? errorMessage
+        : 'Story generation failed.';
+
+    return new Response(JSON.stringify({ error: clientError }), {
+      status:
+        error instanceof Error &&
+        (errorMessage.startsWith('Missing') ||
+          errorMessage.startsWith('Invalid'))
+          ? 400
+          : 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
 
