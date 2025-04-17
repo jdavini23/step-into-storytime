@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useContext } from 'react';
 import { WizardContext, WizardData, ReadingLevel } from '../wizard-context';
+import { lengthSchema } from '@/lib/validation/storyWizard';
 
 const lengths = [5, 10, 15];
 const readingLevels = [
@@ -30,10 +31,19 @@ const LengthStep: React.FC = () => {
   const selectedLength = data.length || 5; // Default length
   const selectedReadingLevel = data.readingLevel || ''; // Default reading level
 
+  const validateLengthStep = (value: number) => {
+    const result = lengthSchema.safeParse(value);
+    return {
+      isValid: result.success,
+      error: result.success ? undefined : result.error.errors[0]?.message,
+    };
+  };
+
   // Validation: require both length and reading level
   useEffect(() => {
+    const lengthValidation = validateLengthStep(selectedLength);
     const isValid =
-      lengths.includes(selectedLength) &&
+      lengthValidation.isValid &&
       readingLevels.some((level) => level.value === selectedReadingLevel);
     setCanGoNext(isValid);
   }, [selectedLength, selectedReadingLevel, setCanGoNext]);

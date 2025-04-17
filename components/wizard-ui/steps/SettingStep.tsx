@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useContext } from 'react';
 import { WizardContext } from '../wizard-context';
+import { settingSchema } from '@/lib/validation/storyWizard';
 
 const settings = [
   { value: 'forest', label: 'Enchanted Forest', icon: (
@@ -17,12 +18,21 @@ const settings = [
   ) },
 ];
 
+const validateSettingStep = (value: string) => {
+  const result = settingSchema.safeParse(value);
+  return {
+    isValid: result.success,
+    error: result.success ? undefined : result.error.errors[0]?.message,
+  };
+};
+
 const SettingStep: React.FC = () => {
   const { data, updateData, setCanGoNext } = useContext(WizardContext);
   const value = data.setting || '';
 
   useEffect(() => {
-    setCanGoNext(!!value);
+    const validation = validateSettingStep(value);
+    setCanGoNext(validation.isValid);
   }, [value, setCanGoNext]);
 
   const handleSelect = (val: string) => {

@@ -9,6 +9,7 @@ import { Label } from '../../ui/label';
 import { characterTraits } from '../../../lib/constants';
 import { Alert, AlertDescription } from '../../ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { characterSchema } from '@/lib/validation/storyWizard';
 
 interface CharacterForm {
   name: string;
@@ -156,6 +157,19 @@ const CharacterStep: React.FC = () => {
     }
     setCustomTrait('');
   };
+
+  const validateCharacterStep = (data: any) => {
+    const result = characterSchema.safeParse(data);
+    return {
+      isValid: result.success,
+      error: result.success ? undefined : result.error.errors[0]?.message,
+    };
+  };
+
+  useEffect(() => {
+    const validation = validateCharacterStep(getValues());
+    setCanGoNext(validation.isValid);
+  }, [watchedName, watchedAge, watchedGender, watchedTraits]);
 
   return (
     <form className="space-y-6" autoComplete="off">

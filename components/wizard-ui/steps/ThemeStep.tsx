@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useContext } from 'react';
 import { WizardContext } from '../wizard-context';
+import { themeSchema } from '@/lib/validation/storyWizard';
 
 const themes = [
   { value: 'adventure', label: 'Adventure', icon: (
@@ -17,12 +18,21 @@ const themes = [
   ) },
 ];
 
+const validateThemeStep = (value: string) => {
+  const result = themeSchema.safeParse(value);
+  return {
+    isValid: result.success,
+    error: result.success ? undefined : result.error.errors[0]?.message,
+  };
+};
+
 const ThemeStep: React.FC = () => {
   const { data, updateData, setCanGoNext } = useContext(WizardContext);
   const value = data.theme || '';
 
   useEffect(() => {
-    setCanGoNext(!!value);
+    const validation = validateThemeStep(value);
+    setCanGoNext(validation.isValid);
   }, [value, setCanGoNext]);
 
   const handleSelect = (val: string) => {

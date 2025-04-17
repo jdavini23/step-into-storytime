@@ -17,6 +17,9 @@ import type {
 } from '@/components/wizard-ui/wizard-context';
 import type { StoryPrompt as GeneratorStoryPrompt } from '@/utils/ai/story-generator';
 
+// Import storyWizardSchema for validation
+import { storyWizardSchema } from '@/lib/validation/storyWizard';
+
 // Initialize OpenAI client with API key from environment variable
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -251,6 +254,33 @@ export async function POST(req: Request) {
       '[Story API] Raw request body received:',
       JSON.stringify(body, null, 2)
     );
+
+    // Validate request body using storyWizardSchema before processing
+    const validateStoryWizardPayload = (payload: any) => {
+      const result = storyWizardSchema.safeParse(payload);
+      if (!result.success) {
+        return {
+          isValid: false,
+          error: result.error.errors[0]?.message,
+        };
+      }
+      return { isValid: true };
+    };
+
+    const validationResponse = validateStoryWizardPayload(body);
+    if (!validationResponse.isValid) {
+      console.error('[Story API] Invalid story wizard payload:', validationResponse.error);
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid request body',
+          details: validationResponse.error,
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Assuming frontend sends the data object directly or nested under 'prompt'
     const wizardData: WizardData = body.prompt || body;
