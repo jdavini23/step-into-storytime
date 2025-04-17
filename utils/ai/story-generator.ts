@@ -11,8 +11,9 @@ interface StoryPrompt {
   character: {
     name: string;
     age: string;
+    gender?: string;
     traits: string[];
-    appearance: string;
+    appearance?: string;
   };
   theme: string;
   setting: string;
@@ -80,9 +81,9 @@ TITLE: [Your engaging title here]
 
   const userPrompt = `Create an engaging story about ${
     prompt.character.name
-  }, a ${
-    prompt.character.age
-  }-year-old character who is ${prompt.character.traits.join(', ')}. 
+  }, a ${prompt.character.age}-year-old ${
+    prompt.character.gender ? prompt.character.gender + ' ' : ''
+  }character who is ${prompt.character.traits.join(', ')}. 
 
 Setting: ${prompt.setting}
 Theme: ${prompt.theme}
@@ -135,6 +136,7 @@ Key Guidelines:
       character: {
         name: prompt.character.name,
         age: prompt.character.age,
+        gender: prompt.character.gender,
         traits: prompt.character.traits,
         appearance: prompt.character.appearance,
       },
