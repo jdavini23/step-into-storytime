@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import WizardContainer from '../wizard-ui/WizardContainer';
 import CharacterStep from '../wizard-ui/steps/CharacterStep';
 import SettingStep from '../wizard-ui/steps/SettingStep';
@@ -21,6 +21,29 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (loading) {
+      setElapsed(0);
+      timerRef.current = setInterval(() => {
+        setElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setElapsed(0);
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [loading]);
 
   // API call for story generation
   const handleFinish = async (wizardData: WizardData) => {
@@ -104,10 +127,27 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
       />
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-black/60 z-50 rounded-xl">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 w-64">
             <span className="loader border-4 border-primary border-t-transparent rounded-full w-12 h-12 animate-spin"></span>
             <span className="text-primary font-semibold">
-              Generating your story...
+              {elapsed <= 10
+                ? 'Generating your story...'
+                : 'Still working... Thanks for your patience!'}
+            </span>
+            {/* Progress Bar */}
+            <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  elapsed > 10 ? 'bg-yellow-400 animate-pulse' : 'bg-primary'
+                }`}
+                style={{ width: `${Math.min((elapsed / 10) * 100, 100)}%` }}
+              ></div>
+            </div>
+            <span className="text-gray-600 dark:text-gray-300 text-sm">
+              Estimated wait: ~10 seconds
+            </span>
+            <span className="text-gray-500 dark:text-gray-400 text-xs">
+              Elapsed: {elapsed} second{elapsed === 1 ? '' : 's'}
             </span>
           </div>
         </div>

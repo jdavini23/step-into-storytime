@@ -61,39 +61,32 @@ Based on analysis of `wizard-context.tsx` and step components (`CharacterStep.ts
 ### 2. Generator Modifications (`utils/ai/story-generator.ts`)
 
 - **`StoryPrompt` Interface:**
-  - Review if changes are needed. It already has `readingLevel`. Consider adding `durationMinutes: number` for clarity, although using the mapped `data.length` directly in the prompt text is also feasible.
+  - ✅ Added `durationMinutes: number` field to the interface for explicit duration control.
+  - ✅ Added validation for `durationMinutes` (3-20 minutes range, defaults to 5).
+  - ✅ Updated system and user prompts to use `durationMinutes` directly.
 - **`systemPrompt` Update:**
-  - **Decouple Length:** Remove the logic that sets story length based on `readingLevel`.
-  - **Use UI Length:** Add a specific instruction using the user's chosen duration (passed into the prompt function). Example: `- Story length: Approximately [DURATION_FROM_UI] minutes reading time.`
-  - **Use UI Reading Level:** Continue using the `readingLevel` parameter (now explicitly chosen by the user) to guide complexity, vocabulary, sentence structure, etc. Example: `- Reading level: ${prompt.readingLevel}`.
-  - **Use Target Age:** Continue using `targetAge` (derived from UI age) to ensure age-appropriateness.
-- **Input Validation:** Add validation within the `generateStory` function to check for valid `StoryPrompt` data before calling the AI API.
+  - ✅ Decoupled Length: Removed the logic that sets story length based on `readingLevel`.
+  - ✅ Use UI Length: Added a specific instruction using the user's chosen duration (passed into the prompt function). Example: `- Story length: Approximately ${prompt.durationMinutes || 5} minutes reading time.`
+  - ✅ Use UI Reading Level: Continue using the `readingLevel` parameter (now explicitly chosen by the user) to guide complexity, vocabulary, sentence structure, etc. Example: `- Reading level: ${prompt.readingLevel}`.
+  - ✅ Use Target Age: Continue using `targetAge` (derived from UI age) to ensure age-appropriateness.
+- **Input Validation:**
+  - ✅ Added validation within the `generateStory` function to check for valid `StoryPrompt` data before calling the AI API.
 
 ### 3. Data Mapping & Handling (In the calling code)
 
-- **Gather UI Data:** Collect all values from `WizardContext` (`data`).
-- **Construct `StoryPrompt`:**
-  - `character.name`: Use `data.character.name`.
-  * `character.age`: Convert `data.character.age` (number) to string.
-  * `character.gender`: Use `data.character.gender`.
-  * `character.traits`: Use `data.character.traits`.
-  * `setting`: Use `data.setting`.
-  * `theme`: Use `data.theme`.
-  * `targetAge`: Use `data.character.age` (number).
-  * `readingLevel`: Use the newly collected `data.readingLevel`.
-  * `durationMinutes` (or similar variable for prompt text): Use `data.length`.
-- **Handle Optional/Future Fields:**
-  - When calling `generateStory` for the current UI, **omit** `character.appearance`, `language`, `style`, and `educationalFocus` from the prompt object.
-  - Ensure `generateStory` and its prompts handle the absence of these optional fields gracefully (e.g., using internal defaults, omitting sections of the prompt text). The `StoryPrompt` interface retains these fields definitions.
+- ✅ Gather UI Data: All values are collected from WizardContext (`data`).
+- ✅ Construct `StoryPrompt`: All fields are mapped correctly, including type conversions (e.g., age to string).
+- ✅ Omit Optional/Future Fields: Optional fields like `character.appearance`, `language`, `style`, and `educationalFocus` are omitted for now.
+- ✅ Ensure Generator Handles Missing Optional Fields: The generator handles missing optional fields gracefully, using defaults or omitting sections as needed.
 
 ## Additional Recommendations
 
-- **Generation Feedback:** Improve UI feedback during story generation (loading states, estimated wait times).
+- ✅ Generation Feedback: The UI now shows a loading spinner, estimated wait (~10 seconds), a live elapsed timer, and a simulated progress bar that fills over 10 seconds. If the wait exceeds 10 seconds, the bar pulses and the message updates to 'Still working... Thanks for your patience!'.
 - **Story Rating/Feedback:** Implement a user rating system (e.g., thumbs up/down) for generated stories to gather data for future improvements.
 - **Regeneration Option:** Add a "Try Again" or "Regenerate" button, perhaps allowing minor prompt tweaks.
-- **Error Handling:** Enhance error handling in `generateStory` for API errors, rate limits, content filtering, etc. Return specific error types to the caller.
+- ✅ Error Handling: Enhanced error handling in `generateStory` for API errors, rate limits, content filtering, etc. Returns specific error types to the caller.
 - **Negative Prompts:** Consider adding an optional `negativePrompt` field to the `StoryPrompt` interface and generator logic to steer the AI away from undesired content.
-- **Logging:** Implement server-side logging for generation requests (anonymized prompts) and outcomes (success/failure, token usage) for monitoring and analysis.
+- ✅ Logging: Implemented server-side logging for generation requests (anonymized prompts) and outcomes (success/failure, token usage) for monitoring and analysis.
 
 ## Future Enhancements
 
@@ -130,4 +123,9 @@ Based on analysis of `wizard-context.tsx` and step components (`CharacterStep.ts
 1.  ✅ **Implement UI Changes:** Add the "Reading Level" selection input to the wizard. (Completed)
 2.  ✅ **Implement Generator Changes:** Modify the `systemPrompt` in `utils/ai/story-generator.ts` to decouple length and complexity, and improve input validation. (Completed)
 3.  ✅ **Update Calling Code:** Modify the code that calls `generateStory` (`app/api/story/generate/route.ts`) to perform the new data mapping (including the new `readingLevel` and `length`/`durationMinutes` usage). (Completed)
+    - ✅ _Fix: Corrected API request payload construction in `StoryWizard.tsx`._
+    - ✅ _Fix: Corrected database column name (`readingLevel`) in API route insert._
+    - ✅ _Fix: Provided default values for required `language` and `style` columns in API route insert._
 4.  **Test:** Thoroughly test the end-to-end flow with different combinations of length and reading level.
+    - ✅ _Fix: Resolved `ReferenceError` for `isStepValid` in `wizard-context.tsx`._
+    - 🔄 Initial testing done, further testing recommended.
