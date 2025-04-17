@@ -60,6 +60,7 @@ interface AuthContextType {
   updatePassword: (password: string) => Promise<void>;
   // Optional: Add profile update function if needed
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 const initialState: AuthState = {
@@ -454,6 +455,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [state.user, state.session, dispatch, handleError]
   );
 
+  // Context-aware fetchWithAuth
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const token = state.session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    // Log the token (redacted)
+    console.log(
+      '[AuthContext fetchWithAuth] Using access token:',
+      token ? `${token.slice(0, 4)}...${token.slice(-4)}` : 'none'
+    );
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  };
+
   // Memoize the context value to prevent unnecessary re-renders
   const contextValue = React.useMemo(
     () => ({
@@ -466,6 +485,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resetPassword,
       updatePassword,
       updateProfile,
+      fetchWithAuth,
     }),
     [
       state,
@@ -477,6 +497,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resetPassword,
       updatePassword,
       updateProfile,
+      fetchWithAuth,
     ]
   );
 
