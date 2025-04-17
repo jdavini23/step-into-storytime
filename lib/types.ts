@@ -10,6 +10,7 @@ export type Story = Omit<
 > & {
   character?: Character;
   length?: StoryLength;
+  tag?: string; // Tag for filtering and display (automated, matches UI usage)
 };
 
 // UI story type with additional fields

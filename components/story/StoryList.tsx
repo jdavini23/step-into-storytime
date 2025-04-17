@@ -12,6 +12,7 @@ import type { Story } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreVertical, Edit, Trash, Share, Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { TagPill } from './TagPill';
 
 interface StoryListProps {
   stories: Story[];
@@ -117,6 +118,9 @@ export function StoryList({
                   <p className="text-sm text-gray-600">
                     Character: {story.character.name}
                   </p>
+                )}
+                {story.tag && (
+                  <TagPill label={story.tag} />
                 )}
               </div>
 

@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { useStory } from '@/contexts/story-context';
 import { SubscriptionStatus } from '@/components/subscription/subscription-status';
+import { TagPill } from '@/components/story/TagPill';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,6 +23,21 @@ export default function DashboardPage() {
   const { state: storyState, fetchStories, deleteStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Extract unique tags from stories (use theme as tag)
+  const uniqueTags = Array.from(
+    new Set(
+      (storyState.stories || [])
+        .map((s) => s.theme || null)
+        .filter((t): t is string => !!t)
+    )
+  );
+
+  // Filter stories by selected tag (theme)
+  const filteredStories = selectedTag
+    ? storyState.stories.filter((s) => s.theme === selectedTag)
+    : storyState.stories;
 
   // Handle authentication and story loading
   useEffect(() => {
@@ -198,57 +214,81 @@ export default function DashboardPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {Array.isArray(storyState.stories) &&
-              storyState.stories.map((story) => (
-                <Card
-                  key={story.id}
-                  className="border-0 shadow-md hover:shadow-lg transition-shadow"
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{story.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600">
-                      {story.character?.name}'s adventure in {story.setting}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Created{' '}
-                      {story.created_at
-                        ? new Date(story.created_at).toLocaleDateString()
-                        : 'recently'}
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-slate-600"
-                      onClick={() => router.push(`/story/${story.id}`)}
-                    >
-                      Read
-                    </Button>
-                    <div className="flex gap-2">
+          <div>
+            {/* Tag filter bar */}
+            {uniqueTags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {uniqueTags.map((tag) => (
+                  <TagPill
+                    key={tag}
+                    label={tag}
+                    selected={selectedTag === tag}
+                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                  />
+                ))}
+                {selectedTag && (
+                  <TagPill
+                    label="Clear"
+                    selected={false}
+                    onClick={() => setSelectedTag(null)}
+                    className="bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                  />
+                )}
+              </div>
+            )}
+            {/* End Tag filter bar */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {Array.isArray(filteredStories) &&
+                filteredStories.map((story) => (
+                  <Card
+                    key={story.id}
+                    className="border-0 shadow-md hover:shadow-lg transition-shadow"
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">{story.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-600">
+                        {story.character?.name}'s adventure in {story.setting}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Created{' '}
+                        {story.created_at
+                          ? new Date(story.created_at).toLocaleDateString()
+                          : 'recently'}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         className="text-slate-600"
-                        onClick={() => router.push(`/story/${story.id}/edit`)}
+                        onClick={() => router.push(`/story/${story.id}`)}
                       >
-                        <Edit className="h-4 w-4" />
+                        Read
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleDeleteStory(story.id || '')}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-slate-600"
+                          onClick={() => router.push(`/story/${story.id}/edit`)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDeleteStory(story.id || '')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardFooter>
+                  </Card>
+                ))}
+            </div>
           </div>
         )}
       </main>
