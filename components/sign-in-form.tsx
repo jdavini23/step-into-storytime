@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/auth-context';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 interface FormData {
   email: string;
@@ -138,12 +138,7 @@ export default function SignInForm() {
         general: errorMessage,
       });
 
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-        duration: 5000,
-      });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

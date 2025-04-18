@@ -1,5 +1,5 @@
 import { AuthError } from '@supabase/supabase-js';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 export class AuthenticationError extends Error {
   constructor(message: string, public readonly code?: string) {
@@ -30,10 +30,8 @@ export const handleAuthError = (
   const userFriendlyMessage = mapErrorToUserMessage(message);
 
   // Show toast notification
-  toast({
-    title: 'Authentication Error',
+  toast.error('Authentication Error', {
     description: userFriendlyMessage,
-    variant: 'destructive',
   });
 
   return new AuthenticationError(userFriendlyMessage, code);

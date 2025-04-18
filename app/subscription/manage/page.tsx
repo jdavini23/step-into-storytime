@@ -60,8 +60,7 @@ import {
 import FeatureList from '../components/FeatureList';
 import { usePlanSwitching } from '../hooks/usePlanSwitching';
 import { useCancelSubscription } from '../hooks/useCancelSubscription';
-import { useToast } from '@/components/ui/use-toast';
-import { Toaster } from '@/components/ui/toaster';
+import { toast, Toaster } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Info } from 'lucide-react';
@@ -101,7 +100,6 @@ export default function ManageSubscriptionPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
   const [showErrorDetails, setShowErrorDetails] = useState(false);
   const [benefitsOpen, setBenefitsOpen] = useState(true);
 
@@ -180,14 +178,12 @@ export default function ManageSubscriptionPage() {
   const handleCancel = async () => {
     try {
       await cancelSubscriptionHook();
-      toast({
-        title: 'Subscription canceled',
+      toast.success('Subscription canceled', {
         description:
           'Your subscription has been canceled. You will retain access until the end of the billing period.',
       });
     } catch (e: any) {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: e?.message || 'An error occurred.',
       });
     }

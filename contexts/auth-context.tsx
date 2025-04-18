@@ -9,7 +9,7 @@ import React, {
   useCallback,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/components/ui/toast';
 import { createBrowserClient, CookieOptions } from '@supabase/ssr';
 import {
   AuthError,
@@ -294,7 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? error.message
           : defaultMessage;
       dispatch({ type: 'SET_ERROR', payload: message });
-      toast({ title: 'Error', description: message, variant: 'destructive' });
+      toast.error('Error', { description: message });
       dispatch({ type: 'SET_LOADING', payload: false }); // Ensure loading stops on error
     },
     [dispatch]
@@ -368,8 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Show success toast
-        toast({
-          title: 'Welcome to Step Into Storytime!',
+        toast.success('Welcome to Step Into Storytime!', {
           description: 'Your account has been created successfully.',
         });
 
@@ -390,8 +389,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { error } = await apiResetPasswordForEmail(email);
         if (error) throw error;
-        toast({
-          title: 'Success',
+        toast.success('Success', {
           description: 'Password reset instructions sent (if account exists).',
         });
         dispatch({ type: 'SET_LOADING', payload: false });
@@ -408,8 +406,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { error } = await apiUpdateUserPassword(password);
         if (error) throw error;
-        toast({
-          title: 'Success',
+        toast.success('Success', {
           description: 'Password updated successfully',
         });
         // Optionally navigate
@@ -444,8 +441,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           type: 'SET_USER_AND_PROFILE',
           payload: { user: state.user, profile, session: state.session },
         });
-        toast({
-          title: 'Success',
+        toast.success('Success', {
           description: 'Profile updated successfully',
         });
       } catch (error) {

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/auth-context';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/components/ui/toast';
 
 interface FormData {
   name: string;
@@ -141,22 +141,18 @@ export default function SignUpPage() {
 
     try {
       // Add a loading toast
-      const loadingToast = toast({
-        title: 'Creating your account...',
+      const loadingId = toast.loading('Creating your account...', {
         description: 'Please wait while we set up your account.',
-        duration: 10000, // 10 seconds
       });
 
       await signUp(formData.name, formData.email, formData.password);
 
       // Clear the loading toast
-      loadingToast.dismiss();
+      toast.dismiss(loadingId);
 
       // Show success toast
-      toast({
-        title: 'Account created!',
+      toast.success('Account created!', {
         description: 'Welcome to Step Into Storytime!',
-        duration: 5000,
       });
 
       // If there was a plan parameter, redirect to subscription page
@@ -189,11 +185,8 @@ export default function SignUpPage() {
       });
 
       // Show error toast
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: errorMessage,
-        variant: 'destructive',
-        duration: 5000,
       });
 
       setIsLoading(false);
