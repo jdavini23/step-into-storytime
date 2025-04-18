@@ -7,7 +7,7 @@ import Loading from '@/components/loading';
 import StoryHeader from './story-header';
 import { cn } from '@/lib/utils';
 import type { Story } from '@/lib/types';
-
+import styles from './story-content.module.css';
 interface StoryContentProps {
   storyId: string;
   className?: string;
@@ -85,7 +85,14 @@ function StoryDisplay({ className }: { className?: string }) {
       .filter(Boolean);
   };
 
+  // Helper function to calculate reading time
+  const calculateReadingTime = (text: string, wordsPerMinute = 150) => {
+    const wordCount = text.trim().split(/\s+/).length;
+    return Math.max(1, Math.ceil(wordCount / wordsPerMinute));
+  };
+
   // Handle potentially stringified content
+  let readingText = '';
   if (typeof rawContent === 'string') {
     try {
       // Try to parse if it's a stringified object
@@ -94,12 +101,15 @@ function StoryDisplay({ className }: { className?: string }) {
         paragraphs = parsed.en.flatMap((text) =>
           splitIntoParagraphs(text.toString())
         );
+        readingText = parsed.en.join(' ');
       } else if (typeof parsed.en === 'string') {
         paragraphs = splitIntoParagraphs(parsed.en);
+        readingText = parsed.en;
       }
     } catch (e) {
       // If parsing fails, treat it as plain text
       paragraphs = splitIntoParagraphs(rawContent);
+      readingText = rawContent;
     }
   } else if (typeof rawContent === 'object' && rawContent !== null) {
     // Handle content that's already an object
@@ -108,10 +118,13 @@ function StoryDisplay({ className }: { className?: string }) {
       paragraphs = storyContent.en.flatMap((text) =>
         splitIntoParagraphs(text.toString())
       );
+      readingText = storyContent.en.join(' ');
     } else if (typeof storyContent.en === 'string') {
       paragraphs = splitIntoParagraphs(storyContent.en);
+      readingText = storyContent.en;
     }
   }
+  const readingTime = calculateReadingTime(readingText);
 
   return (
     <div
@@ -143,6 +156,7 @@ function StoryDisplay({ className }: { className?: string }) {
               : ''
           }
           theme={currentStory.theme ?? ''}
+          readingTimeMinutes={readingTime}
         />
 
         <div className="mt-8">
@@ -256,7 +270,8 @@ function StoryText({ paragraphs }: { paragraphs: string[] }) {
         'leading-relaxed md:leading-loose', // More line height
         'px-2 md:px-4 py-2', // Padding for comfort
         'max-h-[40vh] md:max-h-[60vh] overflow-y-auto', // Scrollable if long
-        'animate-fadein' // Subtle fade-in animation
+        'animate-fadein', // Subtle fade-in animation
+        styles['storybook-scrollbar'] // Custom scrollbar
       )}
       tabIndex={0} // Make scrollable area keyboard accessible
       aria-label="Story text"

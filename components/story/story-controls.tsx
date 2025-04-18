@@ -21,6 +21,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useRouter } from 'next/navigation';
+import styles from './story-controls.module.css';
+import { cn } from '@/lib/utils';
 
 export default function StoryControls() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -29,7 +31,9 @@ export default function StoryControls() {
   const router = useRouter();
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50 p-4 md:p-6 relative">
+    <div
+      className={cn(styles['storybook-controls-bar'], 'p-4 md:p-6 relative')}
+    >
       {/* Floating action buttons */}
       <div className="flex flex-wrap items-center justify-center gap-4 mb-4 z-10">
         <Button
@@ -59,7 +63,7 @@ export default function StoryControls() {
           size="lg"
           className="rounded-full px-6 py-3 font-bold text-lg bg-blue-200 text-blue-900 shadow hover:bg-blue-100 focus:ring-4 focus:ring-blue-300 transition-all animate-pop-on-hover"
           aria-label="Back to Stories"
-          onClick={() => router.push('/stories')}
+          onClick={() => router.push('/dashboard')}
         >
           <ChevronLeft className="h-5 w-5 mr-2" /> Back to Stories
         </Button>
@@ -196,28 +200,6 @@ export default function StoryControls() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        </div>
-
-        {/* Navigation buttons */}
-        <div className="flex items-center gap-2 ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1"
-            aria-label="Previous Story"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous Story
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1"
-            aria-label="Next Story"
-          >
-            Next Story
-            <ChevronRight className="h-4 w-4" />
-          </Button>
         </div>
       </div>
     </div>
