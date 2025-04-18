@@ -1,0 +1,33 @@
+/* Custom scrollbar for story content area */
+.storybook-scrollbar::-webkit-scrollbar {
+  width: 14px;
+  background: #fdf6e3; /* parchment/pastel background */
+  border-radius: 8px;
+}
+
+.storybook-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    135deg,
+    #ffe082 40%,
+    #ffd700 100%
+  ); /* gold gradient */
+  border-radius: 8px;
+  border: 3px solid #fdf6e3;
+  min-height: 40px;
+  box-shadow: 0 2px 8px 0 rgba(100, 80, 30, 0.1);
+}
+
+.storybook-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #ffd700 60%, #ffecb3 100%);
+}
+
+.storybook-scrollbar::-webkit-scrollbar-track {
+  background: #fffde7; /* lighter pastel */
+  border-radius: 8px;
+}
+
+/* Firefox */
+.storybook-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #ffd700 #fffde7;
+}

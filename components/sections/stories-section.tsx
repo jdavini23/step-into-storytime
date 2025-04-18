@@ -37,34 +37,59 @@ export default function StoriesSection() {
         </div>
 
         <Tabs defaultValue="fairy-tales" className="max-w-4xl mx-auto">
-          <TabsList className="grid w-full grid-cols-4 mb-8 bg-slate-100 p-1 rounded-lg">
+          <TabsList
+            className="grid w-full grid-cols-4 mb-8 bg-slate-100 p-1 rounded-lg"
+            role="tablist"
+          >
             <TabsTrigger
               value="fairy-tales"
               className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+              role="tab"
+              aria-selected={true}
+              aria-controls="tab-fairy-tales"
+              id="tab-fairy-tales-trigger"
             >
               Fairy Tales
             </TabsTrigger>
             <TabsTrigger
               value="space"
               className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+              role="tab"
+              aria-selected={false}
+              aria-controls="tab-space"
+              id="tab-space-trigger"
             >
               Space Adventures
             </TabsTrigger>
             <TabsTrigger
               value="animals"
               className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+              role="tab"
+              aria-selected={false}
+              aria-controls="tab-animals"
+              id="tab-animals-trigger"
             >
               Animal Friends
             </TabsTrigger>
             <TabsTrigger
               value="superhero"
               className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+              role="tab"
+              aria-selected={false}
+              aria-controls="tab-superhero"
+              id="tab-superhero-trigger"
             >
               Superhero Journeys
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="fairy-tales" className="mt-6">
+          <TabsContent
+            value="fairy-tales"
+            className="mt-6"
+            id="tab-fairy-tales"
+            role="tabpanel"
+            aria-labelledby="tab-fairy-tales-trigger"
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <StoryCard
                 title="The Enchanted Forest"
@@ -73,6 +98,7 @@ export default function StoriesSection() {
                 author="Created by Emma's family"
                 date="2 days ago"
                 onReadClick={() => router.push('/story')}
+                aria-label="Read preview of The Enchanted Forest"
               />
               <StoryCard
                 title="The Dragon's Treasure"
@@ -81,6 +107,7 @@ export default function StoriesSection() {
                 author="Created by Noah's family"
                 date="1 week ago"
                 onReadClick={() => router.push('/story')}
+                aria-label="Read preview of The Dragon's Treasure"
               />
             </div>
           </TabsContent>
@@ -160,9 +187,13 @@ function StoryCard({
   author,
   date,
   onReadClick,
-}: StoryCardProps) {
+  ...props
+}: StoryCardProps & { 'aria-label'?: string }) {
   return (
-    <Card className="border-0 shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group">
+    <Card
+      className="border-0 shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group"
+      role="listitem"
+    >
       <div className="relative h-56 overflow-hidden">
         <Image
           src={image || '/placeholder.svg'}
@@ -189,6 +220,7 @@ function StoryCard({
           variant="ghost"
           className="w-full text-violet-600 hover:text-violet-700 hover:bg-violet-50"
           onClick={onReadClick}
+          aria-label={props['aria-label'] || `Read preview of ${title}`}
         >
           Read Preview <ChevronRight className="ml-1 h-4 w-4" />
         </Button>

@@ -135,3 +135,37 @@
 - ✅ Complete
 - 🚧 In Progress
 - 📋 Planned
+
+# Story Page UI Enhancement Progress
+
+## /story/:id "Storybook Card" UI Redesign
+
+- [x] **Phase 1: Layout, Card, and Background**
+
+  - [x] Add animated pastel gradient background to the page
+  - [x] Center the story card vertically and horizontally
+  - [x] Refactor story display into a large, rounded "storybook" card with parchment-style background, drop shadow, and border
+  - [x] Ensure card and background are fully responsive
+
+- [x] **Phase 2: Typography, Buttons, and Controls**
+
+  - [x] Use playful, glowing font for story title
+  - [x] Style story text for readability and scrollability
+  - [x] Add subtle page-turn or fade-in animation for story text
+  - [x] Style "Listen" button with glowing/star animation
+  - [x] Add floating "Back to Stories" and "Save" buttons
+  - [x] Ensure all controls are accessible and have large touch targets
+
+- [x] **Phase 3: Animations and Polish**
+
+  - [x] Add animated twinkling stars or floating clouds to background
+  - [x] Add gentle entrance animation for the card
+  - [x] Add hover/tap effects to card and buttons
+  - [x] Ensure all controls are keyboard accessible and have focus states
+
+- [ ] **Accessibility & Responsiveness (Throughout)**
+  - [ ] Use high-contrast text and backgrounds
+  - [ ] Ensure all interactive elements are keyboard navigable
+  - [ ] Test on mobile and desktop for layout and touch target size
+
+---

@@ -1,0 +1,14 @@
+.storybook-controls-bar {
+  background: linear-gradient(
+    135deg,
+    #e3f0ff 60%,
+    #d0e6fa 100%
+  ); /* pastel blue gradient */
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 24px 0 rgba(80, 120, 200, 0.1), 0 1.5px 0 0 #b6d0ee;
+  border: 1.5px solid #dbeafe;
+  /* Optional: add a subtle texture or pattern for extra playfulness */
+  /* background-image: url('/parchment-texture.png'); */
+  /* background-size: cover; */
+  transition: background 0.3s, box-shadow 0.3s;
+}

@@ -25,26 +25,33 @@ export default function FeaturesSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8" role="list">
           <FeatureCard
-            icon={<Wand2 className="h-6 w-6 text-white" />}
+            icon={<Wand2 className="h-6 w-6 text-white" aria-hidden="true" />}
             title="Custom Characters"
             description="Create heroes that look just like your little ones with our advanced character customization."
             color="from-violet-500 to-violet-600"
+            role="listitem"
           />
 
           <FeatureCard
-            icon={<BookOpen className="h-6 w-6 text-white" />}
+            icon={
+              <BookOpen className="h-6 w-6 text-white" aria-hidden="true" />
+            }
             title="Magical Themes"
             description="Choose from fantasy, adventure, space and more with new themes added monthly."
             color="from-indigo-500 to-indigo-600"
+            role="listitem"
           />
 
           <FeatureCard
-            icon={<Sparkles className="h-6 w-6 text-white" />}
+            icon={
+              <Sparkles className="h-6 w-6 text-white" aria-hidden="true" />
+            }
             title="Instant Stories"
             description="Generate unique tales with just a few clicks using our advanced AI technology."
             color="from-sky-500 to-sky-600"
+            role="listitem"
           />
         </div>
       </div>
@@ -59,9 +66,18 @@ interface FeatureCardProps {
   color: string;
 }
 
-function FeatureCard({ icon, title, description, color }: FeatureCardProps) {
+function FeatureCard({
+  icon,
+  title,
+  description,
+  color,
+  ...props
+}: FeatureCardProps & { role?: string }) {
   return (
-    <Card className="border-0 shadow-xl overflow-hidden h-full transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+    <Card
+      className="border-0 shadow-xl overflow-hidden h-full transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
+      role={props.role}
+    >
       <div className={`bg-gradient-to-r ${color} p-4 flex justify-center`}>
         <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
           {icon}

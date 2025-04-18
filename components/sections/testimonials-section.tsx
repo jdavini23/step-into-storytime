@@ -55,7 +55,10 @@ interface TestimonialCardProps {
 
 function TestimonialCard({ quote, name, role, image }: TestimonialCardProps) {
   return (
-    <Card className="border-0 shadow-xl h-full transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+    <Card
+      className="border-0 shadow-xl h-full transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
+      aria-label="Testimonial"
+    >
       <CardContent className="pt-6">
         <div className="flex items-center mb-4">
           <div className="mr-4">
@@ -77,10 +80,15 @@ function TestimonialCard({ quote, name, role, image }: TestimonialCardProps) {
         <div className="pt-2">
           <div className="flex mb-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <Star key={i} className="h-4 w-4 text-amber-400" fill="#fbbf24" />
+              <Star
+                key={i}
+                className="h-4 w-4 text-amber-400"
+                fill="#fbbf24"
+                aria-hidden="true"
+              />
             ))}
           </div>
-          <p className="italic text-slate-700">"{quote}"</p>
+          <blockquote className="italic text-slate-700">"{quote}"</blockquote>
         </div>
       </CardContent>
     </Card>
