@@ -2,6 +2,14 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* Fredoka playful font for story header */
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@700;800&display=swap');
+
+.font-fredoka {
+  font-family: 'Fredoka', 'Comic Neue', 'Comic Sans MS', 'Arial Rounded MT Bold',
+    Arial, sans-serif;
+}
+
 /* Typography System */
 @layer base {
   /* Base Typography */
@@ -272,4 +280,81 @@
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
   }
+}
+
+/* --- Storybook Animations & Effects --- */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  50% {
+    opacity: 0.4;
+    filter: blur(1px);
+  }
+}
+.animate-twinkle {
+  animation: twinkle 2.5s infinite ease-in-out;
+}
+
+@keyframes floatCloud {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-12px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.8;
+  }
+}
+.animate-cloud {
+  animation: floatCloud 8s infinite ease-in-out;
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-fadein {
+  animation: fadein 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes buttonPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-pop-on-hover:hover {
+  animation: buttonPop 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Glow for Listen button */
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 16px 4px #ffe06666, 0 0 0 0 #fff8dc00;
+  }
+  50% {
+    box-shadow: 0 0 32px 8px #ffe066cc, 0 0 8px 4px #fff8dc88;
+  }
+}
+.animate-glow {
+  animation: glow 2.2s infinite alternate;
 }

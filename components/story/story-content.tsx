@@ -116,12 +116,22 @@ function StoryDisplay({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'bg-card rounded-xl shadow-lg',
-        'border border-border/10',
-        'dark:bg-card/95 dark:border-border/5',
+        // Storybook card styles
+        'rounded-3xl shadow-2xl border border-yellow-200',
+        'bg-gradient-to-br from-yellow-50 via-amber-100 to-yellow-200',
+        'parchment-texture', // Optional: add a custom class for a subtle texture if available
+        'mx-auto w-full max-w-2xl',
         'transition-colors',
+        'animate-fadein', // Gentle entrance animation
+        'animate-pop-on-hover', // Playful pop on hover/tap
         className
       )}
+      style={{
+        // Optional: fallback parchment color if custom class is not available
+        backgroundColor: '#fdf6e3',
+        // Add a little extra padding for the storybook feel
+        boxShadow: '0 8px 32px 0 rgba(100, 80, 30, 0.10)',
+      }}
     >
       <div className="p-6 md:p-10">
         <StoryHeader
@@ -241,17 +251,20 @@ function StoryText({ paragraphs }: { paragraphs: string[] }) {
         'prose-headings:text-foreground',
         'prose-p:text-muted-foreground',
         'dark:prose-invert',
-        'transition-colors'
+        'transition-colors',
+        'text-xl md:text-2xl', // Larger font size
+        'leading-relaxed md:leading-loose', // More line height
+        'px-2 md:px-4 py-2', // Padding for comfort
+        'max-h-[40vh] md:max-h-[60vh] overflow-y-auto', // Scrollable if long
+        'animate-fadein' // Subtle fade-in animation
       )}
+      tabIndex={0} // Make scrollable area keyboard accessible
+      aria-label="Story text"
     >
       {formattedParagraphs.map((paragraph, index) => (
         <p
           key={index}
-          className={cn(
-            'text-xl leading-relaxed mb-6',
-            'text-muted-foreground',
-            'transition-colors'
-          )}
+          className={cn('mb-6', 'text-muted-foreground', 'transition-colors')}
         >
           {paragraph}
         </p>

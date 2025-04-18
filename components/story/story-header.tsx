@@ -32,10 +32,16 @@ export default function StoryHeader({
       </Badge>
       <h1
         className={cn(
-          'text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight',
+          'text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight',
           'text-foreground dark:text-foreground/90',
-          'transition-colors'
+          'transition-colors',
+          'font-fredoka',
+          'drop-shadow-[0_2px_12px_rgba(255,200,80,0.5)]',
+          'animate-fadein'
         )}
+        style={{
+          textShadow: '0 0 16px #ffe066, 0 2px 8px #fff8dc',
+        }}
       >
         {title}
       </h1>
@@ -56,3 +62,13 @@ export default function StoryHeader({
     </header>
   );
 }
+
+/*
+To use Fredoka, add this to your global CSS (e.g., globals.css):
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@700;800&display=swap');
+
+.font-fredoka {
+  font-family: 'Fredoka', 'Comic Neue', 'Comic Sans MS', 'Arial Rounded MT Bold', Arial, sans-serif;
+}
+*/
