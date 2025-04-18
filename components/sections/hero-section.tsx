@@ -16,10 +16,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import ProductTourOverlay from '@/components/overlays/product-tour-overlay';
 
 export default function HeroSection() {
   const router = useRouter();
   const [showOverlay, setShowOverlay] = useState(false);
+  const [showProductTour, setShowProductTour] = useState(false);
 
   const handleStoryStart = () => {
     setShowOverlay(true);
@@ -37,6 +39,10 @@ export default function HeroSection() {
           <StoryCreatorOverlay onComplete={handleOverlayComplete} />
         )}
       </AnimatePresence>
+      <ProductTourOverlay
+        open={showProductTour}
+        onOpenChange={setShowProductTour}
+      />
       <section
         className="relative overflow-hidden py-12 sm:py-16 md:py-20"
         aria-label="Hero section"
@@ -86,7 +92,7 @@ export default function HeroSection() {
                   variant="outline"
                   size="lg"
                   className="w-full sm:w-auto text-base sm:text-lg"
-                  onClick={() => router.push('/#how-it-works')}
+                  onClick={() => setShowProductTour(true)}
                   aria-label="Watch demo video"
                 >
                   Watch Demo
