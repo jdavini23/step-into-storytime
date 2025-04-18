@@ -1,14 +1,14 @@
-import Image from "next/image";
-import { Zap } from "lucide-react";
+import Image from 'next/image';
+import { Zap } from 'lucide-react';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 
-type ColorKey = "violet" | "indigo" | "sky";
+type ColorKey = 'violet' | 'indigo' | 'sky';
 
 interface ColorStyles {
   bg: string;
@@ -41,31 +41,38 @@ export default function HowItWorksSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          <StepCard
-            number={1}
-            title="Choose Your Theme"
-            description="Select from fantasy, adventure, sci-fi, and many more magical worlds to explore"
-            image="/placeholder.svg"
-            color="violet"
-          />
-
-          <StepCard
-            number={2}
-            title="Customize Characters"
-            description="Name them, pick traits, and make them truly your own with our intuitive editor"
-            image="/placeholder.svg"
-            color="indigo"
-          />
-
-          <StepCard
-            number={3}
-            title="Generate & Enjoy!"
-            description="Our AI creates a magical bedtime story instantly, ready to read and share"
-            image="/placeholder.svg"
-            color="sky"
-          />
-        </div>
+        <ol
+          className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto"
+          role="list"
+        >
+          <li role="listitem">
+            <StepCard
+              number={1}
+              title="Choose Your Theme"
+              description="Select from fantasy, adventure, sci-fi, and many more magical worlds to explore"
+              image="/placeholder.svg"
+              color="violet"
+            />
+          </li>
+          <li role="listitem">
+            <StepCard
+              number={2}
+              title="Customize Characters"
+              description="Name them, pick traits, and make them truly your own with our intuitive editor"
+              image="/placeholder.svg"
+              color="indigo"
+            />
+          </li>
+          <li role="listitem">
+            <StepCard
+              number={3}
+              title="Generate & Enjoy!"
+              description="Our AI creates a magical bedtime story instantly, ready to read and share"
+              image="/placeholder.svg"
+              color="sky"
+            />
+          </li>
+        </ol>
       </div>
     </section>
   );
@@ -74,22 +81,22 @@ export default function HowItWorksSection() {
 function StepCard({ number, title, description, image, color }: StepCardProps) {
   const colorMap: Record<ColorKey, ColorStyles> = {
     violet: {
-      bg: "bg-violet-600",
+      bg: 'bg-violet-600',
       gradient:
-        "bg-gradient-to-r from-transparent via-violet-300 to-violet-600",
+        'bg-gradient-to-r from-transparent via-violet-300 to-violet-600',
       nextGradient:
-        "bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600",
+        'bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600',
     },
     indigo: {
-      bg: "bg-indigo-600",
-      gradient: "bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600",
+      bg: 'bg-indigo-600',
+      gradient: 'bg-gradient-to-r from-violet-600 via-indigo-300 to-indigo-600',
       nextGradient:
-        "bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent",
+        'bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent',
     },
     sky: {
-      bg: "bg-sky-600",
-      gradient: "bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent",
-      nextGradient: "",
+      bg: 'bg-sky-600',
+      gradient: 'bg-gradient-to-r from-indigo-600 via-sky-300 to-transparent',
+      nextGradient: '',
     },
   };
 
@@ -97,6 +104,7 @@ function StepCard({ number, title, description, image, color }: StepCardProps) {
     <div className="relative">
       <div
         className={`absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ${colorMap[color].bg} text-white h-12 w-12 rounded-full flex items-center justify-center text-xl font-bold shadow-lg z-10`}
+        aria-label={`Step ${number}`}
       >
         {number}
       </div>
@@ -110,12 +118,12 @@ function StepCard({ number, title, description, image, color }: StepCardProps) {
         <CardContent>
           <div className="h-40 w-full mb-4 rounded-lg overflow-hidden">
             <Image
-              src={image || "/placeholder.svg"}
+              src={image || '/placeholder.svg'}
               alt={title}
               width={300}
               height={160}
               className="object-cover"
-              style={{ width: "100%", height: "auto" }}
+              style={{ width: '100%', height: 'auto' }}
             />
           </div>
           <CardDescription className="text-slate-600">

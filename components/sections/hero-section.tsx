@@ -16,7 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import ProductTourOverlay from '@/components/overlays/product-tour-overlay';
+import ProductTourOverlay from '../overlays/product-tour-overlay';
 
 export default function HeroSection() {
   const router = useRouter();
