@@ -1,6 +1,5 @@
 'use client';
 
-import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/index';
 import StoryContent from '@/components/story/story-content';
@@ -11,16 +10,9 @@ import Footer from '@/components/sections/footer';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-interface StoryPageProps {
-  params: {
-    storyId: string;
-  };
-}
-
-export default function StoryPage({ params }: StoryPageProps) {
+export default function StoryPage({ params }: { params: { storyId: string } }) {
   const router = useRouter();
-  const routeParams = useParams();
-  const storyId = routeParams?.storyId as string;
+  const storyId = params.storyId;
 
   // Validate storyId format
   if (!storyId || !UUID_REGEX.test(storyId)) {
