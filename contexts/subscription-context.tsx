@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import {
   fetchSubscription as fetchSubscriptionService,
   createSubscription as createSubscriptionService,
@@ -340,11 +340,7 @@ export function SubscriptionProvider({
     updateState?: (data: T) => void
   ): Promise<void> => {
     if (!auth.state.user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in.',
-        variant: 'destructive',
-      });
+      toast('Please sign in to continue');
       return;
     }
 
@@ -352,41 +348,30 @@ export function SubscriptionProvider({
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      const { data, error } = await serviceCall();
-
-      if (error) {
-        console.error(`${errorMessageBase}:`, error);
-        toast({
-          title: errorMessageBase,
-          description: error.message || 'An unexpected error occurred',
-          variant: 'destructive',
-        });
-        dispatch({
-          type: 'SET_ERROR',
-          payload: error.message || 'An unexpected error occurred',
-        });
+      const result = await serviceCall();
+      if (result.error) {
+        console.error(`${errorMessageBase}:`, result.error);
+        const errorMessage =
+          typeof result.error === 'string'
+            ? result.error
+            : result.error.message || errorMessageBase;
+        toast.error(errorMessage);
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
         return;
       }
 
-      if (!data) {
-        throw new Error('No data received from server');
+      if (result.data && updateState) {
+        updateState(result.data);
       }
-
-      updateState?.(data);
-      toast({
-        title: successMessage,
-        variant: 'default',
-      });
-    } catch (err) {
-      const error =
-        err instanceof Error ? err : new Error('An unexpected error occurred');
+      toast.success(successMessage);
+    } catch (error) {
       console.error(`${errorMessageBase}:`, error);
-      toast({
-        title: errorMessageBase,
-        description: error.message,
-        variant: 'destructive',
-      });
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : String(error || errorMessageBase);
+      toast.error(errorMessage);
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -457,43 +442,32 @@ export function SubscriptionProvider({
   ); // Keep router dependency here as it's used in the callback
 
   const incrementStoryCount = useCallback(async () => {
-    if (!auth.state.user?.id) return;
+    if (!auth.state.user?.id) {
+      toast('You must be logged in to generate stories');
+      return;
+    }
 
-    const tier = getSubscriptionTier();
-    if (tier !== 'free') return; // Only track for free tier
-
-    // Optimistic UI update (optional)
-    // dispatch({ type: 'INCREMENT_STORY_COUNT' });
+    if (!canGenerateStory()) {
+      toast.error('You have reached your story generation limit');
+      return;
+    }
 
     try {
-      const { success, error } = await incrementStoryUsageService(
-        auth.state.user.id
-      );
-      if (error) throw error;
-
-      if (success) {
-        // Confirm optimistic update or fetch latest usage
-        dispatch({ type: 'INCREMENT_STORY_COUNT' }); // Update state after confirmation
-        // OR: await fetchStoryUsage(); // Fetch latest count
-      } else {
-        // Revert optimistic update if needed
-        toast({
-          title: 'Story limit reached',
-          description: 'Please upgrade.',
-          variant: 'destructive',
-        });
+      const result = await incrementStoryUsageService(auth.state.user.id);
+      if (result.error) {
+        console.error('Error incrementing story count:', result.error);
+        toast.error(result.error.message || 'Failed to update story count');
+        return;
       }
+
+      dispatch({ type: 'INCREMENT_STORY_COUNT' });
     } catch (error) {
-      console.error('Error updating story count:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update story count',
-        variant: 'destructive',
-      });
-      // Revert optimistic update if implemented
+      console.error('Error incrementing story count:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update story count'
+      );
     }
-    // Adjusted dependencies: getSubscriptionTier is derived from state, auth.state.user.id is needed
-  }, [auth.state.user?.id, dispatch, getSubscriptionTier]);
+  }, [auth.state.user?.id, dispatch, canGenerateStory]);
 
   // --- Provide Context Value --- //
   const value = {

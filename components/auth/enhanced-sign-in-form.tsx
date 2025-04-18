@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/auth-context';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Provider } from '@supabase/supabase-js';
 
@@ -132,11 +132,8 @@ export default function EnhancedSignInForm() {
         general: errorMessage,
       });
 
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: errorMessage,
-        variant: 'destructive',
-        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -152,11 +149,8 @@ export default function EnhancedSignInForm() {
         error instanceof Error
           ? error.message
           : 'Failed to login with provider';
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: errorMessage,
-        variant: 'destructive',
-        duration: 5000,
       });
     }
   };

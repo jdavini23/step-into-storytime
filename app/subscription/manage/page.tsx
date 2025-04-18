@@ -60,7 +60,8 @@ import {
 import FeatureList from '../components/FeatureList';
 import { usePlanSwitching } from '../hooks/usePlanSwitching';
 import { useCancelSubscription } from '../hooks/useCancelSubscription';
-import { toast, Toaster } from '@/components/ui/toast';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Info } from 'lucide-react';

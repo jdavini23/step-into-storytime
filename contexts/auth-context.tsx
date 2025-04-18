@@ -9,7 +9,7 @@ import React, {
   useCallback,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from '@/components/ui/toast';
+import { toast } from 'sonner';
 import { createBrowserClient, CookieOptions } from '@supabase/ssr';
 import {
   AuthError,
