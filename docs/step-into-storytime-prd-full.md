@@ -1,9 +1,4 @@
 ---
-description: 
-globs: 
-alwaysApply: true
----
----
 # Step Into Storytime – Product Requirements Document (Updated)
 
 ## PRD

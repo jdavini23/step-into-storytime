@@ -140,6 +140,7 @@
     "supabase": "^2.20.12",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
+    "task-master-ai": "^0.12.1",
     "ts-jest": "^29.3.0",
     "typescript": "5.8.2"
   }

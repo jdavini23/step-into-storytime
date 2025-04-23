@@ -1,0 +1,118 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+---
+
+description:
+globs:
+alwaysApply: false
+
+---
+
+---
+
+description:
+globs:
+alwaysApply: true
+
+---
+
+Thank you for the detailed breakdown of _Step Into Storytime_! You've provided a fantastic foundation, and I've incorporated your clarifications into a concise PRD using the Sample PRD headings. Here's the markdown output:
+
+---
+
+**Step Into Storytime – Product Requirements Document (Updated)**
+
+**1. Elevator Pitch**
+
+Step Into Storytime is an AI-powered platform that transforms bedtime into a magical, personalized experience for children aged 3-8 and their families. Parents, caregivers, and educators can instantly create unique stories by choosing characters, settings, and themes, with AI generating engaging narratives in seconds. Offering text or narrated output and a "story vault" to save favorites, it solves the struggle of finding fresh, tailored bedtime stories—making every night a creative, screen-free bonding adventure.
+
+**2. Who is this app for**
+
+- **Primary Users:**
+  - Parents of children aged 3-8 seeking fun, customized bedtime stories.
+  - Caregivers and grandparents wanting to bond through storytelling.
+  - Educators and librarians looking for interactive, educational storytelling tools.
+- **Personas:**
+  - Sarah (Parent, 34): Needs quick, personalized stories for her 5-year-old, accessible on her phone.
+  - Mr. Thomas (Teacher, 42): Wants stories to teach preschoolers values like kindness.
+  - Grandma Susan (60): Reads to grandkids remotely and wants narrated or downloadable tales.
+
+**3. Functional Requirements (Current Implementation)**
+
+- **Story Customization Wizard:**
+  - Step-by-step interface for character (name, gender, traits), setting, theme, and length selection.
+  - Progress bar and animated previews.
+- **Story Vault:**
+  - Save, view, and revisit past stories.
+  - Stories organized by child profile.
+- **Authentication:**
+  - Sign up/login via Supabase (email, Google, Apple).
+  - Supports multiple child profiles per account.
+  - Protected routes via middleware and RLS.
+- **Subscription Model:**
+  - Free and premium tiers.
+  - Subscription management UI and API endpoints.
+- **Audio Narration:**
+  - Audio controls for playback (UI implemented; TTS endpoint present, full integration pending).
+- **Navigation & Dashboard:**
+  - Responsive navbar (mobile/desktop), dashboard for stories and profiles.
+- **Accessibility & UX:**
+  - Mobile-responsive, dark mode, large touch targets, screen reader support, keyboard navigation.
+  - Error boundaries, toasts, and feedback components.
+- **Security:**
+  - Supabase Auth, role-based access, in-memory rate limiting, RLS policies, error handling.
+
+**4. Backend/API (Implemented)**
+
+- **API Endpoints:**
+  - `/api/auth/` – Auth flows (login, logout, session, etc.)
+  - `/api/stories/` – Story CRUD operations
+  - `/api/story/` – Single story operations (view/generate/narrate)
+  - `/api/generate-image/` – Image generation (endpoint present, full feature in progress)
+  - `/api/subscriptions/` – Subscription management
+- **Supabase Integration:**
+  - Database, authentication, RLS, session management
+  - Edge functions and OpenAI integration (in progress)
+
+**5. Database/Schema**
+
+- **Schema:**
+  - Users, Child_Profiles, Stories tables
+  - 1:N relationships between Users-Profiles and Users-Stories
+  - RLS policies for secure, role-based access
+  - Migration scripts present
+
+**6. User Interface & Experience**
+
+- **Core Components:**
+  - Story wizard, character creator, story preview, audio controls, navigation, dashboard, subscription UI
+  - Large, colorful, animated, kid-friendly design (bright pastels, soft edges, dark mode)
+- **Flows:**
+  - Onboarding, story creation, dashboard navigation, subscription management, story vault, audio playback
+
+**7. Security & Middleware**
+
+- **Authentication:**
+  - Supabase Auth with multiple providers, session checks, protected routes
+- **Middleware:**
+  - In-memory rate limiting (per IP)
+  - Role-based access control, error handling, logging
+
+**8. Out of Scope/Planned (Not Yet Fully Implemented)**
+
+- **AI Story Generation:**
+  - OpenAI-powered dynamic plot and moral lesson generation (API endpoints present, full integration pending)
+- **Text-to-Speech:**
+  - Full TTS integration in progress
+- **Image Generation:**
+  - Story illustration generation endpoint present, full feature in progress
+- **Mobile App:**
+  - Future native app planned
+
+---
+
+This PRD reflects the current, implemented state of Step Into Storytime. Any features marked as "in progress" or "planned" are not yet fully available in production.
