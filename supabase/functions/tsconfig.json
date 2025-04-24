@@ -1,0 +1,30 @@
+{
+  // Inherit from the base tsconfig.json in the parent directory
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // --- Deno Specific ---
+    // Use Deno window types (includes DOM, fetch etc.)
+    "lib": ["deno.window"],
+    // Point to the Supabase edge runtime types
+    "types": ["https://esm.sh/v135/@supabase/functions-js@2.4.1/src/edge-runtime.d.ts"],
+    "module": "esnext", // Deno uses ES modules
+    "moduleResolution": "bundler", // Use modern module resolution suitable for Deno/ESM
+
+    // --- General Overrides ---
+    "rootDir": ".", // Root for this specific functions directory
+    "outDir": "dist", // Specify an output directory (optional)
+    "noEmit": true, // Supabase CLI handles building, tsc doesn't need to emit JS
+    "isolatedModules": true, // Good practice for build tools
+    "allowJs": false, // Functions should typically be TS
+    "skipLibCheck": true, // Speeds up type checking
+    "forceConsistentCasingInFileNames": true,
+
+    // --- Ensure Strictness ---
+    "strict": true,
+    "noImplicitAny": true, // Will help catch the 'any' errors
+    "strictNullChecks": true
+  },
+  // Only include files within this directory
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"] // Exclude standard folders
+}
