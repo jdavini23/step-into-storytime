@@ -7,6 +7,9 @@ export interface StripeWebhookEvent {
 }
 
 export interface StripeSubscriptionData {
+  metadata: any;
+  user: any;
+  items: any;
   id: string; // Stripe subscription ID
   customer: string; // Stripe customer ID
   status: string;
