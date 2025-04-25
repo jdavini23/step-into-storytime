@@ -1,5 +1,6 @@
 // Centralized API abstraction for subscription management
-import type { Product, Price, SubscriptionStatus } from '@/contexts/subscription-context';
+import type { Product, Price } from '@/contexts/subscription-context';
+import type { DbSubscription } from '@/types/subscription';
 import { createSupabaseClient } from '@/lib/supabase';
 
 export async function fetchSubscription() {

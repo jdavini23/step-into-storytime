@@ -14,6 +14,8 @@ interface SubscriptionStatusProps {
   compact?: boolean
 }
 
+// NOTE: SubscriptionStatus here is a string union type for status, not the Subscription/DbSubscription object itself.
+// No import of Subscription type is needed here unless used for props or state.
 export function SubscriptionStatus({
   showManageButton = true,
   showUpgradeButton = true,
@@ -162,4 +164,3 @@ export function SubscriptionStatus({
     </Card>
   )
 }
-

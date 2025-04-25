@@ -3,7 +3,7 @@ import { Database } from './supabase';
 // Re-export database types
 export type SubscriptionPlan =
   Database['public']['Tables']['subscription_plans']['Row'];
-export type Subscription =
+export type DbSubscription =
   Database['public']['Tables']['subscriptions']['Row'] & {
     subscription_plans?: SubscriptionPlan;
     // Add properties used in context fallback/defaults
@@ -47,7 +47,7 @@ export interface Product {
 
 export type SubscriptionState = {
   isInitialized: boolean;
-  subscription: Subscription | null;
+  subscription: DbSubscription | null;
   storyUsage: StoryUsage | null;
   isLoading: boolean;
   error: string | null;
@@ -58,13 +58,13 @@ export type SubscriptionAction =
   | {
       type: 'INITIALIZE';
       payload: {
-        subscription: Subscription | null;
+        subscription: DbSubscription | null;
         storyUsage: StoryUsage | null;
         isInitialized: boolean;
         availablePlans?: Product[];
       };
     }
-  | { type: 'SET_SUBSCRIPTION'; payload: Subscription | null }
+  | { type: 'SET_SUBSCRIPTION'; payload: DbSubscription | null }
   | { type: 'SET_STORY_USAGE'; payload: StoryUsage | null }
   | { type: 'INCREMENT_STORY_COUNT' }
   | { type: 'SET_LOADING'; payload: boolean }

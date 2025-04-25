@@ -18,15 +18,11 @@ import {
   updateSubscription as updateSubscriptionService,
   incrementStoryUsage as incrementStoryUsageService,
   fetchStoryUsage as fetchStoryUsageService,
-  cancelSubscription,
-  createSubscription,
-  fetchSubscription,
-  updateSubscription,
 } from '@/services/subscriptionService';
-import {
+import type {
   SubscriptionState,
   SubscriptionAction,
-  Subscription,
+  DbSubscription,
   StoryUsage,
   SubscriptionTier,
   Product,
@@ -42,21 +38,18 @@ import {
   getRemainingDays as getRemainingDaysUtil,
 } from '@/hooks/use-subscription-utils';
 import { PRICING_PLANS } from '@/constants/pricing'; // Assuming PRICING_PLANS defines the structure for availablePlans
-import { type } from 'os';
-import { title } from 'process';
-import { string } from 'zod';
 
 // Re-export subscription types
 export type {
   SubscriptionState,
   SubscriptionAction,
-  Subscription,
   StoryUsage,
   SubscriptionTier,
   Product,
   Price,
   SubscriptionStatus,
   SubscriptionPlan,
+  DbSubscription,
 };
 
 // Initial state remains, but uses imported types and potentially simplifies availablePlans logic
@@ -433,7 +426,7 @@ export function SubscriptionProvider({
       cancelSubscriptionService,
       'Subscription canceled successfully.',
       'Failed to cancel subscription',
-      (data: Subscription | null) => {
+      (data: DbSubscription | null) => {
         dispatch({ type: 'SET_SUBSCRIPTION', payload: data });
         router.push('/dashboard'); // Redirect after cancel
       }
@@ -447,7 +440,7 @@ export function SubscriptionProvider({
         () => updateSubscriptionService(tier),
         'Subscription updated successfully.',
         'Failed to update subscription',
-        (data: Subscription | null) => {
+        (data: DbSubscription | null) => {
           dispatch({ type: 'SET_SUBSCRIPTION', payload: data });
           router.push('/dashboard'); // Redirect after update
         }
@@ -496,7 +489,7 @@ export function SubscriptionProvider({
   }, [auth.state.user?.id, dispatch, getSubscriptionTier]);
 
   // --- Provide Context Value --- //
-  const value = {
+  const value: SubscriptionContextType = {
     state,
     fetchSubscription,
     createSubscription,

@@ -3,7 +3,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { createBrowserClient } from '@supabase/ssr';
 import { PostgrestError } from '@supabase/supabase-js';
-import { Subscription, SubscriptionTier, StoryUsage } from '@/types/subscription';
+import { DbSubscription, SubscriptionTier, StoryUsage } from '@/types/subscription';
 
 // Helper to get client
 function getBrowserClient(): SupabaseClient {
@@ -14,7 +14,7 @@ function getBrowserClient(): SupabaseClient {
 }
 
 export async function fetchSubscription(): Promise<{ 
-  data: Subscription | null; 
+  data: DbSubscription | null; 
   error: Error | null 
 }> {
   try {
@@ -41,7 +41,7 @@ export async function fetchSubscription(): Promise<{
 
 export async function createSubscription(
   tier: SubscriptionTier
-): Promise<{ data: Subscription | null; error: Error | null }> {
+): Promise<{ data: DbSubscription | null; error: Error | null }> {
   try {
     const response = await fetch('/api/subscriptions', {
       method: 'POST',
@@ -66,7 +66,7 @@ export async function createSubscription(
 }
 
 export async function cancelSubscription(): Promise<{
-  data: Subscription | null;
+  data: DbSubscription | null;
   error: Error | null;
 }> {
   try {
@@ -94,7 +94,7 @@ export async function cancelSubscription(): Promise<{
 
 export async function updateSubscription(
   tier: SubscriptionTier
-): Promise<{ data: Subscription | null; error: Error | null }> {
+): Promise<{ data: DbSubscription | null; error: Error | null }> {
   try {
     const response = await fetch('/api/subscriptions', {
       method: 'PUT',

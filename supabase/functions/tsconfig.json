@@ -5,8 +5,7 @@
     // --- Deno Specific ---
     // Use modern ES features and DOM APIs (includes console, fetch, etc.)
     "lib": ["ESNext", "DOM"],
-    // Point to the Supabase edge runtime types
-    "types": ["https://esm.sh/v135/@supabase/functions-js@2.4.1/src/edge-runtime.d.ts"],
+    // REMOVED: remote type reference for edge-runtime.d.ts (not supported by TypeScript)
     "module": "esnext", // Deno uses ES modules
     "moduleResolution": "bundler", // Use modern module resolution suitable for Deno/ESM
 
