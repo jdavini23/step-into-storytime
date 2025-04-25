@@ -25,8 +25,12 @@ export default function UpdatePasswordPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setError(
+        'Password must be at least 8 characters long and include uppercase letters, numbers, and special characters'
+      );
       return;
     }
 
