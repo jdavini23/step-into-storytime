@@ -1,7 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.24.0?target=deno&deno-std=0.168.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7?dts"; // Import Supabase client
-
+import "https://deno.land/x/dotenv@v3.2.2/load.ts";
+console.log("SUPABASE_URL:", Deno.env.get("SUPABASE_URL"));
+console.log(
+  "SUPABASE_SERVICE_ROLE_KEY:",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+);
+console.log("STRIPE_SECRET_KEY:", Deno.env.get("STRIPE_SECRET_KEY"));
+console.log("STRIPE_WEBHOOK_SECRET:", Deno.env.get("STRIPE_WEBHOOK_SECRET"));
 // --- Environment Variable Check ---
 const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
 const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
