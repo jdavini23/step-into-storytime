@@ -1,62 +1,87 @@
-import { Suspense } from 'react';
-import SubscriptionClient from './subscription-client';
-import { createServerClient } from '@supabase/ssr';
+import { Metadata } from 'next';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import type { Database } from '@/lib/database.types';
-import { cache } from 'react';
+import { redirect } from 'next/navigation';
 
-const createServerSupabaseClient = cache(async () => {
-  const cookieStore = await cookies();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables.');
-  }
+import { SubscriptionPlan } from '@/components/subscription/SubscriptionPlan';
 
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get: (name: string) => cookieStore.get(name)?.value,
-      set: (name: string, value: string, options: any) => {
-        cookieStore.set({ name, value, ...options });
-      },
-      remove: (name: string, options: any) => {
-        cookieStore.delete({ name, ...options });
-      },
-    },
-  });
-});
+export const metadata: Metadata = {
+  title: 'Subscription Plans',
+  description: 'Choose a subscription plan that works for you.',
+};
+
+const plans = [
+  {
+    name: 'Basic',
+    description: 'Perfect for getting started with AI story generation',
+    features: [
+      '10 stories per month',
+      'Basic character customization',
+      'Standard story themes',
+      'Text-only stories',
+    ],
+    priceId: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID!,
+    price: 9.99,
+    interval: 'month',
+  },
+  {
+    name: 'Pro',
+    description: 'For families who want the full storytelling experience',
+    features: [
+      'Unlimited stories',
+      'Advanced character customization',
+      'Premium story themes',
+      'Audio narration',
+      'Downloadable stories',
+      'Priority support',
+    ],
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID!,
+    price: 19.99,
+    interval: 'month',
+  },
+];
 
 export default async function SubscriptionPage() {
-  const supabase = await createServerSupabaseClient();
+  const supabase = createServerComponentClient({ cookies });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  const { data: subscriptionPlans, error } = await supabase
-    .from('subscription_plans')
-    .select('id, tier, name, description, price_monthly, features')
-    .order('price_monthly', { ascending: true });
+  // If user is logged in and already has an active subscription, redirect to dashboard
+  if (session?.user) {
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('status')
+      .eq('user_id', session.user.id)
+      .single();
 
-  if (error) {
-    console.error('Error fetching subscription plans:', error);
-    return <div>Error loading subscription plans</div>;
+    if (subscription?.status === 'active') {
+      redirect('/dashboard');
+    }
   }
 
-  const plans =
-    subscriptionPlans?.map((plan) => ({
-      id: plan.id.toString(),
-      tier: plan.tier,
-      name: plan.name,
-      description: plan.description,
-      price: plan.price_monthly,
-      interval: 'month',
-      features: Object.entries(plan.features || {})
-        .filter(([_, enabled]) => enabled)
-        .map(([name]) => ({ name: name.split('_').join(' ') })),
-      is_popular: plan.tier === 'story_creator',
-    })) || [];
-
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SubscriptionClient initialPlans={plans} />
-    </Suspense>
+    <div className="container mx-auto px-4 py-8">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+        <p className="text-xl text-gray-600">
+          Select a subscription that best fits your storytelling needs
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        {plans.map((plan) => (
+          <SubscriptionPlan
+            key={plan.name}
+            name={plan.name}
+            description={plan.description}
+            features={plan.features}
+            priceId={plan.priceId}
+            price={plan.price}
+            interval={plan.interval}
+          />
+        ))}
+      </div>
+    </div>
   );
 }

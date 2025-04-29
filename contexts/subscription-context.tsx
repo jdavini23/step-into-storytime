@@ -171,6 +171,13 @@ export function SubscriptionProvider({
   const auth = useAuth();
   const router = useRouter();
 
+  // Helper to fetch Stripe plans from the new API
+  async function fetchStripePlans() {
+    const res = await fetch('/api/pricing', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to fetch pricing');
+    return await res.json();
+  }
+
   // --- Initialization --- //
   const initialize = useCallback(async () => {
     if (!auth.state.user?.id) {
@@ -185,6 +192,23 @@ export function SubscriptionProvider({
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
+      // Fetch Stripe plans and merge with static free plan
+      let stripePlans: any[] = [];
+      try {
+        stripePlans = await fetchStripePlans();
+      } catch (e) {
+        console.error('Error fetching Stripe plans:', e);
+        stripePlans = [];
+      }
+      const freePlan = {
+        id: 'free',
+        name: PRICING_PLANS.free.title,
+        tier: 'free',
+        features: PRICING_PLANS.free.features,
+        prices: [],
+      };
+      const allPlans = [freePlan, ...stripePlans];
+
       const [subResult, usageResult] = await Promise.all([
         fetchSubscriptionService(),
         fetchStoryUsageService(auth.state.user.id),
@@ -203,7 +227,7 @@ export function SubscriptionProvider({
       let finalSubscription = subResult.data;
       if (!finalSubscription) {
         // Look for the predefined free plan or use a hardcoded fallback
-        const freePlan = state.availablePlans?.find((p) => p.tier === 'free');
+        const freePlanObj = allPlans?.find((p) => p.tier === 'free');
         const freePlanStoryLimit = PRICING_PLANS.free.features.includes(
           '5 story generations per month'
         )
@@ -217,26 +241,25 @@ export function SubscriptionProvider({
           user_id: auth.state.user.id,
           status: 'active',
           plan_id: 'free', // Use string ID for free plan
-          subscription_plans: freePlan
+          subscription_plans: freePlanObj
             ? {
                 id: 1, // Use assumed numeric ID for free plan
-                tier: freePlan.tier as SubscriptionTier,
-                name: freePlan.name,
-                description: PRICING_PLANS.free.description || '', // Add description if available in PRICING_PLANS
+                tier: freePlanObj.tier as SubscriptionTier,
+                name: freePlanObj.name,
+                description: PRICING_PLANS.free.description || '',
                 price_monthly: 0,
-                story_limit: freePlanStoryLimit, // Use consistent limit
-                features: freePlan.features,
+                story_limit: freePlanStoryLimit,
+                features: freePlanObj.features,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               }
             : {
-                // Fallback plan details (ensure this matches SubscriptionPlan type)
-                id: 1, // Use assumed numeric ID for free plan
+                id: 1,
                 tier: 'free',
                 name: 'Free Tier',
                 description: 'Basic plan',
                 price_monthly: 0,
-                story_limit: 1, // Fallback story limit
+                story_limit: 1,
                 features: [],
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -244,9 +267,9 @@ export function SubscriptionProvider({
           current_period_start: new Date().toISOString(),
           current_period_end: new Date(
             new Date().setFullYear(new Date().getFullYear() + 1)
-          ).toISOString(), // Example: 1 year end
+          ).toISOString(),
           subscription_start: new Date().toISOString(),
-          subscription_end: null, // Use null instead of ''
+          subscription_end: null,
           trial_end: null,
           payment_provider: null,
           payment_provider_id: null,
@@ -256,18 +279,14 @@ export function SubscriptionProvider({
       // Handle case where usage data doesn't exist (create default)
       let finalUsage = usageResult.data;
       if (!finalUsage && usageResult.error?.code === 'PGRST116') {
-        // Create a default usage record if none exists
         finalUsage = {
-          id: 0, // Use placeholder numeric ID (assuming number type)
+          id: 0,
           user_id: auth.state.user.id,
           story_count: 0,
           reset_date: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        // Optionally: insert this default record into the DB asynchronously
-        // Do not await here to avoid blocking initialization
-        // createDefaultStoryUsage(auth.state.user.id);
       }
 
       dispatch({
@@ -276,24 +295,13 @@ export function SubscriptionProvider({
           subscription: finalSubscription,
           storyUsage: finalUsage,
           isInitialized: true,
-          availablePlans: state.availablePlans, // Assuming plans are static for now
+          availablePlans: allPlans,
         },
       });
     } catch (error) {
-      console.error('Subscription initialization failed:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: 'Failed to initialize subscription',
-      });
-      // Initialize with defaults even on error to unblock UI
-      dispatch({
-        type: 'INITIALIZE',
-        payload: { ...initialState, isInitialized: true },
-      }); // Remove error field
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
     }
-  }, [auth.state.user, dispatch, state.availablePlans]);
+  }, [auth.state.user]);
 
   useEffect(() => {
     if (auth.state.isInitialized && !state.isInitialized) {

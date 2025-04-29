@@ -49,6 +49,6 @@ begin
       to authenticated
       using (id = auth.uid())
       with check (id = auth.uid());
-    $$;
+    $$; 
   end if;
 end $$; 

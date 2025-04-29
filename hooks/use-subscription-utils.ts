@@ -1,20 +1,26 @@
-'use client';
+"use client";
 
-import { SubscriptionTier, StoryUsage, Subscription } from '@/types/subscription';
+import {
+  DbSubscription,
+  StoryUsage,
+  SubscriptionTier,
+} from "@/types/subscription";
 
-export function getSubscriptionTier(subscription: Subscription | null): SubscriptionTier {
-  if (!subscription || !subscription.subscription_plans) return 'free';
+export function getSubscriptionTier(
+  subscription: DbSubscription | null,
+): SubscriptionTier {
+  if (!subscription || !subscription.subscription_plans) return "free";
   return subscription.subscription_plans.tier as SubscriptionTier;
 }
 
 export function canGenerateStory(
-  subscription: Subscription | null, 
-  storyUsage: StoryUsage | null
+  subscription: DbSubscription | null,
+  storyUsage: StoryUsage | null,
 ): boolean {
   if (!subscription) return true; // Allow one free story before setup
 
   const tier = getSubscriptionTier(subscription);
-  if (tier !== 'free') return true;
+  if (tier !== "free") return true;
 
   if (!storyUsage) return true;
 
@@ -33,18 +39,20 @@ export function canGenerateStory(
 }
 
 export function getRemainingStories(
-  subscription: Subscription | null, 
-  storyUsage: StoryUsage | null
+  subscription: DbSubscription | null,
+  storyUsage: StoryUsage | null,
 ): number {
   const tier = getSubscriptionTier(subscription);
-  if (tier !== 'free') return Infinity;
+  if (tier !== "free") return Infinity;
 
   if (!storyUsage) return 1; // Default to 1 free story
 
   // Get story limit from subscription plan
   const storyLimit = subscription?.subscription_plans?.story_limit ?? 1;
 
-  const resetDate = storyUsage.reset_date ? new Date(storyUsage.reset_date) : null;
+  const resetDate = storyUsage.reset_date
+    ? new Date(storyUsage.reset_date)
+    : null;
   const monthAgo = new Date();
   monthAgo.setMonth(monthAgo.getMonth() - 1);
 
@@ -56,8 +64,8 @@ export function getRemainingStories(
 }
 
 export function hasFeature(
-  subscription: Subscription | null,
-  feature: string
+  subscription: DbSubscription | null,
+  feature: string,
 ): boolean {
   if (!subscription || !subscription.subscription_plans) return false;
 
@@ -67,7 +75,7 @@ export function hasFeature(
 }
 
 export function getRemainingDays(
-  subscription: Subscription | null
+  subscription: DbSubscription | null,
 ): number | null {
   if (!subscription || !subscription.current_period_end) {
     return null;
