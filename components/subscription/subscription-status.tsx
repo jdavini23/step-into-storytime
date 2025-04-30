@@ -14,12 +14,27 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSubscription } from '@/contexts/subscription-context';
+import { PRICING_PLANS } from '@/constants/pricing';
 
 interface SubscriptionStatusProps {
   showManageButton?: boolean;
   showUpgradeButton?: boolean;
   compact?: boolean;
 }
+
+// Helper function to get plan name from tier
+const getPlanName = (tier: string) => {
+  switch (tier) {
+    case 'free':
+      return PRICING_PLANS.free.title;
+    case 'story_creator':
+      return PRICING_PLANS.unlimited.title;
+    case 'family':
+      return PRICING_PLANS.family.title;
+    default:
+      return `${tier} Plan`;
+  }
+};
 
 // NOTE: SubscriptionStatus here is a string union type for status, not the Subscription/DbSubscription object itself.
 // No import of Subscription type is needed here unless used for props or state.
@@ -47,10 +62,13 @@ export function SubscriptionStatus({
   const currentTier = getSubscriptionTier();
   const remainingDays = getRemainingDays();
   const subscription = subscriptionState.subscription;
-  const planName = subscription?.subscription_plans?.name || currentTier;
-  const planTier = String(
-    subscription?.subscription_plans?.tier || currentTier
-  );
+
+  // First try to get the name from subscription_plans, then fall back to PRICING_PLANS
+  const planName =
+    subscription?.subscription_plans?.name || getPlanName(currentTier);
+
+  // Use the tier from subscription_plans if available, otherwise use currentTier
+  const planTier = subscription?.subscription_plans?.tier || currentTier;
 
   if (compact) {
     return (
@@ -62,7 +80,7 @@ export function SubscriptionStatus({
             }`}
           />
           <div>
-            <p className="font-medium">{planName} Plan</p>
+            <p className="font-medium">{planName}</p>
             <p className="text-xs text-slate-500 capitalize">{planTier} Tier</p>
             {subscription?.status === 'trialing' && remainingDays !== null && (
               <p className="text-xs text-slate-500">
@@ -102,7 +120,7 @@ export function SubscriptionStatus({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Current Plan</p>
-              <p className="font-medium text-lg">{planName} Plan</p>
+              <p className="font-medium text-lg">{planName}</p>
               <p className="text-xs text-slate-500 capitalize">
                 {planTier} Tier
               </p>

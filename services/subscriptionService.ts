@@ -138,7 +138,7 @@ export async function updateSubscription(
 
 export async function cancelSubscription(
   subscriptionId: string,
-): Promise<{ success: boolean; error: Error | null }> {
+): Promise<{ data: DbSubscription | null; error: Error | null }> {
   try {
     const response = await fetch(
       `/api/subscriptions/${subscriptionId}/cancel`,
@@ -153,10 +153,11 @@ export async function cancelSubscription(
       throw new Error(errorData.error || `HTTP Error ${response.status}`);
     }
 
-    return { success: true, error: null };
+    // After successful cancellation, fetch the updated subscription
+    return await fetchSubscription();
   } catch (error) {
     return {
-      success: false,
+      data: null,
       error: error instanceof Error ? error : new Error("Unknown error"),
     };
   }

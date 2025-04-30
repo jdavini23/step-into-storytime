@@ -21,7 +21,7 @@ const plans = [
       { name: 'Text-only stories', included: true },
     ],
     priceId: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID!,
-    price: 9.99,
+    price: '9.99',
     interval: 'month',
   },
   {
@@ -36,7 +36,7 @@ const plans = [
       { name: 'Priority support', included: true },
     ],
     priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID!,
-    price: "19.99",
+    price: '19.99',
     interval: 'month',
   },
 ];

@@ -17,6 +17,7 @@ interface SubscriptionPlanProps {
   price: string;
   features: Feature[];
   priceId: string;
+  interval: string;
 }
 
 export function SubscriptionPlan({
@@ -25,6 +26,7 @@ export function SubscriptionPlan({
   price,
   features,
   priceId,
+  interval,
 }: SubscriptionPlanProps) {
   const router = useRouter();
   const { toast } = useToast();

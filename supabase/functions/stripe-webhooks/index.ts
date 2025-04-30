@@ -55,7 +55,7 @@ console.log("Supabase admin client initialized.");
 
 console.log("Stripe Webhook Handler Initialized and Ready");
 
-serve(async (req: Request) => { // Add type Request to req and make async again
+serve(async (req: Request) => {
   try {
     const signature = req.headers.get("Stripe-Signature");
     if (!signature) {
@@ -93,6 +93,9 @@ serve(async (req: Request) => { // Add type Request to req and make async again
 
         const subscription = await stripe.subscriptions.retrieve(
           session.subscription as string,
+          {
+            expand: ["items.data.price"], // Expand price details
+          },
         );
 
         const subscriptionData = {
@@ -118,13 +121,29 @@ serve(async (req: Request) => { // Add type Request to req and make async again
             : null,
         };
 
-        const { error: upsertError } = await supabaseAdmin
+        // First, try to find an existing subscription for this user
+        const { data: existingSubscription } = await supabaseAdmin
           .from("user_subscriptions")
-          .upsert(subscriptionData, {
-            onConflict: "stripe_subscription_id",
-          });
+          .select("id")
+          .eq("user_id", session.client_reference_id)
+          .single();
 
-        if (upsertError) throw upsertError;
+        if (existingSubscription) {
+          // Update existing subscription
+          const { error: updateError } = await supabaseAdmin
+            .from("user_subscriptions")
+            .update(subscriptionData)
+            .eq("id", existingSubscription.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Create new subscription
+          const { error: insertError } = await supabaseAdmin
+            .from("user_subscriptions")
+            .insert([subscriptionData]);
+
+          if (insertError) throw insertError;
+        }
         break;
       }
 
@@ -161,6 +180,7 @@ serve(async (req: Request) => { // Add type Request to req and make async again
           trial_end: subscription.trial_end
             ? new Date(subscription.trial_end * 1000).toISOString()
             : null,
+          updated_at: new Date().toISOString(),
         };
 
         const { error: updateError } = await supabaseAdmin
@@ -169,6 +189,23 @@ serve(async (req: Request) => { // Add type Request to req and make async again
           .eq("user_id", subscriptionData.user_id);
 
         if (updateError) throw updateError;
+
+        // If subscription is deleted or canceled, update the status
+        if (
+          event.type === "customer.subscription.deleted" ||
+          subscription.status === "canceled"
+        ) {
+          const { error: statusError } = await supabaseAdmin
+            .from("user_subscriptions")
+            .update({
+              status: "canceled",
+              canceled_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("stripe_subscription_id", subscription.id);
+
+          if (statusError) throw statusError;
+        }
         break;
       }
 
@@ -179,16 +216,32 @@ serve(async (req: Request) => { // Add type Request to req and make async again
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             invoice.subscription as string,
+            {
+              expand: ["items.data.price"], // Expand price details
+            },
           );
+
+          const updateData: {
+            status: string;
+            current_period_end: string;
+            updated_at: string;
+            plan_id?: string;
+          } = {
+            status: subscription.status,
+            current_period_end: new Date(
+              subscription.current_period_end * 1000,
+            ).toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          // If there's a price change, update the plan_id
+          if (subscription.items.data[0]?.price?.id) {
+            updateData.plan_id = subscription.items.data[0].price.id;
+          }
 
           const { error: updateError } = await supabaseAdmin
             .from("user_subscriptions")
-            .update({
-              status: subscription.status,
-              current_period_end: new Date(
-                subscription.current_period_end * 1000,
-              ).toISOString(),
-            })
+            .update(updateData)
             .eq("stripe_subscription_id", subscription.id);
 
           if (updateError) throw updateError;
@@ -208,11 +261,28 @@ serve(async (req: Request) => { // Add type Request to req and make async again
             .from("user_subscriptions")
             .update({
               status: subscription.status,
+              updated_at: new Date().toISOString(),
             })
             .eq("stripe_subscription_id", subscription.id);
 
           if (updateError) throw updateError;
         }
+        break;
+      }
+
+      case "customer.subscription.trial_will_end": {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        const { error: updateError } = await supabaseAdmin
+          .from("user_subscriptions")
+          .update({
+            status: "trialing",
+            trial_end: new Date(subscription.trial_end * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("stripe_subscription_id", subscription.id);
+
+        if (updateError) throw updateError;
         break;
       }
     }
@@ -226,6 +296,15 @@ serve(async (req: Request) => { // Add type Request to req and make async again
     const errorMessage = err instanceof Error
       ? err.message
       : "Unknown error occurred";
+
+    // Log detailed error information
+    if (err instanceof Error) {
+      console.error("Error stack:", err.stack);
+      if ("code" in err) {
+        console.error("Error code:", (err as Stripe.errors.StripeError).code);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         error: "Webhook processing failed",
