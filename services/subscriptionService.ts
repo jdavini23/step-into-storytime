@@ -22,20 +22,56 @@ export async function fetchSubscription(): Promise<{
   error: Error | null;
 }> {
   try {
+    console.log("[Debug] Starting subscription fetch...");
+
+    // Log auth state if available
+    try {
+      const authResponse = await fetch("/api/auth/session");
+      console.log("[Debug] Auth status:", authResponse.status);
+    } catch (authErr) {
+      console.warn("[Debug] Could not check auth state:", authErr);
+    }
+
     const response = await fetch("/api/subscriptions", {
       credentials: "include",
       cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
+      headers: {
+        "Cache-Control": "no-cache",
+        "Accept": "application/json",
+      },
     });
 
+    console.log("[Debug] Subscription API response status:", response.status);
+
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorText = await response.text();
+      console.error("[Debug] Subscription API error response:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText,
+      });
+
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: errorText };
+      }
+
       throw new Error(errorData.error || `HTTP Error ${response.status}`);
     }
 
     const data = await response.json();
+    console.log("[Debug] Subscription data received:", data);
     return { data, error: null };
-  } catch (error) {
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("[Debug] Subscription fetch error:", {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    });
     return {
       data: null,
       error: error instanceof Error ? error : new Error("Unknown error"),

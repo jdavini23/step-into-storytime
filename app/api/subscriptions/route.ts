@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         .select("*, subscription_plans(*)")
         .eq("user_id", user.id)
         .eq("status", "active")
-        .order("subscription_start", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
