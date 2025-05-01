@@ -23,11 +23,13 @@ import {
 } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth-context';
 import { useStory } from '@/contexts/story-context';
+import { useSearchParams } from 'next/navigation';
 import { SubscriptionStatus } from '@/components/subscription/subscription-status';
 import { TagPill } from '@/components/story/TagPill';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { state: authState, logout } = useAuth();
   const { state: storyState, fetchStories, deleteStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +37,6 @@ export default function DashboardPage() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [storyToDeleteId, setStoryToDeleteId] = useState<string | null>(null);
-
   // Extract unique tags from stories (use theme as tag)
   const uniqueTags = Array.from(
     new Set(

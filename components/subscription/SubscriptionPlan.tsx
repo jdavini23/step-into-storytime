@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { useSession } from '@/hooks/useSession';
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
 import { Check, X } from 'lucide-react';
 
 interface Feature {
@@ -30,10 +31,19 @@ export function SubscriptionPlan({
 }: SubscriptionPlanProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { session } = useSession();
+  const { session, loading } = useSession();
+  const { supabase } = useAuth(); // Use supabase from useAuth
 
   const handleSubscribe = async () => {
     try {
+      if (loading) {
+        toast({
+          title: 'Loading',
+          description: 'Please wait...',
+        });
+        return;
+      }
+
       if (!session) {
         // Store intended subscription in localStorage
         localStorage.setItem('intended_price_id', priceId);
@@ -41,10 +51,21 @@ export function SubscriptionPlan({
         return;
       }
 
+      // Use the session directly from the hook
+      if (!session.access_token) {
+         toast({
+          title: 'Unauthorized',
+          description: 'Please sign in to subscribe.',
+        });
+        return;
+      }
+
+
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`, // Use session.access_token
         },
         body: JSON.stringify({
           priceId,
