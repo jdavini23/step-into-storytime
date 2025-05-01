@@ -53,20 +53,36 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient(req, res);
 
   try {
-    // Get session using the middleware client
+    // First get the session to ensure it exists
     const {
       data: { session },
-      error,
+      error: sessionError,
     } = await supabase.auth.getSession();
 
-    if (error) {
-      console.error("Session error:", error);
+    if (sessionError) {
+      console.error("Session error:", sessionError);
       return res;
+    }
+
+    // Then verify the user with getUser if we have a session
+    let verifiedUser = null;
+    if (session) {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error("User verification error:", userError);
+      } else {
+        verifiedUser = user;
+      }
     }
 
     console.log("Middleware Auth Status:", {
       hasSession: !!session,
-      userId: session?.user?.id,
+      isVerified: !!verifiedUser,
+      userId: verifiedUser?.id || session?.user?.id,
     });
 
     const isPublicRoute = publicRoutes.some(
@@ -78,11 +94,11 @@ export async function middleware(req: NextRequest) {
     console.log("Route Status:", {
       pathname,
       isPublicRoute,
-      isAuthenticated: !!session,
+      isAuthenticated: !!session && !!verifiedUser,
     });
 
     // Handle authentication redirects
-    if (!isPublicRoute && !session) {
+    if (!isPublicRoute && (!session || !verifiedUser)) {
       console.log(">>> REDIRECTING: Authentication required");
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = defaultRedirectPath;
@@ -91,7 +107,10 @@ export async function middleware(req: NextRequest) {
     }
 
     // Redirect authenticated users away from auth pages
-    if (session && (pathname === "/sign-in" || pathname === "/signup")) {
+    if (
+      session && verifiedUser &&
+      (pathname === "/sign-in" || pathname === "/signup")
+    ) {
       console.log(">>> REDIRECTING: Authenticated user to dashboard");
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = "/dashboard";

@@ -4,12 +4,15 @@ import type { Database } from "@/types/supabase";
 export type SubscriptionPlan =
   Database["public"]["Tables"]["subscription_plans"]["Row"];
 export type DbSubscription = {
+  payment_provider: any;
+  subscription_start: string;
   id: string;
   user_id: string;
   stripe_subscription_id: string;
   stripe_customer_id: string;
   status: string;
   plan_id: string;
+  price_id?: string | null; // Added price_id
   current_period_start: string;
   current_period_end: string;
   cancel_at_period_end: boolean;
@@ -54,14 +57,14 @@ export interface Product {
   features: string[];
 }
 
-export type SubscriptionState = {
+export interface SubscriptionState {
   isInitialized: boolean;
   subscription: DbSubscription | null;
   storyUsage: StoryUsage | null;
   isLoading: boolean;
   error: string | null;
-  availablePlans: Product[];
-};
+  // Removed availablePlans: Product[]; - Managed by useState in context provider
+}
 
 export type SubscriptionAction =
   | { type: "SET_SUBSCRIPTION"; payload: DbSubscription | null }

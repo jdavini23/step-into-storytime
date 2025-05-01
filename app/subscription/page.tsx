@@ -43,16 +43,37 @@ const plans = [
 
 export default async function SubscriptionPage() {
   const supabase = createServerComponentClient({ cookies });
+
+  // First get the session
   const {
     data: { session },
+    error: sessionError,
   } = await supabase.auth.getSession();
 
+  if (sessionError) {
+    console.error('Error fetching session:', sessionError);
+    return null;
+  }
+
+  // Then get the user if we have a session
+  const {
+    data: { user },
+    error: userError,
+  } = session
+    ? await supabase.auth.getUser()
+    : { data: { user: null }, error: null };
+
+  if (userError) {
+    console.error('Error fetching user:', userError);
+    return null;
+  }
+
   // If user is logged in and already has an active subscription, redirect to dashboard
-  if (session?.user) {
+  if (user) {
     const { data: subscription } = await supabase
       .from('subscriptions')
       .select('status')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (subscription?.status === 'active') {

@@ -24,14 +24,41 @@ export async function fetchSubscription(): Promise<{
   try {
     console.log("[Debug] Starting subscription fetch...");
 
-    // Log auth state if available
-    try {
-      const authResponse = await fetch("/api/auth/session");
-      console.log("[Debug] Auth status:", authResponse.status);
-    } catch (authErr) {
-      console.warn("[Debug] Could not check auth state:", authErr);
+    // Get the Supabase client first
+    const supabase = getBrowserClient();
+
+    // Check session first
+    const { data: sessionData, error: sessionError } = await supabase.auth
+      .getSession();
+
+    if (sessionError) {
+      console.warn("[Debug] Session check failed:", sessionError);
+      return {
+        data: null,
+        error: new Error("Authentication required - Session error"),
+      };
     }
 
+    if (!sessionData.session) {
+      console.warn("[Debug] No active session found");
+      return {
+        data: null,
+        error: new Error("Authentication required - No active session"),
+      };
+    }
+
+    // Verify user after session check
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      console.warn("[Debug] User verification failed:", userError);
+      return {
+        data: null,
+        error: new Error("Authentication required - User verification failed"),
+      };
+    }
+
+    // Both session and user are verified, proceed with subscription fetch
     const response = await fetch("/api/subscriptions", {
       credentials: "include",
       cache: "no-store",

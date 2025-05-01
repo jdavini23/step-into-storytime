@@ -9,7 +9,10 @@ import {
 export function getSubscriptionTier(
   subscription: DbSubscription | null,
 ): SubscriptionTier {
-  if (!subscription || subscription.plan_id === "free") return "free";
+  // Rely on the plan_id directly from the user_subscriptions table
+  if (!subscription || subscription.plan_id === "free") {
+     return "free";
+  }
   return subscription.plan_id as SubscriptionTier;
 }
 

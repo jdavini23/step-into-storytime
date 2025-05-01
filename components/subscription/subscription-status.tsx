@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSubscription } from '@/contexts/subscription-context';
-import { PRICING_PLANS } from '@/constants/pricing';
+import { capitalize } from '@/lib/utils';
+import { SubscriptionTier, DbSubscription } from '@/types/subscription';
 
 interface SubscriptionStatusProps {
   showManageButton?: boolean;
@@ -22,22 +23,20 @@ interface SubscriptionStatusProps {
   compact?: boolean;
 }
 
-// Helper function to get plan name from tier
-const getPlanName = (tier: string) => {
-  switch (tier) {
-    case 'free':
-      return PRICING_PLANS.free.title;
-    case 'story_creator':
-      return PRICING_PLANS.unlimited.title;
-    case 'family':
-      return PRICING_PLANS.family.title;
-    default:
-      return `${tier} Plan`;
+// Helper to get plan name
+const getPlanName = (tier: SubscriptionTier | undefined, subscription?: DbSubscription | null): string => {
+  // Prioritize name from the fetched subscription relationship
+  if (subscription?.subscription_plans?.name) {
+    return subscription.subscription_plans.name;
   }
+  // Handle undefined or non-string tier before fallback
+  if (typeof tier !== 'string' || !tier) {
+    return 'Unknown Plan'; // Provide a safe fallback
+  }
+  // Simple fallback: capitalize the tier name
+  return capitalize(tier.replace('_', ' '));
 };
 
-// NOTE: SubscriptionStatus here is a string union type for status, not the Subscription/DbSubscription object itself.
-// No import of Subscription type is needed here unless used for props or state.
 export function SubscriptionStatus({
   showManageButton = true,
   showUpgradeButton = true,
@@ -63,9 +62,8 @@ export function SubscriptionStatus({
   const remainingDays = getRemainingDays();
   const subscription = subscriptionState.subscription;
 
-  // First try to get the name from subscription_plans, then fall back to PRICING_PLANS
-  const planName =
-    subscription?.subscription_plans?.name || getPlanName(currentTier);
+  // First try to get the name from subscription_plans, then fall back to capitalizing tier
+  const planName = getPlanName(currentTier, subscription);
 
   // Use the tier from subscription_plans if available, otherwise use currentTier
   const planTier = subscription?.subscription_plans?.tier || currentTier;
