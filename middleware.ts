@@ -32,9 +32,11 @@ function checkRateLimit(ip: string): boolean {
 }
 
 export async function middleware(req: NextRequest) {
-  console.log("--- Middleware START ---");
-  console.log("Request URL:", req.url);
-  console.log("Request Method:", req.method);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("--- Middleware START ---");
+    console.log("Request URL:", req.url);
+    console.log("Request Method:", req.method);
+  }
 
   // Rate limiting check
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ||
@@ -42,7 +44,9 @@ export async function middleware(req: NextRequest) {
     "unknown";
 
   if (!checkRateLimit(ip)) {
-    console.warn("Rate limit exceeded for IP:", ip);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Rate limit exceeded for IP:", ip);
+    }
     return new NextResponse("Too Many Requests", { status: 429 });
   }
 
@@ -60,7 +64,9 @@ export async function middleware(req: NextRequest) {
     } = await supabase.auth.getSession();
 
     if (sessionError) {
-      console.error("Session error:", sessionError);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Session error:", sessionError);
+      }
       return res;
     }
 
@@ -73,17 +79,21 @@ export async function middleware(req: NextRequest) {
       } = await supabase.auth.getUser();
 
       if (userError) {
-        console.error("User verification error:", userError);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("User verification error:", userError);
+        }
       } else {
         verifiedUser = user;
       }
     }
 
-    console.log("Middleware Auth Status:", {
-      hasSession: !!session,
-      isVerified: !!verifiedUser,
-      userId: verifiedUser?.id || session?.user?.id,
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Middleware Auth Status:", {
+        hasSession: !!session,
+        isVerified: !!verifiedUser,
+        userId: verifiedUser?.id || session?.user?.id,
+      });
+    }
 
     const isPublicRoute = publicRoutes.some(
       (route) =>
@@ -91,15 +101,19 @@ export async function middleware(req: NextRequest) {
         (route.endsWith("/*") && pathname.startsWith(route.slice(0, -2))),
     );
 
-    console.log("Route Status:", {
-      pathname,
-      isPublicRoute,
-      isAuthenticated: !!session && !!verifiedUser,
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Route Status:", {
+        pathname,
+        isPublicRoute,
+        isAuthenticated: !!session && !!verifiedUser,
+      });
+    }
 
     // Handle authentication redirects
     if (!isPublicRoute && (!session || !verifiedUser)) {
-      console.log(">>> REDIRECTING: Authentication required");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(">>> REDIRECTING: Authentication required");
+      }
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = defaultRedirectPath;
       redirectUrl.searchParams.set("redirect", pathname);
@@ -111,7 +125,9 @@ export async function middleware(req: NextRequest) {
       session && verifiedUser &&
       (pathname === "/sign-in" || pathname === "/signup")
     ) {
-      console.log(">>> REDIRECTING: Authenticated user to dashboard");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(">>> REDIRECTING: Authenticated user to dashboard");
+      }
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = "/dashboard";
       redirectUrl.search = "";
@@ -120,7 +136,9 @@ export async function middleware(req: NextRequest) {
 
     return res;
   } catch (error) {
-    console.error("Middleware error:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Middleware error:", error);
+    }
     return res;
   }
 }

@@ -12,13 +12,6 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children, id }) => {
   const tooltipRef = useRef<HTMLDivElement>(null);
   // Use SSR-safe deterministic id
   const tooltipId = id || useId();
-  // Debug log for verification (remove after confirming fix)
-  if (typeof window !== 'undefined') {
-    console.log('TooltipID (client):', tooltipId);
-  } else {
-    // This will only log on server/SSR
-    console.log('TooltipID (server):', tooltipId);
-  }
 
   // Clone the child to add aria-describedby and tabIndex if needed
   let trigger = children;

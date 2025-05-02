@@ -115,9 +115,11 @@ const customFetch = async (
       const url = input instanceof URL ? input : new URL(input.toString());
 
       // Log attempt for debugging
-      console.log(
-        `[DEBUG] Attempt ${i + 1}/${retries} - Fetching: ${url.toString()}`,
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(
+          `[DEBUG] Attempt ${i + 1}/${retries} - Fetching: ${url.toString()}`,
+        );
+      }
 
       // Ensure headers object exists
       const headers = new Headers(init?.headers || {});
@@ -160,13 +162,15 @@ const customFetch = async (
       const isLastAttempt = i === retries - 1;
 
       // Log detailed error information
-      console.error(`[DEBUG] Fetch attempt ${i + 1} failed:`, {
-        error,
-        url: input.toString(),
-        isLastAttempt,
-        requestHeaders: init?.headers,
-        requestBody: init?.body,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[DEBUG] Fetch attempt ${i + 1} failed:`, {
+          error,
+          url: input.toString(),
+          isLastAttempt,
+          requestHeaders: init?.headers,
+          requestBody: init?.body,
+        });
+      }
 
       if (isLastAttempt) {
         throw error;
@@ -176,7 +180,9 @@ const customFetch = async (
         1000 * Math.pow(2, i) + Math.random() * 1000,
         10000,
       );
-      console.log(`[DEBUG] Retrying in ${Math.round(delay)}ms...`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEBUG] Retrying in ${Math.round(delay)}ms...`);
+      }
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }

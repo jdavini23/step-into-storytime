@@ -37,10 +37,12 @@ export const signInWithPassword = async (
 ): Promise<{ user: User | null; error: AuthError | null }> => {
   const supabase = getBrowserClient();
   try {
-    console.log(
-      '[Auth] Attempting login with email:',
-      email.split('@')[0] + '***'
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(
+        '[Auth] Attempting login with email:',
+        email.split('@')[0] + '***'
+      );
+    }
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
@@ -48,7 +50,9 @@ export const signInWithPassword = async (
     });
 
     if (error) {
-      console.error('[Auth] Login error:', error.message);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Auth] Login error:', error.message);
+      }
       // Re-throw specific user-friendly errors or a generic one
       if (error.message?.includes('Invalid login credentials')) {
         throw new Error('Invalid email or password.');
@@ -63,10 +67,14 @@ export const signInWithPassword = async (
 
     // Session is now managed by @supabase/ssr via cookies and middleware.
     // No need for manual session checks here.
-    console.log('[Auth] Login successful for user:', data.user?.id);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Auth] Login successful for user:', data.user?.id);
+    }
     return { user: data.user as User | null, error: null };
   } catch (error) {
-    console.error('[Auth] Unexpected login error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Auth] Unexpected login error:', error);
+    }
     // Ensure the caught error is returned in the expected structure
     return {
       user: null,
@@ -93,7 +101,11 @@ export const signInWithOAuth = async (
       redirectTo: `${window.location.origin}/auth/callback`,
     },
   });
-  if (error) console.error('[Auth] OAuth Sign In error:', error.message);
+  if (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Auth] OAuth Sign In error:', error.message);
+    }
+  }
   return { error };
 };
 
@@ -107,24 +119,36 @@ export const signInWithOtp = async (
       emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
-  if (error) console.error('[Auth] OTP Sign In error:', error.message);
+  if (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Auth] OTP Sign In error:', error.message);
+    }
+  }
   return { error };
 };
 
 export const signOut = async (): Promise<{ error: AuthError | null }> => {
   const supabase = getBrowserClient();
   try {
-    console.log('[Auth] Signing out...');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Auth] Signing out...');
+    }
     const { error } = await supabase.auth.signOut();
     if (error) {
-      console.error('[Auth] Sign out error:', error.message);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Auth] Sign out error:', error.message);
+      }
     } else {
-      console.log('[Auth] Sign out successful.');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[Auth] Sign out successful.');
+      }
     }
     // Clear any local state if necessary (handled in AuthContext)
     return { error };
   } catch (error) {
-    console.error('[Auth] Unexpected Sign out error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Auth] Unexpected Sign out error:', error);
+    }
     return {
       error: new AuthError(
         error instanceof Error
@@ -145,7 +169,11 @@ export const resetPasswordForEmail = async (
       redirectTo: `${window.location.origin}/update-password`, // Ensure this route exists
     }
   );
-  if (error) console.error('[Auth] Reset Password error:', error.message);
+  if (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Auth] Reset Password error:', error.message);
+    }
+  }
   return { error };
 };
 
@@ -157,12 +185,16 @@ export const updateUserPassword = async (
     password: newPassword,
   });
   if (error) {
-    console.error('[Auth] Update Password error:', error.message);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Auth] Update Password error:', error.message);
+    }
   } else {
-    console.log(
-      '[Auth] Password updated successfully for user:',
-      data.user?.id
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(
+        '[Auth] Password updated successfully for user:',
+        data.user?.id
+      );
+    }
   }
   return { error };
 };
@@ -174,10 +206,12 @@ export const signUp = async (
 ): Promise<{ user: User | null; error: AuthError | null }> => {
   const supabase = getBrowserClient();
   try {
-    console.log(
-      '[Auth] Attempting sign up for email:',
-      email.split('@')[0] + '***'
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(
+        '[Auth] Attempting sign up for email:',
+        email.split('@')[0] + '***'
+      );
+    }
     // Sign up the user
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
       {
@@ -191,7 +225,9 @@ export const signUp = async (
     );
 
     if (signUpError) {
-      console.error('[Auth] Sign up error:', signUpError.message);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Auth] Sign up error:', signUpError.message);
+      }
       // Map common errors
       if (signUpError.message?.includes('User already registered')) {
         throw new Error('This email is already registered. Try logging in.');
@@ -206,20 +242,26 @@ export const signUp = async (
     }
 
     if (!signUpData.user) {
-      console.error('[Auth] Sign up succeeded but no user data returned.');
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Auth] Sign up succeeded but no user data returned.');
+      }
       throw new Error('Sign up process failed to return user information.');
     }
 
-    console.log(
-      '[Auth] Sign up successful, user created with ID:',
-      signUpData.user.id
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(
+        '[Auth] Sign up successful, user created with ID:',
+        signUpData.user.id
+      );
+    }
     // Profile creation is now typically handled by onAuthStateChange listener
     // in the AuthContext after successful sign-up and sign-in (or by a trigger in Supabase).
     // We return the user object here for immediate feedback if needed.
     return { user: signUpData.user as User | null, error: null };
   } catch (error) {
-    console.error('[Auth] Unexpected sign up error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Auth] Unexpected sign up error:', error);
+    }
     return {
       user: null,
       error:
@@ -238,12 +280,14 @@ export const signUp = async (
 // These functions might be called client-side (using getBrowserClient)
 // or server-side (using createServerClient from @supabase/ssr).
 // For simplicity here, we assume client-side usage for now.
-
+// Error handling: always return { profile, error }. All logs are environment-guarded.
 export const getUserProfile = async (
   userId: string
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
   if (!userId) {
-    console.error('[Profile] getUserProfile called with invalid userId.');
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Profile] getUserProfile called with invalid userId.');
+    }
     return {
       profile: null,
       error: {
@@ -256,7 +300,9 @@ export const getUserProfile = async (
   }
 
   const supabase = getBrowserClient(); // Use browser client
-  console.log('[Profile] Fetching profile for userId:', userId);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Profile] Fetching profile for userId:', userId);
+  }
 
   try {
     const { data, error, status } = await supabase
@@ -268,22 +314,30 @@ export const getUserProfile = async (
     if (error) {
       // Handle case where profile doesn't exist (e.g., PGRST116: 'JSON object requested, multiple (or no) rows returned')
       if (status === 406 || error.code === 'PGRST116') {
-        console.warn(
-          `[Profile] Profile not found for userId: ${userId}. It might need to be created.`
-        );
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[Profile] Profile not found for userId: ${userId}. It might need to be created.`
+          );
+        }
         // Decide if creation should happen here or be triggered elsewhere (e.g., on sign-up listener)
         // For now, just return null profile and no error
         return { profile: null, error: null };
       } else {
-        console.error('[Profile] Error fetching profile:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[Profile] Error fetching profile:', error);
+        }
         return { profile: null, error };
       }
     }
 
-    console.log('[Profile] Profile fetched successfully for userId:', userId);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Profile] Profile fetched successfully for userId:', userId);
+    }
     return { profile: data as UserProfile, error: null };
   } catch (error) {
-    console.error('[Profile] Unexpected error fetching profile:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Profile] Unexpected error fetching profile:', error);
+    }
     return {
       profile: null,
       error: {
@@ -300,13 +354,16 @@ export const getUserProfile = async (
 // after sign-up confirmation, either via Supabase Triggers/Functions or
 // reliably in the onAuthStateChange listener when a new user signs in
 // for the first time without an existing profile.
+// Error handling: always return { profile, error }. All logs are environment-guarded.
 export const createUserProfile = async (
   user: User
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
   if (!user || !user.id) {
-    console.error(
-      '[Profile] createUserProfile called with invalid user object.'
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(
+        '[Profile] createUserProfile called with invalid user object.'
+      );
+    }
     return {
       profile: null,
       error: {
@@ -327,9 +384,11 @@ export const createUserProfile = async (
     `User_${user.id.substring(0, 6)}`;
   const avatarUrl = user.user_metadata?.avatar_url || null; // Default to null if not provided
 
-  console.log(
-    `[Profile] Attempting to create profile for new user: ${user.id} (${userName})`
-  );
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[Profile] Attempting to create profile for new user: ${user.id} (${userName})`
+    );
+  }
 
   try {
     const { data, error } = await supabase
@@ -349,23 +408,31 @@ export const createUserProfile = async (
       // Handle potential conflict if profile already exists (e.g., due to race condition or trigger)
       if (error.code === '23505') {
         // Unique constraint violation
-        console.warn(
-          `[Profile] Profile already exists for userId: ${user.id}. Fetching existing profile.`
-        );
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[Profile] Profile already exists for userId: ${user.id}. Fetching existing profile.`
+          );
+        }
         // Attempt to fetch the existing profile instead
         return await getUserProfile(user.id);
       } else {
-        console.error('[Profile] Error inserting new profile:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[Profile] Error inserting new profile:', error);
+        }
         return { profile: null, error };
       }
     }
 
-    console.log(
-      `[Profile] Profile created successfully for userId: ${user.id}`
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(
+        `[Profile] Profile created successfully for userId: ${user.id}`
+      );
+    }
     return { profile: data as UserProfile, error: null };
   } catch (error) {
-    console.error('[Profile] Unexpected error creating profile:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Profile] Unexpected error creating profile:', error);
+    }
     return {
       profile: null,
       error: {
@@ -378,14 +445,17 @@ export const createUserProfile = async (
   }
 };
 
+// Error handling: always return { profile, error }. All logs are environment-guarded.
 export const updateUserProfileData = async (
   userId: string,
   data: Partial<UserProfile>
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
   if (!userId) {
-    console.error(
-      '[Profile] updateUserProfileData called with invalid userId.'
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(
+        '[Profile] updateUserProfileData called with invalid userId.'
+      );
+    }
     return {
       profile: null,
       error: {
@@ -397,19 +467,23 @@ export const updateUserProfileData = async (
     };
   }
   if (!data || Object.keys(data).length === 0) {
-    console.warn(
-      '[Profile] updateUserProfileData called with no data to update for userId:',
-      userId
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[Profile] updateUserProfileData called with no data to update for userId:',
+        userId
+      );
+    }
     // Optionally fetch and return the current profile or return null
     return { profile: null, error: null };
   }
 
   const supabase = getBrowserClient(); // Use browser client
-  console.log(
-    `[Profile] Updating profile for userId: ${userId} with data:`,
-    data
-  );
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[Profile] Updating profile for userId: ${userId} with data:`,
+      data
+    );
+  }
 
   try {
     const { data: updatedProfile, error } = await supabase
@@ -420,14 +494,20 @@ export const updateUserProfileData = async (
       .single(); // Expect a single row back
 
     if (error) {
-      console.error('[Profile] Error updating profile:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Profile] Error updating profile:', error);
+      }
       return { profile: null, error };
     }
 
-    console.log(`[Profile] Profile updated successfully for userId: ${userId}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Profile] Profile updated successfully for userId: ${userId}`);
+    }
     return { profile: updatedProfile as UserProfile, error: null };
   } catch (error) {
-    console.error('[Profile] Unexpected error updating profile:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Profile] Unexpected error updating profile:', error);
+    }
     return {
       profile: null,
       error: {

@@ -49,7 +49,9 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
   const handleFinish = async (wizardData: WizardData) => {
     setLoading(true);
     setError(null);
-    console.log('[StoryWizard] handleFinish called with data:', wizardData);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[StoryWizard] handleFinish called with data:', wizardData);
+    }
 
     // Basic validation before sending
     if (
@@ -58,10 +60,12 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
       !wizardData.length ||
       !wizardData.readingLevel
     ) {
-      console.error(
-        '[StoryWizard] Missing essential data for API call:',
-        wizardData
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(
+          '[StoryWizard] Missing essential data for API call:',
+          wizardData
+        );
+      }
       setError(
         'Oops! Some required information is missing. Please go back and check.'
       );
@@ -79,7 +83,9 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
       readingLevel: wizardData.readingLevel,
     };
 
-    console.log('[StoryWizard] Sending payload to API:', payload);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[StoryWizard] Sending payload to API:', payload);
+    }
 
     try {
       // Use the specific wizardData fields to build the request
@@ -91,11 +97,15 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('[StoryWizard] API Error Response:', errorData);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[StoryWizard] API Error Response:', errorData);
+        }
         throw new Error(errorData.error || 'API error');
       }
       const story = await response.json();
-      console.log('[StoryWizard] Story generated successfully:', story.id);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[StoryWizard] Story generated successfully:', story.id);
+      }
       setLoading(false);
       setCelebrate(true);
       setTimeout(() => {
@@ -103,7 +113,9 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
         onComplete(story);
       }, 2600); // allow confetti to finish
     } catch (e: any) {
-      console.error('[StoryWizard] Error during story generation:', e);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[StoryWizard] Error during story generation:', e);
+      }
       setLoading(false);
       // Provide more specific error message if possible
       const message = e.message?.includes('required information')

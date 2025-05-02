@@ -13,6 +13,7 @@ export interface UserProfile {
   subscription_tier: 'free' | 'basic' | 'premium' | null;
   created_at: string;
   updated_at: string;
+  stripe_customer_id?: string | null; // Added for Stripe integration compatibility
 }
 
 // --- Auth Context State and Actions ---

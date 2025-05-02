@@ -37,7 +37,9 @@ export function ChatInput({
       // Focus the input after sending
       inputRef.current?.focus();
     } catch (error) {
-      console.error('Failed to send message:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to send message:', error);
+      }
     } finally {
       setIsSending(false);
     }

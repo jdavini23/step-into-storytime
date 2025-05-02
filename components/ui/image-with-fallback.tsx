@@ -24,18 +24,25 @@ export function ImageWithFallback({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    console.log(`[ImageWithFallback] Loading image: ${src}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[ImageWithFallback] Loading image: ${src}`);
+    }
   }, [src]);
 
   const handleError = (e: any) => {
-    console.error(`[ImageWithFallback] Error loading image: ${src}`, e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(`[ImageWithFallback] Error loading image: ${src}`, e);
+    }
     setError(true);
     setIsLoading(false);
   };
 
   const handleLoad = () => {
-    console.log(`[ImageWithFallback] Successfully loaded image: ${src}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[ImageWithFallback] Successfully loaded image: ${src}`);
+    }
     setIsLoading(false);
+    setError(false);
   };
 
   if (error) {

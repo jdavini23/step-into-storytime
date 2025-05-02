@@ -1,3 +1,5 @@
+// Error handling: always return { data, error } or similar. All logs are environment-guarded.
+
 "use client";
 
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -17,12 +19,19 @@ function getBrowserClient(): SupabaseClient {
   );
 }
 
+/**
+ * Fetches the user's subscription data.
+ * 
+ * @returns { data: DbSubscription | null, error: Error | null }
+ */
 export async function fetchSubscription(): Promise<{
   data: DbSubscription | null;
   error: Error | null;
 }> {
   try {
-    console.log("[Debug] Starting subscription fetch...");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Starting subscription fetch...");
+    }
 
     // Get the Supabase client first
     const supabase = getBrowserClient();
@@ -32,7 +41,9 @@ export async function fetchSubscription(): Promise<{
       .getSession();
 
     if (sessionError) {
-      console.warn("[Debug] Session check failed:", sessionError);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("[Debug] Session check failed:", sessionError);
+      }
       return {
         data: null,
         error: new Error("Authentication required - Session error"),
@@ -40,7 +51,9 @@ export async function fetchSubscription(): Promise<{
     }
 
     if (!sessionData.session) {
-      console.warn("[Debug] No active session found");
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("[Debug] No active session found");
+      }
       return {
         data: null,
         error: new Error("Authentication required - No active session"),
@@ -51,7 +64,9 @@ export async function fetchSubscription(): Promise<{
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
     if (userError || !userData.user) {
-      console.warn("[Debug] User verification failed:", userError);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("[Debug] User verification failed:", userError);
+      }
       return {
         data: null,
         error: new Error("Authentication required - User verification failed"),
@@ -68,16 +83,20 @@ export async function fetchSubscription(): Promise<{
       },
     });
 
-    console.log("[Debug] Subscription API response status:", response.status);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Subscription API response status:", response.status);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Debug] Subscription API error response:", {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        body: errorText,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Subscription API error response:", {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+        });
+      }
 
       let errorData;
       try {
@@ -85,20 +104,23 @@ export async function fetchSubscription(): Promise<{
       } catch (e) {
         errorData = { error: errorText };
       }
-
       throw new Error(errorData.error || `HTTP Error ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("[Debug] Subscription data received:", data);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Subscription data received:", data);
+    }
     return { data, error: null };
   } catch (error: unknown) {
     const err = error as Error;
-    console.error("[Debug] Subscription fetch error:", {
-      name: err.name,
-      message: err.message,
-      stack: err.stack,
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[Debug] Subscription fetch error:", {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+      });
+    }
     return {
       data: null,
       error: error instanceof Error ? error : new Error("Unknown error"),
@@ -106,10 +128,19 @@ export async function fetchSubscription(): Promise<{
   }
 }
 
+/**
+ * Creates a new subscription for the user.
+ * 
+ * @param {SubscriptionTier} tier The subscription tier to create.
+ * @returns { data: DbSubscription | null, error: Error | null }
+ */
 export async function createSubscription(
   tier: SubscriptionTier,
 ): Promise<{ data: DbSubscription | null; error: Error | null }> {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Creating subscription for tier:", tier);
+    }
     const response = await fetch("/api/subscriptions", {
       method: "POST",
       headers: {
@@ -121,12 +152,21 @@ export async function createSubscription(
 
     if (!response.ok) {
       const errorData = await response.json();
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Subscription creation error:", errorData);
+      }
       throw new Error(errorData.error || `HTTP Error ${response.status}`);
     }
 
     const data = await response.json();
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Subscription created:", data);
+    }
     return { data, error: null };
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[Debug] Subscription creation exception:", error);
+    }
     return {
       data: null,
       error: error instanceof Error ? error : new Error("Unknown error"),
@@ -134,11 +174,21 @@ export async function createSubscription(
   }
 }
 
+/**
+ * Updates the user's subscription data.
+ * 
+ * @param {string} subscriptionId The ID of the subscription to update.
+ * @param {Partial<DbSubscription>} updates The updates to apply to the subscription.
+ * @returns { data: DbSubscription | null, error: Error | null }
+ */
 export async function updateSubscription(
   subscriptionId: string,
   updates: Partial<DbSubscription>,
 ): Promise<{ data: DbSubscription | null; error: Error | null }> {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Updating subscription:", subscriptionId, updates);
+    }
     const response = await fetch(`/api/subscriptions/${subscriptionId}`, {
       method: "PATCH",
       headers: {
@@ -150,12 +200,21 @@ export async function updateSubscription(
 
     if (!response.ok) {
       const errorData = await response.json();
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Subscription update error:", errorData);
+      }
       throw new Error(errorData.error || `HTTP Error ${response.status}`);
     }
 
     const data = await response.json();
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Subscription updated:", data);
+    }
     return { data, error: null };
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[Debug] Subscription update exception:", error);
+    }
     return {
       data: null,
       error: error instanceof Error ? error : new Error("Unknown error"),
@@ -163,10 +222,19 @@ export async function updateSubscription(
   }
 }
 
+/**
+ * Cancels the user's subscription.
+ * 
+ * @param {string} subscriptionId The ID of the subscription to cancel.
+ * @returns { data: DbSubscription | null, error: Error | null }
+ */
 export async function cancelSubscription(
   subscriptionId: string,
 ): Promise<{ data: DbSubscription | null; error: Error | null }> {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Cancelling subscription:", subscriptionId);
+    }
     const response = await fetch(
       `/api/subscriptions/${subscriptionId}/cancel`,
       {
@@ -177,12 +245,21 @@ export async function cancelSubscription(
 
     if (!response.ok) {
       const errorData = await response.json();
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Subscription cancel error:", errorData);
+      }
       throw new Error(errorData.error || `HTTP Error ${response.status}`);
     }
 
     // After successful cancellation, fetch the updated subscription
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Subscription cancelled. Fetching updated subscription...");
+    }
     return await fetchSubscription();
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[Debug] Subscription cancel exception:", error);
+    }
     return {
       data: null,
       error: error instanceof Error ? error : new Error("Unknown error"),
@@ -190,28 +267,45 @@ export async function cancelSubscription(
   }
 }
 
+/**
+ * Fetches the user's story usage data.
+ * 
+ * @returns { used: number, limit: number | null, error: Error | null }
+ */
 export async function getStoryUsage(): Promise<{
   used: number;
   limit: number | null;
   error: Error | null;
 }> {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Fetching story usage...");
+    }
     const response = await fetch("/api/subscriptions/usage", {
       credentials: "include",
     });
 
     if (!response.ok) {
       const errorData = await response.json();
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Story usage fetch error:", errorData);
+      }
       throw new Error(errorData.error || `HTTP Error ${response.status}`);
     }
 
     const data = await response.json();
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Story usage data:", data);
+    }
     return {
       used: data.used,
       limit: data.limit,
       error: null,
     };
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[Debug] Story usage fetch exception:", error);
+    }
     return {
       used: 0,
       limit: null,
@@ -220,19 +314,36 @@ export async function getStoryUsage(): Promise<{
   }
 }
 
+/**
+ * Increments the user's story usage.
+ * 
+ * @param {string} userId The ID of the user to increment story usage for.
+ * @returns { success: boolean, error: Error | null }
+ */
 export async function incrementStoryUsage(
   userId: string,
 ): Promise<{ success: boolean; error: Error | null }> {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Incrementing story usage for user:", userId);
+    }
     const supabase = getBrowserClient();
     const { data: success, error } = await supabase.rpc(
       "increment_story_usage",
       { user_id: userId },
     );
 
-    if (error) throw error;
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Increment story usage error:", error);
+      }
+      throw error;
+    }
     return { success: !!success, error: null };
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[Debug] Increment story usage exception:", error);
+    }
     return {
       success: false,
       error: error instanceof Error ? error : new Error("Unknown error"),
@@ -240,10 +351,19 @@ export async function incrementStoryUsage(
   }
 }
 
+/**
+ * Fetches the user's story usage data.
+ * 
+ * @param {string} userId The ID of the user to fetch story usage for.
+ * @returns { data: StoryUsage | null, error: PostgrestError | null }
+ */
 export async function fetchStoryUsage(
   userId: string,
 ): Promise<{ data: StoryUsage | null; error: PostgrestError | null }> {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Debug] Fetching story usage for user:", userId);
+    }
     const supabase = getBrowserClient();
     const { data, error } = await supabase
       .from("story_usage")
@@ -251,9 +371,16 @@ export async function fetchStoryUsage(
       .eq("user_id", userId)
       .maybeSingle();
 
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Error fetching story usage:", error);
+      }
+    }
     return { data, error };
   } catch (error) {
-    console.error("Error fetching story usage:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[Debug] Exception fetching story usage:", error);
+    }
     return {
       data: null,
       error: error instanceof PostgrestError ? error : {

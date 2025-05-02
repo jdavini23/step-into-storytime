@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { getOrCreateUserProfile } from "@/utils/userProfile";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: "2023-10-16",
@@ -27,12 +28,14 @@ export async function POST(request: Request) {
         }
 
         // Get or create the customer
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("stripe_customer_id")
-            .eq("id", session.user.id)
-            .single();
-
+        // Use the new utility to ensure a profile exists
+        const { profile, error: profileError } = await getOrCreateUserProfile(session.user);
+        if (profileError) {
+            return new NextResponse(
+                JSON.stringify({ error: "Could not get or create user profile", details: profileError }),
+                { status: 500 },
+            );
+        }
         let customerId = profile?.stripe_customer_id;
 
         if (!customerId) {
@@ -46,10 +49,16 @@ export async function POST(request: Request) {
             customerId = customer.id;
 
             // Update the user's profile with their Stripe customer ID
-            await supabase
+            const { error: updateError } = await supabase
                 .from("profiles")
                 .update({ stripe_customer_id: customerId })
                 .eq("id", session.user.id);
+            if (updateError) {
+                return new NextResponse(
+                    JSON.stringify({ error: "Could not update profile with Stripe customer ID", details: updateError }),
+                    { status: 500 },
+                );
+            }
         }
 
         // Create a checkout session

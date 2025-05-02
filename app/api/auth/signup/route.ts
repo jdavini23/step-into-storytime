@@ -61,12 +61,20 @@ export async function POST(request: NextRequest) {
       });
 
     if (signUpError) {
-      return NextResponse.json({ error: signUpError.message }, { status: 400 });
+      // Log raw error server-side, return user-friendly message
+      console.error("Supabase signUp error:", signUpError);
+      let userMessage = "An error occurred during registration. Please try again.";
+      if (signUpError.message && signUpError.message.toLowerCase().includes("already registered")) {
+        userMessage = "This email is already registered. Please sign in or use a different email.";
+      }
+      return NextResponse.json({ error: userMessage }, { status: 400 });
     }
 
     if (!authData.user) {
+      // Log raw error server-side, return user-friendly message
+      console.error("Supabase returned no user object after signUp:", authData);
       return NextResponse.json(
-        { error: "Failed to create user" },
+        { error: "Failed to create user. Please try again later." },
         { status: 500 }
       );
     }
@@ -84,6 +92,7 @@ export async function POST(request: NextRequest) {
       ]);
 
     if (profileError) {
+      // Log raw error server-side, return user-friendly message
       console.error("Error creating profile:", profileError);
       // Don't fail the signup if profile creation fails
       // We can handle this case separately
@@ -95,7 +104,8 @@ export async function POST(request: NextRequest) {
       message: "User created successfully",
     });
   } catch (error) {
+    // Log raw error server-side, return user-friendly message
     console.error("Signup error:", error);
-    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
+    return NextResponse.json({ error: "Registration failed. Please try again later." }, { status: 500 });
   }
 }

@@ -14,7 +14,9 @@ export const cookieManager = {
       const value = cookie.split('=')[1];
       return name.startsWith('sb-') ? value : decodeURIComponent(value);
     } catch (error) {
-      console.error('[Cookies] Get error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Cookies] Get error:', error);
+      }
       return undefined;
     }
   },
@@ -29,7 +31,9 @@ export const cookieManager = {
         return acc;
       }, {} as Record<string, string>);
     } catch (error) {
-      console.error('[Cookies] GetAll error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Cookies] GetAll error:', error);
+      }
       return {};
     }
   },
@@ -50,7 +54,9 @@ export const cookieManager = {
 
       document.cookie = cookieString;
     } catch (error) {
-      console.error('[Cookies] Set error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Cookies] Set error:', error);
+      }
     }
   },
 
@@ -68,7 +74,9 @@ export const cookieManager = {
         options.path || '/'
       }; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
     } catch (error) {
-      console.error('[Cookies] Remove error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Cookies] Remove error:', error);
+      }
     }
   },
 };
