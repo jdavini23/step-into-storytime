@@ -350,100 +350,26 @@ export const getUserProfile = async (
   }
 };
 
-// This function is crucial and should ideally be triggered automatically
-// after sign-up confirmation, either via Supabase Triggers/Functions or
-// reliably in the onAuthStateChange listener when a new user signs in
-// for the first time without an existing profile.
-// Error handling: always return { profile, error }. All logs are environment-guarded.
+/**
+ * Creates a new user profile record.
+ */
 export const createUserProfile = async (
-  user: User
+  userId: string,
+  data: Partial<UserProfile> = {}
 ): Promise<{ profile: UserProfile | null; error: PostgrestError | null }> => {
-  if (!user || !user.id) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error(
-        '[Profile] createUserProfile called with invalid user object.'
-      );
-    }
-    return {
-      profile: null,
-      error: {
-        message: 'Invalid user object provided',
-        details: '',
-        hint: '',
-        code: '400',
-      } as PostgrestError,
-    };
+  const supabase = getBrowserClient();
+  const profileData = { id: userId, ...data };
+  const { data: inserted, error } = await supabase
+    .from('profiles')
+    .insert(profileData)
+    .single();
+  if (error) {
+    return { profile: null, error };
   }
-
-  const supabase = getBrowserClient(); // Use browser client
-  const userEmail = user.email || '';
-  // Extract name from metadata if available, otherwise fallback to email part
-  const userName =
-    user.user_metadata?.name ||
-    userEmail.split('@')[0] ||
-    `User_${user.id.substring(0, 6)}`;
-  const avatarUrl = user.user_metadata?.avatar_url || null; // Default to null if not provided
-
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(
-      `[Profile] Attempting to create profile for new user: ${user.id} (${userName})`
-    );
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({
-        id: user.id, // Ensure this matches the auth.users.id
-        name: userName,
-        email: userEmail, // Store email in profile if needed
-        avatar_url: avatarUrl,
-        subscription_tier: 'free', // Default subscription tier
-        // Add any other default fields for your profile table
-      })
-      .select() // Select the newly created profile data
-      .single(); // Expect a single row back
-
-    if (error) {
-      // Handle potential conflict if profile already exists (e.g., due to race condition or trigger)
-      if (error.code === '23505') {
-        // Unique constraint violation
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(
-            `[Profile] Profile already exists for userId: ${user.id}. Fetching existing profile.`
-          );
-        }
-        // Attempt to fetch the existing profile instead
-        return await getUserProfile(user.id);
-      } else {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('[Profile] Error inserting new profile:', error);
-        }
-        return { profile: null, error };
-      }
-    }
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(
-        `[Profile] Profile created successfully for userId: ${user.id}`
-      );
-    }
-    return { profile: data as UserProfile, error: null };
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[Profile] Unexpected error creating profile:', error);
-    }
-    return {
-      profile: null,
-      error: {
-        message: error instanceof Error ? error.message : 'Unexpected error',
-        details: '',
-        hint: '',
-        code: '500',
-      } as PostgrestError,
-    };
-  }
+  return { profile: inserted as UserProfile, error: null };
 };
+
+// Note: duplicate user-based overload removed. Use createUserProfile(userId) only.
 
 // Error handling: always return { profile, error }. All logs are environment-guarded.
 export const updateUserProfileData = async (

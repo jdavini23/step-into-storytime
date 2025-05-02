@@ -63,20 +63,17 @@ export function SubscriptionPlan({
 
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`, // Use session.access_token
         },
-        body: JSON.stringify({
-          priceId,
-        }),
+        body: JSON.stringify({ priceId }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
       router.push(data.url);
     } catch (error) {
       console.error('Subscription error:', error);

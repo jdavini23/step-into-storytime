@@ -74,7 +74,8 @@ export async function fetchSubscription(): Promise<{
     }
 
     // Both session and user are verified, proceed with subscription fetch
-    const response = await fetch("/api/subscriptions", {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const response = await fetch(`${baseUrl}/api/subscriptions`, {
       credentials: "include",
       cache: "no-store",
       headers: {
@@ -141,7 +142,8 @@ export async function createSubscription(
     if (process.env.NODE_ENV !== 'production') {
       console.log("[Debug] Creating subscription for tier:", tier);
     }
-    const response = await fetch("/api/subscriptions", {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const response = await fetch(`${baseUrl}/api/subscriptions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -189,7 +191,8 @@ export async function updateSubscription(
     if (process.env.NODE_ENV !== 'production') {
       console.log("[Debug] Updating subscription:", subscriptionId, updates);
     }
-    const response = await fetch(`/api/subscriptions/${subscriptionId}`, {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const response = await fetch(`${baseUrl}/api/subscriptions/${subscriptionId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -235,13 +238,11 @@ export async function cancelSubscription(
     if (process.env.NODE_ENV !== 'production') {
       console.log("[Debug] Cancelling subscription:", subscriptionId);
     }
-    const response = await fetch(
-      `/api/subscriptions/${subscriptionId}/cancel`,
-      {
-        method: "POST",
-        credentials: "include",
-      },
-    );
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const response = await fetch(`${baseUrl}/api/subscriptions/${subscriptionId}/cancel`, {
+      method: "POST",
+      credentials: "include",
+    });
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -281,7 +282,8 @@ export async function getStoryUsage(): Promise<{
     if (process.env.NODE_ENV !== 'production') {
       console.log("[Debug] Fetching story usage...");
     }
-    const response = await fetch("/api/subscriptions/usage", {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const response = await fetch(`${baseUrl}/api/subscriptions/usage`, {
       credentials: "include",
     });
 

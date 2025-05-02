@@ -350,7 +350,8 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
             gender: storyData.character?.gender || 'Male',
           },
         };
-        const response = await fetch('/api/story/generate', {
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const response = await fetch(`${baseUrl}/api/story/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt }),

@@ -14,10 +14,44 @@ type ThemeProviderProps = NextThemesProviderProps & {
 export function ThemeProvider(props: ThemeProviderProps) {
   return (
     <NextThemesProvider {...props}>
+      <ThemeScript />
       <ThemeWrapper>{props.children}</ThemeWrapper>
     </NextThemesProvider>
   );
 }
+
+// Add a script to prevent theme flashing and hydration issues
+const ThemeScript = () => {
+  // This script runs before React hydration, setting the initial theme
+  const themeScript = `
+    (function() {
+      function getTheme() {
+        try {
+          const storedTheme = localStorage.getItem('theme');
+          if (storedTheme) return storedTheme;
+          
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
+          }
+          return 'light';
+        } catch (e) {
+          return 'light';
+        }
+      }
+      
+      const theme = getTheme();
+      document.documentElement.classList.add(theme);
+      document.documentElement.style.colorScheme = theme;
+    })();
+  `;
+
+  return (
+    <script
+      dangerouslySetInnerHTML={{ __html: themeScript }}
+      suppressHydrationWarning
+    />
+  );
+};
 
 // Remove console logs for theme and class names
 const ThemeWrapper = React.memo(({ children }: { children: React.ReactNode }) => {

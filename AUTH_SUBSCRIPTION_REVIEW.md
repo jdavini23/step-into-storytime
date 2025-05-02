@@ -31,21 +31,38 @@ Comprehensive review of all authentication, subscription, and Stripe integration
 - **Status:** Complete — all debug logs are now gated with `process.env.NODE_ENV !== 'production'` or removed. No debug logs remain in production builds. Only intentional logs are available in development for diagnostics.
 
 ### 4. Profile/Subscription Logic Duplication
-- Consider centralizing shared logic (e.g., fetch/create user profile) to avoid duplication between context and hooks.
+- **Status:** Pending — shared logic is duplicated in `useAuth` context and `SubscriptionPlan` hook.
+- **Proposal:** Abstract `fetchOrCreateUserProfile()` into `src/services/user.ts` and import in contexts/hooks.
+- **Benefits:** DRY code, easier maintenance, single source of truth for profile operations.
 
 ### 5. Mock/Dev Helpers
-- Ensure all mock data helpers are excluded or gated for production builds.
+- **Status:** Pending — mock data helpers still present in production bundle.
+- **Action:** Configure webpack to exclude `__mocks__` directory in production builds or wrap exports behind `NODE_ENV !== 'production'`.
+- **Verification:** Bundle analysis should confirm no mock helpers in production.
 
-### 6. Security
-- Consider rate limiting and anti-bot protections for sensitive endpoints (handled at infra level if not in code).
+### 6. API Rate Limiting & Bot Protection
+- **Status:** Pending — no rate limiting on auth or payment endpoints.
+- **Action:** Integrate rate limiting (e.g., using Supabase Edge Functions middleware) with configurable thresholds (e.g., 5 req/min) and optional CAPTCHA on sign-up.
+- **Verification:** Automated tests simulate abuse scenarios and expect 429 responses after limit.
+
+### 7. Stripe Integration Best Practices
+- **Status:** Pending — stripe webhooks and checkout flows require enhanced security.
+- **Action Items:**
+  - Verify webhook signatures using `stripe.webhooks.constructEvent`.
+  - Use idempotency keys for all customer/payment creation requests.
+  - Configure proration settings for subscription updates.
+  - Separate test vs live webhook endpoints and secrets.
+- **Verification:** Integration tests for webhook handling; manual verification via Stripe dashboard.
 
 ---
 
 ## Next Steps
-- [ ] Review and approve these recommendations.
-- [ ] Assign targeted fixes and track progress.
-- [ ] Move to deployment phase or further review as needed.
-- [ ] Document any additional findings or decisions here.
+- [ ] Review and approve these recommendations. (Owner: @team, Due: 2025-05-05)
+- [ ] Refactor profile logic into shared service. (Owner: @dev, Due: 2025-05-10; Tests: unit tests for services/user)
+- [ ] Exclude mock helpers from production bundle. (Owner: @devops, Due: 2025-05-08)
+- [ ] Add rate limiting middleware. (Owner: @security, Due: 2025-05-12)
+- [ ] Enhance Stripe security (webhooks & idempotency). (Owner: @payments, Due: 2025-05-15)
+- [ ] Move to deployment phase or further review. (Owner: @team)
 
 ---
 

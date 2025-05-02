@@ -4,7 +4,9 @@ import { createSupabaseClient } from "@/lib/supabase";
 
 export async function fetchSubscription(): Promise<DbSubscription | null> {
   try {
-    const response = await fetch("/api/subscriptions", {
+    // Use window.location.origin to get the current origin including protocol, hostname, and port
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const response = await fetch(`${baseUrl}/api/subscriptions`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

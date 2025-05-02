@@ -25,10 +25,8 @@ import {
   signUp as apiSignUp,
   resetPasswordForEmail as apiResetPasswordForEmail,
   updateUserPassword as apiUpdateUserPassword,
-  getUserProfile,
-  createUserProfile,
-  updateUserProfileData, // Assuming you might need this
 } from '@/services/authService';
+import { fetchOrCreateUserProfile } from '@/services/user';
 import { User, UserProfile } from '@/types/auth';
 import { cookieManager } from '@/lib/cookies';
 import { handleAuthError } from '@/lib/error-handler';
@@ -178,10 +176,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (sessionError) throw sessionError;
 
         if (session?.user) {
-          const { profile, error: profileError } = await getUserProfile(
-            session.user.id
+          // Seed profile data from user metadata
+          const profileData = {
+            name: session.user.user_metadata?.name,
+            email: session.user.email,
+            avatar_url: session.user.user_metadata?.avatar_url,
+          };
+          const { profile, error } = await fetchOrCreateUserProfile(
+            session.user.id,
+            profileData
           );
-          if (profileError) throw profileError;
+          if (error) throw error;
 
           if (mounted) {
             dispatch({
@@ -234,10 +239,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === 'SIGNED_IN' && session?.user) {
         try {
-          const { profile, error: profileError } = await getUserProfile(
-            session.user.id
+          // Seed profile data on sign-in event
+          const profileData = {
+            name: session.user.user_metadata?.name,
+            email: session.user.email,
+            avatar_url: session.user.user_metadata?.avatar_url,
+          };
+          const { profile, error } = await fetchOrCreateUserProfile(
+            session.user.id,
+            profileData
           );
-          if (profileError) throw profileError;
+          if (error) throw error;
 
           if (mounted) {
             dispatch({
@@ -434,7 +446,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       dispatch({ type: 'SET_LOADING', payload: true });
       try {
-        const { profile, error } = await updateUserProfileData(
+        const { profile, error } = await fetchOrCreateUserProfile(
           state.user.id,
           profileData
         );

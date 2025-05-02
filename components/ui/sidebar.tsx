@@ -54,9 +54,23 @@ interface SidebarProviderProps {
 function SidebarProvider({ children }: SidebarProviderProps) {
   const [state, setState] = React.useState<SidebarState>('expanded');
   const [openMobile, setOpenMobile] = React.useState(false);
-  const isMobile = React.useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia('(max-width: 768px)').matches;
+  // Initialize isMobile with false for server-side rendering
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  // Update isMobile state after hydration
+  React.useEffect(() => {
+    // Check if we're on the client side
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mediaQuery.matches);
+    
+    // Add listener for changes
+    const handleResize = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
+    };
+    
+    // Modern browsers
+    mediaQuery.addEventListener('change', handleResize);
+    return () => mediaQuery.removeEventListener('change', handleResize);
   }, []);
 
   React.useEffect(() => {

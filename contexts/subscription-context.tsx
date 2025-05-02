@@ -172,7 +172,9 @@ export function SubscriptionProvider({
     setIsLoadingPlans(true);
     setPlansError(null);
     try {
-      const response = await fetch('/api/stripe/products');
+      // Use window.location.origin to get the current origin including protocol, hostname, and port
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const response = await fetch(`${baseUrl}/api/stripe/products`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch plans');
@@ -208,19 +210,26 @@ export function SubscriptionProvider({
   const createSubscription = useCallback(
     async (tier: SubscriptionTier, priceId: string) => {
       if (!auth.state.user) {
-        console.error('User not authenticated');
-        dispatch({ type: 'SET_ERROR', payload: 'Authentication required.' });
-        return;
+        throw new Error('User must be authenticated to create a subscription');
       }
+
       dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
       try {
-        // Call backend to create checkout session
-        const response = await fetch('/api/stripe/create-checkout-session', {
+        // Use window.location.origin to get the current origin including protocol, hostname, and port
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const response = await fetch(`${baseUrl}/api/stripe/create-checkout-session`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ priceId }), // Pass priceId to backend
+          body: JSON.stringify({
+            priceId,
+            userId: auth.state.user.id,
+            email: auth.state.user.email,
+            tier,
+          }),
         });
 
         if (!response.ok) {

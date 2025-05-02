@@ -278,7 +278,7 @@ export default function DashboardPage() {
                       </p>
                     </CardContent>
                     <CardFooter className="flex justify-between">
-                      <Link href={`/story/view/${story.id}`} passHref>
+                      <Link href={`/story/${story.id}`} passHref>
                         <Button className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700">
                           View Story
                         </Button>

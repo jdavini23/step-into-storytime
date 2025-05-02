@@ -69,20 +69,27 @@ const STORAGE_KEY = 'step_into_storytime_wizard_data';
 export const WizardProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  // Initialize data from localStorage if available
-  const [data, setData] = useState<WizardData>(() => {
-    if (typeof window === 'undefined') return defaultContext.data; // Use default data server-side
+  // Use a ref to track if we're on the client side
+  const isClient = React.useRef(false);
+
+  // Initialize data with default values first
+  const [data, setData] = useState<WizardData>(defaultContext.data);
+
+  // Then load from localStorage in a useEffect after hydration
+  useEffect(() => {
+    isClient.current = true;
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      // Merge saved data with defaults to ensure all keys exist if structure changes
-      const parsed = saved ? JSON.parse(saved) : {};
-      return { ...defaultContext.data, ...parsed };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Merge saved data with defaults to ensure all keys exist if structure changes
+        setData((prevData) => ({ ...prevData, ...parsed }));
+      }
     } catch (e) {
       console.error('Failed to parse wizard data from localStorage', e);
       localStorage.removeItem(STORAGE_KEY); // Clear corrupted data
-      return defaultContext.data;
     }
-  });
+  }, []);
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   // Initialize canGoNext based on the initial step and data
@@ -93,7 +100,7 @@ export const WizardProvider: React.FC<{ children: ReactNode }> = ({
 
   // Persist data to localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isClient.current) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (e) {
