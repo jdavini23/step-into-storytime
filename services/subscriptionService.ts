@@ -366,29 +366,85 @@ export async function fetchStoryUsage(
     if (process.env.NODE_ENV !== 'production') {
       console.log("[Debug] Fetching story usage for user:", userId);
     }
+    
+    // Validate userId before making the request
+    if (!userId) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Debug] Error fetching story usage: Missing user ID");
+      }
+      return { 
+        data: null, 
+        error: {
+          message: "Missing user ID",
+          details: "User ID is required to fetch story usage",
+          hint: "Ensure user is authenticated before fetching usage",
+          code: "auth/missing-user-id",
+        } as PostgrestError
+      };
+    }
+    
     const supabase = getBrowserClient();
+    
+    // First try to get the most recent usage record
     const { data, error } = await supabase
       .from("story_usage")
       .select("*")
       .eq("user_id", userId)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
     if (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("[Debug] Error fetching story usage:", error);
       }
+      
+      // Check if the error is "no rows returned" - this is expected for new users
+      if (error.code === 'PGRST116' && error.details?.includes('no rows')) {
+        // Create default usage object for new users
+        const now = new Date();
+        const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        
+        return { 
+          data: {
+            id: 0,
+            user_id: userId,
+            story_count: 0,
+            reset_date: resetDate.toISOString(),
+            created_at: now.toISOString(),
+            updated_at: now.toISOString(),
+          } as StoryUsage, 
+          error: null 
+        };
+      }
+      
+      // For other errors, return null data and the error
+      return { data: null, error };
     }
-    return { data, error };
+    
+    return { data, error: null };
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error("[Debug] Exception fetching story usage:", error);
     }
+    
+    // Get the current date and calculate reset date (first day of next month)
+    const now = new Date();
+    const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    
     return {
-      data: null,
+      data: {
+        id: 0, // Use 0 as a placeholder ID
+        user_id: userId,
+        story_count: 0,
+        reset_date: resetDate.toISOString(),
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      } as StoryUsage,
       error: error instanceof PostgrestError ? error : {
-        message: "Unknown error",
+        message: error instanceof Error ? error.message : "Unknown error",
         details: "",
-        hint: "",
+        hint: "This may be a temporary issue. Please try again later.",
         code: "",
       } as PostgrestError,
     };

@@ -1,9 +1,9 @@
 import { Metadata } from 'next';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { SubscriptionPlan } from '@/components/subscription/SubscriptionPlan';
+import { createSupabaseClient } from '@/lib/supabase';
 
 export const metadata: Metadata = {
   title: 'Subscription Plans',
@@ -42,7 +42,8 @@ const plans = [
 ];
 
 export default async function SubscriptionPage() {
-  const supabase = createServerComponentClient({ cookies });
+  // Use our custom Supabase client instead of createServerComponentClient
+  const supabase = createSupabaseClient();
 
   // First get the session
   const {

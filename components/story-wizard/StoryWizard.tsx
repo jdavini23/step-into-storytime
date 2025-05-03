@@ -89,23 +89,95 @@ const StoryWizard: React.FC<StoryWizardProps> = ({ onComplete, onError }) => {
 
     try {
       // Use the specific wizardData fields to build the request
+      console.log('[StoryWizard] About to call story generation API');
       const response = await fetchWithAuth('/api/story/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
+      console.log('[StoryWizard] API response status:', response.status);
+      
+      // Clone the response for debugging
+      const responseClone = response.clone();
+      const responseText = await responseClone.text();
+      console.log('[StoryWizard] Raw API response:', responseText);
+      
+      // Parse the response as JSON
+      let story;
+      try {
+        story = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[StoryWizard] Error parsing API response:', parseError);
+        throw new Error('Failed to parse API response');
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('[StoryWizard] API Error Response:', errorData);
+        console.error('[StoryWizard] API Error Response:', story);
+        throw new Error(story.error || 'API error');
+      }
+      
+      console.log('[StoryWizard] Story generated successfully:', story);
+
+      // Validate that we have a proper story object with an ID
+      if (!story || !story.id) {
+        console.error('[StoryWizard] Story generated but missing ID:', story);
+        throw new Error('Story was generated but no ID was returned. Please try again.');
+      }
+
+      // If this is a temporary ID, save the story to session storage
+      if (story.id.startsWith('temp-')) {
+        console.log(`[StoryWizard] Saving temporary story to session storage: ${story.id}`);
+        try {
+          sessionStorage.setItem(`story_${story.id}`, JSON.stringify(story));
+        } catch (storageError) {
+          console.error('[StoryWizard] Error saving to session storage:', storageError);
+          // Continue anyway, as we'll still redirect to the story page
         }
-        throw new Error(errorData.error || 'API error');
       }
-      const story = await response.json();
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[StoryWizard] Story generated successfully:', story.id);
+
+      // Verify the story exists in the database before redirecting
+      if (story.id) {
+        let verificationAttempts = 3;
+        let storyVerified = false;
+
+        while (verificationAttempts > 0 && !storyVerified) {
+          try {
+            console.log(`[StoryWizard] Verifying story ${story.id}, attempt ${4 - verificationAttempts}`);
+            const verifyResponse = await fetchWithAuth(`/api/story/verify/${story.id}`, {
+              method: 'GET'
+            });
+
+            if (verifyResponse.ok) {
+              const verifyData = await verifyResponse.json();
+              if (verifyData.exists) {
+                console.log(`[StoryWizard] Story ${story.id} verified successfully`);
+                storyVerified = true;
+                break;
+              } else {
+                console.warn(`[StoryWizard] Story ${story.id} not found in database yet, retrying...`);
+              }
+            } else {
+              const errorData = await verifyResponse.json();
+              console.error(`[StoryWizard] Error verifying story:`, errorData);
+            }
+            
+            // If verification fails, wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            verificationAttempts--;
+          } catch (verifyError) {
+            console.error(`[StoryWizard] Error verifying story (attempt ${4 - verificationAttempts}):`, verifyError);
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            verificationAttempts--;
+          }
+        }
+
+        if (!storyVerified) {
+          console.warn(`[StoryWizard] Could not verify story ${story.id} after multiple attempts`);
+          // Continue anyway, as the story might still be accessible
+        }
       }
+
       setLoading(false);
       setCelebrate(true);
       setTimeout(() => {

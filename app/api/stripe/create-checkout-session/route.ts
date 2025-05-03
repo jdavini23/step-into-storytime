@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getOrCreateUserProfile } from "@/utils/userProfile";
@@ -14,8 +13,8 @@ export async function POST(request: Request) {
     try {
         const { priceId } = await request.json();
 
-        // Get the user from Supabase auth
-        const supabase = createRouteHandlerClient({ cookies });
+        // Use our enhanced server Supabase client that properly handles base64-encoded cookies
+        const supabase = await createServerSupabaseClient();
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {

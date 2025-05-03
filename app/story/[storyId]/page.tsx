@@ -6,10 +6,7 @@ import Navbar from '@/components/navbar/index';
 import StoryContent from '@/components/story/story-content';
 import StoryControls from '@/components/story/story-controls';
 import Footer from '@/components/sections/footer';
-
-// UUID validation regex
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { isValidStoryId } from '@/utils/validation';
 
 interface StoryPageProps {
   params: {
@@ -22,28 +19,38 @@ export default function StoryPage({ params }: StoryPageProps) {
   const routeParams = useParams();
   const storyId = routeParams?.storyId as string;
 
-  // Validate storyId format
-  if (!storyId || !UUID_REGEX.test(storyId)) {
+  // Validate storyId format using our utility function
+  if (!isValidStoryId(storyId)) {
     // If not a valid UUID, show error or redirect
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-pink-100 via-blue-100 to-yellow-100 relative overflow-hidden">
         <Navbar />
         <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           <div className="max-w-4xl w-full mx-auto">
-            <div className="mt-8 bg-white rounded-2xl shadow-xl p-6">
-              <h1 className="text-2xl font-bold text-red-600">
-                Invalid Story ID
-              </h1>
-              <p className="mt-4">
-                The story ID format is invalid. Please check the URL and try
-                again.
-              </p>
-              <button
-                onClick={() => router.push('/stories')}
-                className="mt-4 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700"
-              >
-                Return to Stories
-              </button>
+            <div className="mt-8 bg-white rounded-2xl shadow-xl p-6 md:p-8">
+              <div className="text-center">
+                <h1 className="text-2xl md:text-3xl font-bold text-red-600 mb-4">
+                  Invalid Story ID
+                </h1>
+                <p className="mt-4 text-gray-700 mb-6">
+                  The story ID format is invalid. Please check the URL and try
+                  again.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <button
+                    onClick={() => router.push('/dashboard')}
+                    className="px-6 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                  >
+                    Go to Dashboard
+                  </button>
+                  <button
+                    onClick={() => router.push('/create')}
+                    className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                  >
+                    Create New Story
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </main>

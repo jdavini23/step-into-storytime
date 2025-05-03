@@ -22,7 +22,7 @@ export default function StoryContent({
   storyId,
   className,
 }: StoryContentProps) {
-  const { state, fetchStory } = useStory();
+  const { state, fetchStory, dispatch } = useStory();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +32,25 @@ export default function StoryContent({
       setError(null);
 
       try {
+        // For temporary IDs (development/testing), use local storage instead of fetching
+        if (storyId.startsWith('temp-')) {
+          console.log(`[StoryContent] Handling temporary story ID: ${storyId}`);
+          // Try to get from session storage first
+          const sessionStory = sessionStorage.getItem(`story_${storyId}`);
+          
+          if (sessionStory) {
+            try {
+              const parsedStory = JSON.parse(sessionStory);
+              dispatch({ type: 'SET_CURRENT_STORY', payload: parsedStory });
+              setIsLoading(false);
+              return;
+            } catch (parseError) {
+              console.error('[StoryContent] Error parsing session story:', parseError);
+              // Continue to normal fetch if parsing fails
+            }
+          }
+        }
+        
         await fetchStory(storyId);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load story');
@@ -41,7 +60,7 @@ export default function StoryContent({
     };
 
     loadStory();
-  }, [storyId, fetchStory]);
+  }, [storyId, fetchStory, dispatch]);
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorMessage message={error} />;

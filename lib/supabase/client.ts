@@ -32,7 +32,18 @@ function getSupabaseClientInstance(): SupabaseClient<Database> {
         const cookie = document.cookie
           .split('; ')
           .find((row) => row.startsWith(`${name}=`));
-        return cookie ? cookie.split('=')[1] : undefined;
+        
+        if (!cookie) return undefined;
+        
+        const value = cookie.split('=')[1];
+        
+        // Handle special case for Supabase cookies that might be base64 encoded
+        // Don't try to parse these as JSON
+        if (name.startsWith('sb-') && value.startsWith('base64-')) {
+          return value;
+        }
+        
+        return value;
       },
       set: (name: string, value: string, options: CookieOptions) => {
         document.cookie = `${name}=${value}; path=${

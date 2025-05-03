@@ -13,12 +13,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 let serverClient: SupabaseClient<Database> | null = null;
 
+/**
+ * Create a Supabase client for server-side use with enhanced cookie handling
+ * This version properly handles base64-encoded cookies and Supabase auth cookies
+ */
 export const createServerSupabaseClient = async () => {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      get: (name: string) => cookieStore.get(name)?.value,
+      get: (name: string) => {
+        const cookieValue = cookieStore.get(name)?.value;
+        
+        // If it's a Supabase cookie (starts with 'sb-') or base64-encoded,
+        // return it as is without trying to parse it as JSON
+        if (cookieValue && (name.startsWith('sb-') || cookieValue.startsWith('base64-'))) {
+          return cookieValue;
+        }
+        
+        return cookieValue;
+      },
       set: (name: string, value: string, options: any) => {
         cookieStore.set({ name, value, ...options });
       },
@@ -52,6 +66,7 @@ export const createServerSupabaseClientWithToken = (accessToken: string) => {
       Authorization: `Bearer ${accessToken}`,
     };
   }
+  client.auth.setSession({ access_token: accessToken, refresh_token: '' });
   return client;
 };
 

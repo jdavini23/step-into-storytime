@@ -87,22 +87,34 @@ serve(async (req: Request) => {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        if (!session.client_reference_id) {
-          throw new Error("Missing client_reference_id in session");
+        if (!session.client_reference_id && !session.metadata?.supabase_uid) {
+          console.error("Missing user ID in session");
+          throw new Error("Missing user ID in session");
         }
+
+        // Get user ID from either client_reference_id or metadata
+        const userId = session.client_reference_id || session.metadata?.supabase_uid;
 
         const subscription = await stripe.subscriptions.retrieve(
           session.subscription as string,
           {
-            expand: ["items.data.price"], // Expand price details
+            expand: ["items.data.price.product"], // Expand price and product details
           },
         );
 
+        // Get product details from the first subscription item
+        const productId = typeof subscription.items.data[0]?.price?.product === "string"
+          ? subscription.items.data[0]?.price?.product
+          : (subscription.items.data[0]?.price?.product as Stripe.Product)?.id;
+
+        const priceId = subscription.items.data[0]?.price?.id;
+
         const subscriptionData = {
-          user_id: session.client_reference_id,
+          user_id: userId,
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: subscription.id,
-          plan_id: subscription.items.data[0]?.price?.id,
+          plan_id: productId,
+          price_id: priceId,
           status: subscription.status,
           current_period_start: new Date(
             subscription.current_period_start * 1000,
@@ -121,12 +133,19 @@ serve(async (req: Request) => {
             : null,
         };
 
+        console.log("Processing subscription data:", JSON.stringify(subscriptionData, null, 2));
+
         // First, try to find an existing subscription for this user
-        const { data: existingSubscription } = await supabaseAdmin
+        const { data: existingSubscription, error: fetchError } = await supabaseAdmin
           .from("user_subscriptions")
           .select("id")
-          .eq("user_id", session.client_reference_id)
-          .single();
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (fetchError && fetchError.code !== "PGRST116") {
+          console.error("Error fetching subscription:", fetchError);
+          throw fetchError;
+        }
 
         if (existingSubscription) {
           // Update existing subscription
@@ -135,21 +154,96 @@ serve(async (req: Request) => {
             .update(subscriptionData)
             .eq("id", existingSubscription.id);
 
-          if (updateError) throw updateError;
+          if (updateError) {
+            console.error("Error updating subscription:", updateError);
+            throw updateError;
+          }
+          
+          console.log(`Updated subscription for user ${userId}`);
         } else {
           // Create new subscription
           const { error: insertError } = await supabaseAdmin
             .from("user_subscriptions")
             .insert([subscriptionData]);
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            console.error("Error inserting subscription:", insertError);
+            throw insertError;
+          }
+          
+          console.log(`Created new subscription for user ${userId}`);
         }
+
+        // Initialize or update story usage for the user
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        
+        // Determine story limit based on plan
+        let storyLimit = 5; // Default free tier
+        if (productId) {
+          // Get plan details from product metadata or use defaults based on product ID
+          if (productId.includes("story_creator")) {
+            storyLimit = 30;
+          } else if (productId.includes("family")) {
+            storyLimit = 999; // Effectively unlimited
+          }
+        }
+
+        // Check for existing usage record
+        const { data: existingUsage, error: usageError } = await supabaseAdmin
+          .from("story_usage")
+          .select("*")
+          .eq("user_id", userId)
+          .gte("period_start", firstDayOfMonth.toISOString())
+          .lte("period_end", lastDayOfMonth.toISOString())
+          .maybeSingle();
+
+        if (usageError && usageError.code !== "PGRST116") {
+          console.error("Error fetching usage:", usageError);
+          throw usageError;
+        }
+
+        if (existingUsage) {
+          // Update existing usage with new limit
+          const { error: updateUsageError } = await supabaseAdmin
+            .from("story_usage")
+            .update({ stories_limit: storyLimit })
+            .eq("id", existingUsage.id);
+
+          if (updateUsageError) {
+            console.error("Error updating usage:", updateUsageError);
+            throw updateUsageError;
+          }
+          
+          console.log(`Updated usage limit to ${storyLimit} for user ${userId}`);
+        } else {
+          // Create new usage record
+          const { error: insertUsageError } = await supabaseAdmin
+            .from("story_usage")
+            .insert([{
+              user_id: userId,
+              period_start: firstDayOfMonth.toISOString(),
+              period_end: lastDayOfMonth.toISOString(),
+              stories_generated: 0,
+              stories_limit: storyLimit
+            }]);
+
+          if (insertUsageError) {
+            console.error("Error inserting usage:", insertUsageError);
+            throw insertUsageError;
+          }
+          
+          console.log(`Created new usage record with limit ${storyLimit} for user ${userId}`);
+        }
+        
         break;
       }
 
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
+        console.log(`Processing ${event.type} for subscription ${subscription.id}`);
 
         // Find the user with this subscription
         const { data: subscriptionData, error: fetchError } =
@@ -157,14 +251,40 @@ serve(async (req: Request) => {
             .from("user_subscriptions")
             .select("user_id")
             .eq("stripe_subscription_id", subscription.id)
-            .single();
+            .maybeSingle();
 
-        if (fetchError || !subscriptionData) {
+        if (fetchError && fetchError.code !== "PGRST116") {
+          console.error(`Error finding subscription ${subscription.id}:`, fetchError);
           throw new Error(`No subscription found with ID ${subscription.id}`);
         }
 
+        if (!subscriptionData) {
+          console.warn(`No subscription found in database with ID ${subscription.id}`);
+          // If we can't find the subscription, try to get user ID from metadata
+          if (!subscription.metadata?.supabase_uid) {
+            console.error("No user ID found in subscription metadata");
+            throw new Error("Could not determine user ID for subscription update");
+          }
+        }
+
+        const userId = subscriptionData?.user_id || subscription.metadata?.supabase_uid;
+        
+        if (!userId) {
+          console.error("Could not determine user ID for subscription update");
+          throw new Error("Could not determine user ID for subscription update");
+        }
+
+        // Get product details from the first subscription item
+        const productId = typeof subscription.items.data[0]?.price?.product === "string"
+          ? subscription.items.data[0]?.price?.product
+          : (subscription.items.data[0]?.price?.product as Stripe.Product)?.id;
+
+        const priceId = subscription.items.data[0]?.price?.id;
+
         const updateData = {
           status: subscription.status,
+          plan_id: productId,
+          price_id: priceId,
           current_period_start: new Date(
             subscription.current_period_start * 1000,
           ).toISOString(),
@@ -183,29 +303,119 @@ serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         };
 
-        const { error: updateError } = await supabaseAdmin
+        console.log(`Updating subscription for user ${userId}:`, JSON.stringify(updateData, null, 2));
+
+        // Check if subscription exists in database
+        const { data: existingSubscription, error: checkError } = await supabaseAdmin
           .from("user_subscriptions")
-          .update(updateData)
-          .eq("user_id", subscriptionData.user_id);
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
 
-        if (updateError) throw updateError;
-
-        // If subscription is deleted or canceled, update the status
-        if (
-          event.type === "customer.subscription.deleted" ||
-          subscription.status === "canceled"
-        ) {
-          const { error: statusError } = await supabaseAdmin
-            .from("user_subscriptions")
-            .update({
-              status: "canceled",
-              canceled_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("stripe_subscription_id", subscription.id);
-
-          if (statusError) throw statusError;
+        if (checkError && checkError.code !== "PGRST116") {
+          console.error("Error checking for existing subscription:", checkError);
+          throw checkError;
         }
+
+        if (existingSubscription) {
+          // Update existing subscription
+          const { error: updateError } = await supabaseAdmin
+            .from("user_subscriptions")
+            .update(updateData)
+            .eq("id", existingSubscription.id);
+
+          if (updateError) {
+            console.error("Error updating subscription:", updateError);
+            throw updateError;
+          }
+          
+          console.log(`Updated subscription for user ${userId}`);
+        } else {
+          // Create new subscription record if it doesn't exist
+          const { error: insertError } = await supabaseAdmin
+            .from("user_subscriptions")
+            .insert([{
+              user_id: userId,
+              stripe_subscription_id: subscription.id,
+              ...updateData
+            }]);
+
+          if (insertError) {
+            console.error("Error inserting subscription:", insertError);
+            throw insertError;
+          }
+          
+          console.log(`Created new subscription for user ${userId}`);
+        }
+
+        // If subscription status changed, update story usage limits
+        if (event.type === "customer.subscription.updated") {
+          // Determine story limit based on plan
+          let storyLimit = 5; // Default free tier
+          
+          // Only update limits for active subscriptions
+          if (subscription.status === "active" || subscription.status === "trialing") {
+            if (productId) {
+              if (productId.includes("story_creator")) {
+                storyLimit = 30;
+              } else if (productId.includes("family")) {
+                storyLimit = 999; // Effectively unlimited
+              }
+            }
+
+            const now = new Date();
+            const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+            // Update usage limits
+            const { data: existingUsage, error: usageError } = await supabaseAdmin
+              .from("story_usage")
+              .select("*")
+              .eq("user_id", userId)
+              .gte("period_start", firstDayOfMonth.toISOString())
+              .lte("period_end", lastDayOfMonth.toISOString())
+              .maybeSingle();
+
+            if (usageError && usageError.code !== "PGRST116") {
+              console.error("Error fetching usage:", usageError);
+              throw usageError;
+            }
+
+            if (existingUsage) {
+              // Update existing usage with new limit
+              const { error: updateUsageError } = await supabaseAdmin
+                .from("story_usage")
+                .update({ stories_limit: storyLimit })
+                .eq("id", existingUsage.id);
+
+              if (updateUsageError) {
+                console.error("Error updating usage:", updateUsageError);
+                throw updateUsageError;
+              }
+              
+              console.log(`Updated usage limit to ${storyLimit} for user ${userId}`);
+            } else {
+              // Create new usage record
+              const { error: insertUsageError } = await supabaseAdmin
+                .from("story_usage")
+                .insert([{
+                  user_id: userId,
+                  period_start: firstDayOfMonth.toISOString(),
+                  period_end: lastDayOfMonth.toISOString(),
+                  stories_generated: 0,
+                  stories_limit: storyLimit
+                }]);
+
+              if (insertUsageError) {
+                console.error("Error inserting usage:", insertUsageError);
+                throw insertUsageError;
+              }
+              
+              console.log(`Created new usage record with limit ${storyLimit} for user ${userId}`);
+            }
+          }
+        }
+
         break;
       }
 

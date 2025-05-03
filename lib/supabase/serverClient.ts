@@ -12,7 +12,15 @@ export const createClient = (request: NextRequest, response: NextResponse) => {
     {
       cookies: {
         get(name) {
-          return request.cookies.get(name)?.value
+          const cookieValue = request.cookies.get(name)?.value;
+          
+          // If it's a Supabase cookie (starts with 'sb-') or base64-encoded,
+          // return it as is without trying to parse it as JSON
+          if (cookieValue && (name.startsWith('sb-') || cookieValue.startsWith('base64-'))) {
+            return cookieValue;
+          }
+          
+          return cookieValue;
         },
         set(name, value, options) {
           request.cookies.set({

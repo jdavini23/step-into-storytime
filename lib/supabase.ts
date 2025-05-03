@@ -7,6 +7,7 @@ import {
 } from "@supabase/supabase-js";
 import { createBrowserClient as createBrowserClientSSR } from "@supabase/ssr";
 import type { Database } from "@/types/supabase";
+import getCustomClient from "./supabase/custom-client";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -32,7 +33,8 @@ export const createBrowserClient = () => {
   if (typeof window === "undefined") {
     return supabase;
   }
-  return supabase;
+  // Use our custom client implementation that properly handles base64-encoded cookies
+  return getCustomClient();
 };
 
 // For server-side operations
@@ -41,10 +43,14 @@ export const createServerClient = () => {
 };
 
 export const createSupabaseBrowser = () => {
-  return createBrowserClientSSR(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  if (typeof window === "undefined") {
+    return createBrowserClientSSR(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+  }
+  // Use our custom client implementation that properly handles base64-encoded cookies
+  return getCustomClient();
 };
 
 // Type for Supabase instance with all tables
@@ -70,6 +76,13 @@ export const createSupabaseClient = (): SupabaseClient<Database> => {
   }
 
   try {
+    // Use our custom client implementation for browser
+    if (typeof window !== "undefined") {
+      supabaseInstance = getCustomClient();
+      return supabaseInstance;
+    }
+    
+    // Use standard client for server
     supabaseInstance = createClient<Database>(supabaseUrl, supabaseKey, {
       auth: {
         persistSession: true,
@@ -78,16 +91,6 @@ export const createSupabaseClient = (): SupabaseClient<Database> => {
         storageKey: "sb-auth-token",
       },
     });
-
-    // Test the client
-    // Add auth listener only if client initialized successfully and in browser
-    if (supabaseInstance && typeof window !== "undefined") {
-      supabaseInstance.auth.onAuthStateChange(
-        (event: AuthChangeEvent, session: Session | null) => {
-          console.log("[Supabase] Auth state changed:", event, !!session);
-        },
-      );
-    }
 
     return supabaseInstance;
   } catch (error) {

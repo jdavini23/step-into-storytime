@@ -227,26 +227,53 @@ export const StoryProvider = ({ children }: { children: React.ReactNode }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
-      try {
-        const { data: story, error } = await supabase
-          .from('stories')
-          .select('*')
-          .eq('id', id)
-          .single();
+      // Add retry logic
+      let retries = 3;
+      let success = false;
+      let story = null;
+      let lastError = null;
 
-        if (error) throw error;
+      while (retries > 0 && !success) {
+        try {
+          console.log(`[Story] Fetching story ${id}, attempt ${4 - retries}`);
+          const { data: fetchedStory, error } = await supabase
+            .from('stories')
+            .select('*')
+            .eq('id', id)
+            .single();
 
+          if (error) throw error;
+
+          if (fetchedStory) {
+            story = fetchedStory;
+            success = true;
+            console.log(`[Story] Successfully fetched story ${id}`);
+          } else {
+            // If no error but also no story, wait and retry
+            console.log(`[Story] No story found for ID ${id}, will retry`);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+            retries--;
+          }
+        } catch (error) {
+          console.error(`[Story] Error fetching story (attempt ${4 - retries}):`, error);
+          lastError = error;
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+          retries--;
+        }
+      }
+
+      if (success && story) {
         dispatch({ type: 'SET_CURRENT_STORY', payload: story });
-      } catch (error) {
-        console.error('[Story] Error fetching story:', error);
+      } else {
+        console.error('[Story] All retry attempts failed for story fetch:', lastError);
         dispatch({
           type: 'SET_ERROR',
           payload:
-            error instanceof Error ? error.message : 'Failed to fetch story',
+            lastError instanceof Error ? lastError.message : 'Failed to fetch story after multiple attempts',
         });
-      } finally {
-        dispatch({ type: 'SET_LOADING', payload: false });
       }
+      
+      dispatch({ type: 'SET_LOADING', payload: false });
     },
     [state.loading, supabase]
   );

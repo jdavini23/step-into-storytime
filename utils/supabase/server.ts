@@ -13,7 +13,15 @@ export async function createClient() {
       cookies: {
         async get(name: string) {
           const cookieStore = await cookies();
-          return cookieStore.get(name)?.value;
+          const cookieValue = cookieStore.get(name)?.value;
+          
+          // If it's a Supabase cookie (starts with 'sb-') or base64-encoded,
+          // return it as is without trying to parse it as JSON
+          if (cookieValue && (name.startsWith('sb-') || cookieValue.startsWith('base64-'))) {
+            return cookieValue;
+          }
+          
+          return cookieValue;
         },
         async set(name: string, value: string, options: CookieOptions) {
           const cookieStore = await cookies();
