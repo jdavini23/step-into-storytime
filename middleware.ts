@@ -1,8 +1,8 @@
-import { createClient as createMiddlewareClient } from '@/lib/supabase/serverClient';
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { publicRoutes, defaultRedirectPath } from './config/authRoutes';
-import { Session } from '@supabase/supabase-js';
+import { createClient as createMiddlewareClient } from "@/lib/supabase/serverClient";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { defaultRedirectPath, publicRoutes } from "./config/authRoutes";
+import { Session } from "@supabase/supabase-js";
 
 // Simple in-memory rate limiting store
 const rateLimit = new Map<string, { count: number; timestamp: number }>();
@@ -32,19 +32,18 @@ function checkRateLimit(ip: string): boolean {
 }
 
 export async function middleware(req: NextRequest) {
-  console.log('--- Middleware START ---');
-  console.log('Request URL:', req.url);
-  console.log('Request Method:', req.method);
+  console.log("--- Middleware START ---");
+  console.log("Request URL:", req.url);
+  console.log("Request Method:", req.method);
 
   // Rate limiting check
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0] ||
-    req.headers.get('x-real-ip') ||
-    'unknown';
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
 
   if (!checkRateLimit(ip)) {
-    console.warn('Rate limit exceeded for IP:', ip);
-    return new NextResponse('Too Many Requests', { status: 429 });
+    console.warn("Rate limit exceeded for IP:", ip);
+    return new NextResponse("Too Many Requests", { status: 429 });
   }
 
   const res = NextResponse.next();
@@ -54,55 +53,74 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient(req, res);
 
   try {
-    // Get session using the middleware client
+    // First get the session to ensure it exists
     const {
       data: { session },
-      error,
+      error: sessionError,
     } = await supabase.auth.getSession();
 
-    if (error) {
-      console.error('Session error:', error);
+    if (sessionError) {
+      console.error("Session error:", sessionError);
       return res;
     }
 
-    console.log('Middleware Auth Status:', {
+    // Then verify the user with getUser if we have a session
+    let verifiedUser = null;
+    if (session) {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error("User verification error:", userError);
+      } else {
+        verifiedUser = user;
+      }
+    }
+
+    console.log("Middleware Auth Status:", {
       hasSession: !!session,
-      userId: session?.user?.id,
+      isVerified: !!verifiedUser,
+      userId: verifiedUser?.id || session?.user?.id,
     });
 
     const isPublicRoute = publicRoutes.some(
       (route) =>
         pathname === route ||
-        (route.endsWith('/*') && pathname.startsWith(route.slice(0, -2)))
+        (route.endsWith("/*") && pathname.startsWith(route.slice(0, -2))),
     );
 
-    console.log('Route Status:', {
+    console.log("Route Status:", {
       pathname,
       isPublicRoute,
-      isAuthenticated: !!session,
+      isAuthenticated: !!session && !!verifiedUser,
     });
 
     // Handle authentication redirects
-    if (!isPublicRoute && !session) {
-      console.log('>>> REDIRECTING: Authentication required');
+    if (!isPublicRoute && (!session || !verifiedUser)) {
+      console.log(">>> REDIRECTING: Authentication required");
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = defaultRedirectPath;
-      redirectUrl.searchParams.set('redirect', pathname);
+      redirectUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(redirectUrl);
     }
 
     // Redirect authenticated users away from auth pages
-    if (session && (pathname === '/sign-in' || pathname === '/signup')) {
-      console.log('>>> REDIRECTING: Authenticated user to dashboard');
+    if (
+      session && verifiedUser &&
+      (pathname === "/sign-in" || pathname === "/signup")
+    ) {
+      console.log(">>> REDIRECTING: Authenticated user to dashboard");
       const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = '/dashboard';
-      redirectUrl.search = '';
+      redirectUrl.pathname = "/dashboard";
+      redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }
 
     return res;
   } catch (error) {
-    console.error('Middleware error:', error);
+    console.error("Middleware error:", error);
     return res;
   }
 }
@@ -123,10 +141,11 @@ export const config = {
      * Match specific routes that need authentication
      * while excluding Next.js static files
      */
-    '/',
-    '/dashboard/:path*',
-    '/sign-in',
-    '/signup',
-    '/_sites/:path*',
+    "/",
+    "/dashboard/:path*",
+    "/sign-in",
+    "/signup",
+    "/_sites/:path*",
+    "/subscription/:path*",
   ],
 };

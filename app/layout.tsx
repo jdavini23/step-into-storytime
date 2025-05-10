@@ -1,7 +1,6 @@
 import type React from 'react';
 import type { Metadata, Viewport } from 'next/types';
 import { Inter } from 'next/font/google';
-import { ThemeProvider } from '@/components/theme-provider';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { AuthProvider } from '@/contexts/auth-context';
 import { StoryProvider } from '@/contexts/story-context';
@@ -10,6 +9,7 @@ import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/react';
+import { ThemeWrapperClient } from '@/components/theme-wrapper-client';
 
 // Initialize font
 const inter = Inter({
@@ -61,15 +61,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="en" className={inter.variable}>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ErrorBoundary>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem
-            disableTransitionOnChange
-          >
+          <ThemeWrapperClient>
             <AuthProvider>
               <SubscriptionProvider>
                 <StoryProvider>
@@ -79,7 +74,7 @@ export default function RootLayout({
                 </StoryProvider>
               </SubscriptionProvider>
             </AuthProvider>
-          </ThemeProvider>
+          </ThemeWrapperClient>
         </ErrorBoundary>
       </body>
     </html>

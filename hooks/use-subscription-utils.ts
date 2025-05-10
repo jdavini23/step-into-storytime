@@ -1,20 +1,29 @@
-'use client';
+"use client";
 
-import { SubscriptionTier, StoryUsage, Subscription } from '@/types/subscription';
+import {
+  DbSubscription,
+  StoryUsage,
+  SubscriptionTier,
+} from "@/types/subscription";
 
-export function getSubscriptionTier(subscription: Subscription | null): SubscriptionTier {
-  if (!subscription || !subscription.subscription_plans) return 'free';
-  return subscription.subscription_plans.tier as SubscriptionTier;
+export function getSubscriptionTier(
+  subscription: DbSubscription | null,
+): SubscriptionTier {
+  // Rely on the plan_id directly from the user_subscriptions table
+  if (!subscription || subscription.plan_id === "free") {
+     return "free";
+  }
+  return subscription.plan_id as SubscriptionTier;
 }
 
 export function canGenerateStory(
-  subscription: Subscription | null, 
-  storyUsage: StoryUsage | null
+  subscription: DbSubscription | null,
+  storyUsage: StoryUsage | null,
 ): boolean {
   if (!subscription) return true; // Allow one free story before setup
 
   const tier = getSubscriptionTier(subscription);
-  if (tier !== 'free') return true;
+  if (tier !== "free") return true;
 
   if (!storyUsage) return true;
 
@@ -27,54 +36,68 @@ export function canGenerateStory(
     return true;
   }
 
-  // Get story limit from subscription plan
-  const storyLimit = subscription.subscription_plans?.story_limit ?? 1;
-  return storyUsage.story_count < storyLimit;
+  // Free tier gets 1 story per month
+  return storyUsage.story_count < 1;
 }
 
 export function getRemainingStories(
-  subscription: Subscription | null, 
-  storyUsage: StoryUsage | null
+  subscription: DbSubscription | null,
+  storyUsage: StoryUsage | null,
 ): number {
   const tier = getSubscriptionTier(subscription);
-  if (tier !== 'free') return Infinity;
+  if (tier !== "free") return Infinity;
 
   if (!storyUsage) return 1; // Default to 1 free story
 
-  // Get story limit from subscription plan
-  const storyLimit = subscription?.subscription_plans?.story_limit ?? 1;
-
-  const resetDate = storyUsage.reset_date ? new Date(storyUsage.reset_date) : null;
+  const resetDate = storyUsage.reset_date
+    ? new Date(storyUsage.reset_date)
+    : null;
   const monthAgo = new Date();
   monthAgo.setMonth(monthAgo.getMonth() - 1);
 
   if (!resetDate || resetDate < monthAgo) {
-    return storyLimit;
+    return 1; // Reset to 1 free story
   }
 
-  return Math.max(0, storyLimit - storyUsage.story_count);
+  return Math.max(0, 1 - storyUsage.story_count);
 }
 
 export function hasFeature(
-  subscription: Subscription | null,
-  feature: string
+  subscription: DbSubscription | null,
+  feature: string,
 ): boolean {
-  if (!subscription || !subscription.subscription_plans) return false;
+  const tier = getSubscriptionTier(subscription);
 
-  // Assuming features is an array of strings
-  const features = subscription.subscription_plans.features;
-  return Array.isArray(features) ? features.includes(feature) : false;
+  // Define features for each tier
+  const tierFeatures: Record<SubscriptionTier, string[]> = {
+    free: ["Basic story generation"],
+    story_creator: [
+      "Basic story generation",
+      "Advanced story generation",
+      "Audio narration",
+      "Unlimited stories",
+    ],
+    family: [
+      "Basic story generation",
+      "Advanced story generation",
+      "Audio narration",
+      "Unlimited stories",
+      "Multiple profiles",
+    ],
+  };
+
+  return tierFeatures[tier]?.includes(feature) ?? false;
 }
 
 export function getRemainingDays(
-  subscription: Subscription | null
+  subscription: DbSubscription | null,
 ): number | null {
-  if (!subscription || !subscription.current_period_end) {
-    return null;
-  }
+  if (!subscription || !subscription.current_period_end) return null;
 
-  const currentPeriodEnd = new Date(subscription.current_period_end);
+  const endDate = new Date(subscription.current_period_end);
   const now = new Date();
-  const diff = currentPeriodEnd.getTime() - now.getTime();
-  return Math.ceil(diff / (1000 * 3600 * 24));
+  const diffTime = endDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return Math.max(0, diffDays);
 }

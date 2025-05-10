@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { StoryList } from '@/components/story/StoryList';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,11 +16,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import type { Story } from '@/contexts/story-context';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { fetchWithAuth } from '@/lib/api';
 
 export default function StoriesPage() {
   const router = useRouter();
+  const { fetchWithAuth } = useAuth();
   const [stories, setStories] = useState<Story[]>([]);
   const [deleteStoryId, setDeleteStoryId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);

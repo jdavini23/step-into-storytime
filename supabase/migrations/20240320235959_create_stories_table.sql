@@ -1,3 +1,12 @@
+-- Function to update updated_at column
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = timezone('utc', now());
+  return new;
+end;
+$$ language plpgsql;
+
 -- Create the stories table
 create table public.stories (
   id uuid primary key default gen_random_uuid(),

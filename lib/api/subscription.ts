@@ -1,9 +1,33 @@
 // Centralized API abstraction for subscription management
-import type { Product, Price, SubscriptionStatus } from '@/contexts/subscription-context';
-import { createSupabaseClient } from '@/lib/supabase';
+import type { DbSubscription, Price, Product } from "@/types/subscription"; // Corrected import path
+import { createSupabaseClient } from "@/lib/supabase";
 
-export async function fetchSubscription() {
-  // TODO: Implement fetch logic
+export async function fetchSubscription(): Promise<DbSubscription | null> {
+  try {
+    const response = await fetch("/api/subscriptions", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("[fetchSubscription] API Error:", errorData);
+      throw new Error(
+        errorData.error ||
+          `Failed to fetch subscription: ${response.statusText}`,
+      );
+    }
+
+    const data = await response.json();
+    console.log("[fetchSubscription] Received data:", data);
+    return data.subscription as DbSubscription | null;
+  } catch (error) {
+    console.error("[fetchSubscription] Fetch Error:", error);
+    // Re-throw or handle as appropriate for the calling context (e.g., update state)
+    throw error;
+  }
 }
 
 export async function switchPlan(productId: string) {
@@ -21,24 +45,28 @@ export async function cancelSubscription() {
  * @param periodEnd - ISO string for the end of the billing period
  * @returns { used: number }
  */
-export async function fetchStoryUsage(userId: string, periodStart?: string, periodEnd?: string): Promise<{ used: number }> {
+export async function fetchStoryUsage(
+  userId: string,
+  periodStart?: string,
+  periodEnd?: string,
+): Promise<{ used: number }> {
   try {
     const supabase = createSupabaseClient();
     let query = supabase
-      .from('stories')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .from("stories")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
     if (periodStart) {
-      query = query.gte('created_at', periodStart);
+      query = query.gte("created_at", periodStart);
     }
     if (periodEnd) {
-      query = query.lt('created_at', periodEnd);
+      query = query.lt("created_at", periodEnd);
     }
     const { count, error } = await query;
     if (error) throw error;
     return { used: count ?? 0 };
   } catch (err) {
-    console.error('[fetchStoryUsage] Error:', err);
+    console.error("[fetchStoryUsage] Error:", err);
     return { used: 0 };
   }
 }

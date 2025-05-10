@@ -9,10 +9,37 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, name } = await request.json();
 
-    // Validate input
+    // Enhanced input validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
+    const sanitizedName = typeof name === 'string' ? name.replace(/[<>]/g, '').trim() : '';
     if (!email || !password || !name) {
       return NextResponse.json(
         { error: "Email, password, and name are required" },
+        { status: 400 }
+      );
+    }
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: "Please enter a valid email address." },
+        { status: 400 }
+      );
+    }
+    if (!passwordRegex.test(password)) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters, include uppercase, lowercase, number, and special character." },
+        { status: 400 }
+      );
+    }
+    if (sanitizedName.length < 2) {
+      return NextResponse.json(
+        { error: "Name must be at least 2 characters and not contain < or >." },
+        { status: 400 }
+      );
+    }
+    if (/script/i.test(name)) {
+      return NextResponse.json(
+        { error: "Name cannot contain the word 'script'." },
         { status: 400 }
       );
     }
@@ -28,7 +55,7 @@ export async function POST(request: NextRequest) {
         password,
         options: {
           data: {
-            name,
+            name: sanitizedName,
           },
         },
       });
@@ -51,7 +78,7 @@ export async function POST(request: NextRequest) {
         {
           id: authData.user.id,
           email: email,
-          name: name,
+          name: sanitizedName,
           subscription_tier: "free",
         },
       ]);

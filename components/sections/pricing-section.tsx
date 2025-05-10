@@ -101,6 +101,7 @@ export default function PricingSection() {
               buttonColor="bg-slate-900 hover:bg-slate-800"
               isLoading={pricingState.isLoading === 'free'}
               onButtonClick={() => handlePricingButtonClick('free')}
+              tier="basic"
             />
 
             <PricingCard
@@ -127,6 +128,7 @@ export default function PricingSection() {
               highlighted={true}
               isLoading={pricingState.isLoading === 'unlimited'}
               onButtonClick={() => handlePricingButtonClick('unlimited')}
+              tier="premium"
             />
 
             <PricingCard
@@ -153,6 +155,7 @@ export default function PricingSection() {
               buttonColor="bg-amber-600 hover:bg-amber-700 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
               isLoading={pricingState.isLoading === 'family'}
               onButtonClick={() => handlePricingButtonClick('family')}
+              tier="family"
             />
           </div>
         </TooltipProvider>

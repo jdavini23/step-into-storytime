@@ -1,32 +1,44 @@
-import { Database } from './supabase';
+import type { Database } from "@/types/supabase";
 
 // Re-export database types
 export type SubscriptionPlan =
-  Database['public']['Tables']['subscription_plans']['Row'];
-export type Subscription =
-  Database['public']['Tables']['subscriptions']['Row'] & {
-    subscription_plans?: SubscriptionPlan;
-    // Add properties used in context fallback/defaults
-    current_period_start?: string | null;
-    current_period_end?: string | null;
-    subscription_start?: string | null;
-    subscription_end?: string | null;
-    trial_end?: string | null;
-    payment_provider?: string | null;
-    payment_provider_id?: string | null;
+  Database["public"]["Tables"]["subscription_plans"]["Row"];
+export type DbSubscription = {
+  payment_provider: any;
+  subscription_start: string;
+  id: string;
+  user_id: string;
+  stripe_subscription_id: string;
+  stripe_customer_id: string;
+  status: string;
+  plan_id: string;
+  price_id?: string | null; // Added price_id
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  canceled_at?: string | null;
+  trial_start?: string | null;
+  trial_end?: string | null;
+  created_at: string;
+  updated_at: string;
+  subscription_end?: string | null;
+  subscription_plans?: {
+    name: string;
+    tier: string;
   };
-export type StoryUsage = Database['public']['Tables']['story_usage']['Row'];
+};
+export type StoryUsage = Database["public"]["Tables"]["story_usage"]["Row"];
 
 // Context-specific types
-export type SubscriptionTier = 'free' | 'story_creator' | 'family';
+export type SubscriptionTier = "free" | "story_creator" | "family";
 export type SubscriptionStatus =
-  | 'active'
-  | 'canceled'
-  | 'past_due'
-  | 'unpaid'
-  | 'trialing'
-  | 'incomplete'
-  | 'incomplete_expired';
+  | "active"
+  | "canceled"
+  | "past_due"
+  | "unpaid"
+  | "trialing"
+  | "incomplete"
+  | "incomplete_expired";
 
 export interface Price {
   id: string;
@@ -45,29 +57,18 @@ export interface Product {
   features: string[];
 }
 
-export type SubscriptionState = {
+export interface SubscriptionState {
   isInitialized: boolean;
-  subscription: Subscription | null;
+  subscription: DbSubscription | null;
   storyUsage: StoryUsage | null;
   isLoading: boolean;
   error: string | null;
-  availablePlans?: Product[];
-};
+  // Removed availablePlans: Product[]; - Managed by useState in context provider
+}
 
 export type SubscriptionAction =
-  | {
-      type: 'INITIALIZE';
-      payload: {
-        subscription: Subscription | null;
-        storyUsage: StoryUsage | null;
-        isInitialized: boolean;
-        availablePlans?: Product[];
-      };
-    }
-  | { type: 'SET_SUBSCRIPTION'; payload: Subscription | null }
-  | { type: 'SET_STORY_USAGE'; payload: StoryUsage | null }
-  | { type: 'INCREMENT_STORY_COUNT' }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'CLEAR_SUBSCRIPTION' }
-  | { type: 'RESET' };
+  | { type: "SET_SUBSCRIPTION"; payload: DbSubscription | null }
+  | { type: "SET_STORY_USAGE"; payload: StoryUsage | null }
+  | { type: "SET_ERROR"; payload: string | null }
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_AVAILABLE_PLANS"; payload: Product[] };

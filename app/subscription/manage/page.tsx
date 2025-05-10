@@ -42,11 +42,8 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/auth-context';
 import {
   useSubscription,
-  type SubscriptionStatus,
-  type Product,
-  type Price,
+  type FetchedPlan,
 } from '@/contexts/subscription-context';
-import { PRICING_PLANS } from '@/constants/pricing';
 import {
   PLAN_STATUS_LABELS,
   ERROR_MESSAGES,
@@ -65,14 +62,20 @@ import { Toaster } from '@/components/ui/toaster';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Info } from 'lucide-react';
+import type {
+  DbSubscription,
+  SubscriptionTier,
+  SubscriptionStatus as SubscriptionStatusType,
+} from '@/types/subscription';
 
 export default function ManageSubscriptionPage() {
   const router = useRouter();
   const { state: authState } = useAuth();
   const {
     state: subscriptionState,
-    fetchSubscription,
-    cancelSubscription,
+    availablePlans,
+    isLoadingPlans,
+    plansError,
     getSubscriptionTier,
     getRemainingDays,
   } = useSubscription();
@@ -87,7 +90,7 @@ export default function ManageSubscriptionPage() {
   } = usePlanSwitching(currentTier);
 
   const subscriptionStatus = subscriptionState.subscription
-    ?.status as SubscriptionStatus;
+    ?.status as SubscriptionStatusType;
   const {
     isCancelling,
     error: cancelError,
@@ -96,8 +99,8 @@ export default function ManageSubscriptionPage() {
     optimisticStatus,
   } = useCancelSubscription(subscriptionStatus);
 
-  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
-  const [currentPrice, setCurrentPrice] = useState<Price | null>(null);
+  const [currentProduct, setCurrentProduct] = useState<FetchedPlan | null>(null);
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -129,22 +132,22 @@ export default function ManageSubscriptionPage() {
   ]);
 
   useEffect(() => {
-    if (subscriptionState.subscription && subscriptionState.availablePlans) {
-      const product = subscriptionState.availablePlans.find(
-        (plan) =>
-          plan.tier === subscriptionState.subscription?.subscription_plans?.tier
+    if (subscriptionState.subscription && availablePlans) {
+      const currentPlanDetails = availablePlans.find(
+        (plan: FetchedPlan) =>
+          subscriptionState.subscription && plan.productId === subscriptionState.subscription.plan_id
       );
 
-      if (product?.prices?.length) {
-        setCurrentProduct(product);
-        setCurrentPrice(product.prices[0]);
+      if (currentPlanDetails) {
+        setCurrentProduct(currentPlanDetails);
+        setCurrentPrice(currentPlanDetails.price);
       }
     }
-  }, [subscriptionState.subscription, subscriptionState.availablePlans]);
+  }, [subscriptionState.subscription, availablePlans]);
 
   const remainingDays = getRemainingDays();
 
-  const formatDate = (dateString: string | null | undefined) => {
+  const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -153,7 +156,7 @@ export default function ManageSubscriptionPage() {
     });
   };
 
-  const getStatusBadge = (status: SubscriptionStatus) => {
+  const getStatusBadge = (status: SubscriptionStatusType) => {
     switch (status) {
       case 'active':
         return <Badge className="bg-green-500">Active</Badge>;
@@ -206,7 +209,7 @@ export default function ManageSubscriptionPage() {
       ? authState.user.user_metadata.name
       : authState.user?.email?.split('@')[0];
 
-  if (subscriptionState.isLoading) {
+  if (subscriptionState.isLoading || isLoadingPlans) {
     return (
       <div className="max-w-3xl mx-auto py-12">
         <Skeleton className="h-32 w-full rounded-xl mb-6" />
@@ -475,14 +478,11 @@ export default function ManageSubscriptionPage() {
               </Card>
 
               {/* Plan Card Section - Modularized */}
-              {subscriptionState.availablePlans &&
-                subscriptionState.availablePlans.length > 0 && (
+              {availablePlans &&
+                availablePlans.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 animate-slide-fade-in">
-                    {subscriptionState.availablePlans.map((plan) => {
-                      const price =
-                        plan.prices && plan.prices.length > 0
-                          ? plan.prices[0]
-                          : undefined;
+                    {availablePlans.map((plan: FetchedPlan) => {
+                      const price = plan.price;
                       // Only render if price exists (or adjust PlanCard to handle undefined price)
                       if (!price) return null;
                       // Only allow valid SubscriptionStatus values
@@ -492,7 +492,7 @@ export default function ManageSubscriptionPage() {
                           product={plan}
                           price={price}
                           status={effectiveStatus}
-                          isCurrent={plan.tier === effectiveTier}
+                          isCurrent={plan.metadata?.tier === effectiveTier}
                           onSelect={() => switchPlan(plan.id)}
                         />
                       );
@@ -519,9 +519,8 @@ export default function ManageSubscriptionPage() {
                 {benefitsOpen && (
                   <CardContent>
                     <FeatureList
-                      plans={subscriptionState.availablePlans ?? []}
+                      plans={availablePlans ?? []}
                       currentTier={effectiveTier}
-                      PRICING_PLANS={PRICING_PLANS}
                     />
                   </CardContent>
                 )}

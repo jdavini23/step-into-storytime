@@ -27,7 +27,7 @@ export default function CtaSection() {
             </p>
             <Button
               size="lg"
-              className="bg-white text-indigo-600 hover:bg-indigo-50 rounded-lg px-8 py-6 text-lg font-medium shadow-lg transition-all hover:shadow-xl"
+              className="rounded-lg px-8 py-6 text-lg font-medium shadow-lg transition-all hover:shadow-xl"
               onClick={() => router.push('/create')}
             >
               Start Creating Stories{' '}

@@ -82,6 +82,10 @@ export default function SignUpPage() {
     }
   };
 
+  // Enhanced validation regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
+
   const validateForm = () => {
     let isValid = true;
     const newErrors = {
@@ -93,35 +97,45 @@ export default function SignUpPage() {
       general: '',
     };
 
-    if (!formData.name.trim()) {
+    const sanitizedName = formData.name.replace(/[<>]/g, '').trim();
+
+    if (!sanitizedName) {
       newErrors.name = 'Name is required';
+      isValid = false;
+    } else if (sanitizedName.length < 2) {
+      newErrors.name = 'Name must be at least 2 characters and not contain < or >.';
+      isValid = false;
+    } else if (/script/i.test(formData.name)) {
+      newErrors.name = "Name cannot contain the word 'script'.";
       isValid = false;
     }
 
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
       isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address.';
       isValid = false;
     }
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
       isValid = false;
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters long';
+    } else if (!passwordRegex.test(formData.password)) {
+      newErrors.password = 'Password must be at least 8 characters, include uppercase, lowercase, number, and special character.';
       isValid = false;
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+      isValid = false;
+    } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
       isValid = false;
     }
 
     if (!formData.agreeTerms) {
-      newErrors.agreeTerms =
-        'You must agree to the Terms of Service and Privacy Policy';
+      newErrors.agreeTerms = 'You must agree to the terms';
       isValid = false;
     }
 

@@ -1,30 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import Stripe from "stripe";
+import {
+  DbSubscription,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  SubscriptionTier,
+} from "@/types/subscription";
 
-export const runtime = 'edge';
-
-// Types for subscription handling
-interface SubscriptionTier {
-  free: 'free';
-  story_creator: 'story_creator';
-  family: 'family';
-}
-
-interface SubscriptionRequest {
-  tier: keyof SubscriptionTier;
-}
-
-interface SubscriptionResponse {
-  id: string;
-  user_id: string;
-  status: 'active' | 'inactive' | 'cancelled';
-  plan_id: string;
-  subscription_start: string;
-  subscription_end: string;
-  trial_end: string | null;
-  payment_provider: string | null;
-  payment_provider_id: string | null;
-}
+export const runtime = "edge";
 
 interface ErrorResponse {
   error: string;
@@ -32,419 +16,282 @@ interface ErrorResponse {
   details?: unknown;
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    console.log('[DEBUG] Starting GET /api/subscriptions');
-    const supabase = await createClient();
+// Initialize Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // apiVersion: "2024-06-20", // Let the library use its default or manage via Stripe dashboard
+  typescript: true,
+});
 
+export async function GET(request: NextRequest) {
+  console.log("API Route Log: GET /api/subscriptions starting...");
+  try {
+    console.log("API Route Log: Attempting to create Supabase client...");
+    const supabase = await createClient();
+    console.log("API Route Log: Supabase client created successfully.");
+
+    // First get the session
+    console.log("API Route Log: Attempting to get session...");
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error("[DEBUG] Session error:", sessionError);
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: "Unauthorized - No valid session",
+          code: "AUTH_ERROR",
+          details: sessionError.message,
+        },
+        { status: 401 },
+      );
+    }
+
+    if (!session) {
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: "Unauthorized - No session found",
+          code: "AUTH_ERROR",
+          details: "No active session",
+        },
+        { status: 401 },
+      );
+    }
+
+    // Then verify the user
+    console.log("API Route Log: Attempting to get user...");
     const {
       data: { user },
-      error: authError,
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      console.error('[DEBUG] Auth error:', authError);
+    if (userError || !user) {
+      console.error("[DEBUG] User verification error:", userError);
       return NextResponse.json<ErrorResponse>(
         {
-          error: 'Unauthorized - Please sign in',
-          code: 'AUTH_ERROR',
-          details: authError?.message,
+          error: "Unauthorized - User verification failed",
+          code: "AUTH_ERROR",
+          details: userError?.message || "User not found",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    try {
-      // Count active subscriptions
-      const { count, error: countError } = await supabase
-        .from('subscriptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'active');
+    console.log(`API Route Log: User authenticated: ${user.id}`);
 
-      if (countError) {
-        console.error('[DEBUG] Error counting subscriptions:', countError);
-        return NextResponse.json<ErrorResponse>(
-          {
-            error: 'Failed to check subscriptions',
-            code: 'DB_ERROR',
-            details: countError.message,
-          },
-          { status: 500 }
-        );
+    // Fetch subscription data
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+
+    if (subscriptionError) {
+      console.error("[DEBUG] Subscription fetch error:", subscriptionError);
+      if (subscriptionError.code === "PGRST116") {
+        // No subscription found
+        return NextResponse.json({ subscription: null });
       }
 
-      console.log('[DEBUG] Found active subscriptions:', count);
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: "Failed to fetch subscription",
+          code: "DATABASE_ERROR",
+          details: subscriptionError.message,
+        },
+        { status: 500 },
+      );
+    } // <-- Added missing closing brace here
 
-      // If no active subscriptions, return free tier
-      if (count === 0) {
-        const freeTierSubscription: SubscriptionResponse = {
-          id: 'free',
-          user_id: user.id,
-          status: 'active',
-          plan_id: 'free',
-          subscription_start: new Date().toISOString(),
-          subscription_end: new Date(
-            Date.now() + 30 * 24 * 60 * 60 * 1000
+    let liveSubscriptionData: Partial<DbSubscription> = {};
+
+    // If subscription exists in DB and has a Stripe ID, fetch live data from Stripe
+    if (subscription && subscription.stripe_subscription_id) {
+      console.log(
+        `API Route Log: Fetching live data for Stripe subscription ID: ${subscription.stripe_subscription_id}`,
+      );
+      try {
+        const stripeSubscription = await stripe.subscriptions.retrieve(
+          subscription.stripe_subscription_id,
+          { expand: ["plan.product", "customer"] }, // Expand plan and product for details
+        );
+
+        console.log("API Route Log: Successfully fetched data from Stripe.");
+
+        // Map Stripe data to our DbSubscription structure
+        // Ensure stripeSubscription is treated as Stripe.Subscription, not Stripe.Response<...>
+        const sub = stripeSubscription as Stripe.Subscription; // Type assertion for clarity
+
+        liveSubscriptionData = {
+          status: sub.status as SubscriptionStatus,
+          // Use items array to reliably get product and price IDs
+          plan_id: typeof sub.items.data[0]?.price?.product === "string"
+            ? sub.items.data[0].price.product
+            : undefined, // Ensure undefined if null/not string
+          price_id: sub.items.data[0]?.price?.id,
+          subscription_start: new Date(
+            sub.created * 1000,
           ).toISOString(),
-          trial_end: null,
-          payment_provider: null,
-          payment_provider_id: null,
+          // Cast to 'any' to bypass strict type checking for these specific properties
+          subscription_end: (sub as any)["current_period_end"]
+            ? new Date((sub as any)["current_period_end"] * 1000).toISOString()
+            : null,
+          trial_start: (sub as any)["trial_start"]
+            ? new Date((sub as any)["trial_start"] * 1000).toISOString()
+            : null,
+          trial_end: (sub as any)["trial_end"]
+            ? new Date((sub as any)["trial_end"] * 1000).toISOString()
+            : null,
+          // Add any other relevant fields you want to sync
         };
 
-        return NextResponse.json<SubscriptionResponse>(freeTierSubscription);
-      }
-
-      // Get the most recent active subscription
-      const { data: subscription, error: subError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('subscription_start', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (subError) {
-        console.error('[DEBUG] Error fetching subscription:', subError);
-        return NextResponse.json<ErrorResponse>(
-          {
-            error: 'Failed to fetch subscription details',
-            code: 'DB_ERROR',
-            details: subError.message,
-          },
-          { status: 500 }
+        // Optionally: Update the DB record asynchronously (fire and forget or use a queue)
+        // supabase.from('subscriptions').update(liveSubscriptionData).eq('id', subscription.id);
+      } catch (stripeError) {
+        console.error(
+          "[DEBUG] Error fetching subscription from Stripe:",
+          stripeError,
         );
+        // Decide how to handle Stripe errors: return DB data, return error, etc.
+        // For now, we'll log the error and return the potentially stale DB data.
       }
-
-      // Ensure features is an array
-      if (subscription) {
-        return NextResponse.json<SubscriptionResponse>(subscription);
-      }
-
-      throw new Error('No subscription found after count > 0');
-    } catch (dbError) {
-      console.error(
-        '[DEBUG] Database error in GET /api/subscriptions:',
-        dbError
-      );
-      return NextResponse.json<ErrorResponse>(
-        {
-          error: dbError instanceof Error ? dbError.message : 'Database error',
-          code: 'DB_ERROR',
-          details: dbError,
-        },
-        { status: 500 }
+    } else {
+      console.log(
+        "API Route Log: No subscription found in DB or no Stripe ID.",
       );
     }
+
+    // Merge DB data with live Stripe data (Stripe data takes precedence)
+    const finalSubscriptionData = subscription
+      ? { ...subscription, ...liveSubscriptionData }
+      : null;
+
+    return NextResponse.json({ subscription: finalSubscriptionData });
   } catch (error) {
-    console.error('[DEBUG] Unexpected error in GET /api/subscriptions:', {
-      error,
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    console.error("[DEBUG] Unexpected error in GET /api/subscriptions:", error);
     return NextResponse.json<ErrorResponse>(
       {
-        error: 'Internal Server Error',
-        code: 'INTERNAL_ERROR',
-        details: error instanceof Error ? error.message : undefined,
+        error: "Internal server error",
+        code: "UNKNOWN_ERROR",
+        details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[DEBUG] Starting POST /api/subscriptions');
     const supabase = await createClient();
 
+    // First get the session
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      console.error('[DEBUG] Auth error:', authError);
+    if (sessionError) {
       return NextResponse.json<ErrorResponse>(
         {
-          error: 'Unauthorized - Please sign in',
-          code: 'AUTH_ERROR',
-          details: authError?.message,
+          error: "Unauthorized - No valid session",
+          code: "AUTH_ERROR",
+          details: sessionError.message,
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    const body = (await request.json()) as SubscriptionRequest;
-    const { tier } = body;
+    if (!session) {
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: "Unauthorized - No session found",
+          code: "AUTH_ERROR",
+          details: "No active session",
+        },
+        { status: 401 },
+      );
+    }
 
-    console.log('[DEBUG] Received subscription request:', {
-      tier,
-      userId: user.id,
-    });
+    // Then verify the user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: "Unauthorized - User verification failed",
+          code: "AUTH_ERROR",
+          details: userError?.message || "User not found",
+        },
+        { status: 401 },
+      );
+    }
+
+    const body = await request.json();
+    const { tier } = body;
 
     if (!tier) {
       return NextResponse.json<ErrorResponse>(
         {
-          error: 'Subscription tier is required',
-          code: 'VALIDATION_ERROR',
+          error: "Subscription tier is required",
+          code: "VALIDATION_ERROR",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Validate tier
-    const validTiers: (keyof SubscriptionTier)[] = [
-      'free',
-      'story_creator',
-      'family',
-    ];
-    if (!validTiers.includes(tier)) {
+    const origin = request.headers.get("origin") ||
+      process.env.NEXT_PUBLIC_APP_URL;
+
+    // Create Stripe checkout session
+    try {
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price: tier === "premium"
+              ? process.env.STRIPE_PREMIUM_PRICE_ID
+              : process.env.STRIPE_BASIC_PRICE_ID,
+            quantity: 1,
+          },
+        ],
+        mode: "subscription",
+        success_url:
+          `${origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/subscription/cancel`,
+        customer_email: user.email || undefined,
+        metadata: {
+          userId: user.id,
+        },
+      });
+
+      if (!session.url) {
+        throw new Error("Failed to create checkout session URL");
+      }
+
+      return NextResponse.redirect(session.url, { status: 303 });
+    } catch (error) {
+      console.error("Stripe checkout session creation error:", error);
       return NextResponse.json<ErrorResponse>(
         {
-          error: 'Invalid subscription tier',
-          code: 'VALIDATION_ERROR',
-          details: `Valid tiers are: ${validTiers.join(', ')}`,
+          error: "Failed to create checkout session",
+          code: "STRIPE_ERROR",
+          details: error instanceof Error ? error.message : String(error),
         },
-        { status: 400 }
+        { status: 500 },
       );
-    }
-
-    try {
-      // First, ensure subscription plan exists
-      const { data: existingPlan, error: planCheckError } = await supabase
-        .from('subscription_plans')
-        .select('*')
-        .eq('tier', tier)
-        .single();
-
-      if (planCheckError) {
-        console.log('[DEBUG] Plan does not exist, creating default plan');
-        // Create the plan if it doesn't exist
-        const defaultPlan = {
-          tier,
-          name:
-            tier === 'free'
-              ? 'Free Tier'
-              : tier === 'story_creator'
-              ? 'Story Creator'
-              : 'Family Plan',
-          description:
-            tier === 'free'
-              ? 'Basic story creation'
-              : tier === 'story_creator'
-              ? 'Advanced story creation'
-              : 'Family story creation',
-          price_monthly:
-            tier === 'free' ? 0 : tier === 'story_creator' ? 9.99 : 19.99,
-          story_limit: tier === 'free' ? 1 : tier === 'story_creator' ? 10 : 30,
-          features:
-            tier === 'free'
-              ? ['Basic story generation']
-              : tier === 'story_creator'
-              ? ['Advanced story generation', 'Audio narration']
-              : [
-                  'Family story generation',
-                  'Audio narration',
-                  'Multiple profiles',
-                ],
-        };
-
-        const { data: newPlan, error: createPlanError } = await supabase
-          .from('subscription_plans')
-          .insert([defaultPlan])
-          .select()
-          .single();
-
-        if (createPlanError) {
-          return NextResponse.json<ErrorResponse>({
-            error: `Failed to create subscription plan`,
-            code: 'DB_ERROR',
-            details: createPlanError.message,
-          }, { status: 500 });
-        }
-
-        console.log('[DEBUG] Created new plan:', newPlan);
-      }
-
-      // Now get the plan (either existing or newly created)
-      const { data: plan, error: planError } = await supabase
-        .from('subscription_plans')
-        .select('*')
-        .eq('tier', tier)
-        .single();
-
-      if (planError || !plan) {
-        return NextResponse.json<ErrorResponse>({
-          error: `Failed to fetch subscription plan`,
-          code: 'DB_ERROR',
-          details: planError?.message,
-        }, { status: 500 });
-      }
-
-      // Check for existing active subscription
-      const { data: existingSub, error: existingSubError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
-
-      if (existingSubError && existingSubError.code !== 'PGRST116') {
-        return NextResponse.json<ErrorResponse>({
-          error: `Failed to check existing subscription`,
-          code: 'DB_ERROR',
-          details: existingSubError.message,
-        }, { status: 500 });
-      }
-
-      // If an active subscription exists
-      if (existingSub) {
-        // If the user is on the Free tier, allow upgrade by updating the subscription
-        if (existingSub.plan_id && plan.tier === 'free') {
-          return NextResponse.json<ErrorResponse>({
-            error: 'Already on Free plan',
-            code: 'ALREADY_FREE',
-          }, { status: 400 });
-        }
-        // If current plan is free, allow upgrade
-        const { data: currentPlan, error: currentPlanError } = await supabase
-          .from('subscription_plans')
-          .select('*')
-          .eq('id', existingSub.plan_id)
-          .single();
-        if (currentPlanError) {
-          return NextResponse.json<ErrorResponse>({
-            error: `Failed to fetch current subscription plan`,
-            code: 'DB_ERROR',
-            details: currentPlanError.message,
-          }, { status: 500 });
-        }
-        if (currentPlan.tier === 'free') {
-          // Update existing subscription to new plan
-          const now = new Date();
-          const endDate = new Date(now);
-          endDate.setDate(endDate.getDate() + 30);
-          const { data: updatedSub, error: updateError } = await supabase
-            .from('subscriptions')
-            .update({
-              plan_id: plan.id.toString(),
-              updated_at: now.toISOString(),
-              start_date: now.toISOString(),
-              end_date: endDate.toISOString(),
-              status: 'active',
-            })
-            .eq('id', existingSub.id)
-            .select()
-            .single();
-          if (updateError) {
-            return NextResponse.json<ErrorResponse>({
-              error: `Failed to upgrade subscription`,
-              code: 'DB_ERROR',
-              details: updateError.message,
-            }, { status: 500 });
-          }
-          return NextResponse.json({
-            message: 'Subscription upgraded successfully',
-            subscription: updatedSub,
-          });
-        } else {
-          // Already has an active paid subscription
-          return NextResponse.json<ErrorResponse>({
-            error: 'User already has an active paid subscription',
-            code: 'DUPLICATE_SUBSCRIPTION',
-          }, { status: 400 });
-        }
-      }
-
-      const now = new Date();
-      const endDate = new Date(now);
-      endDate.setDate(endDate.getDate() + 30);
-
-      console.log('[DEBUG] Creating subscription with plan:', plan);
-
-      // Create the subscription
-      const { data: subscription, error: subError } = await supabase
-        .from('subscriptions')
-        .insert([
-          {
-            user_id: user.id,
-            status: 'active',
-            plan_id: plan.id.toString(),
-            start_date: now.toISOString(),
-            end_date: endDate.toISOString(),
-          },
-        ])
-        .select()
-        .single();
-      if (subError) {
-        return NextResponse.json<ErrorResponse>({
-          error: `Failed to create subscription`,
-          code: 'DB_ERROR',
-          details: subError.message,
-        }, { status: 500 });
-      }
-
-      // Update the user's profile with the new subscription tier
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          subscription_tier:
-            tier === 'story_creator'
-              ? 'premium'
-              : tier === 'family'
-              ? 'premium'
-              : 'basic',
-          updated_at: now.toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (profileError) {
-        console.error('[DEBUG] Profile update failed:', profileError);
-        // If profile update fails, delete the subscription to maintain consistency
-        const { error: deleteError } = await supabase
-          .from('subscriptions')
-          .delete()
-          .eq('id', subscription.id);
-
-        if (deleteError) {
-          console.error(
-            '[DEBUG] Failed to cleanup subscription after profile update error:',
-            deleteError
-          );
-        }
-
-        return NextResponse.json<ErrorResponse>({
-          error: `Failed to update profile`,
-          code: 'DB_ERROR',
-          details: profileError.message,
-        }, { status: 500 });
-      }
-
-      console.log(
-        '[DEBUG] Successfully created subscription and updated profile'
-      );
-      return NextResponse.json<SubscriptionResponse>(subscription);
-    } catch (error) {
-      console.error('[POST /api/subscriptions] Unhandled error:', error);
-      return NextResponse.json<ErrorResponse>({
-        error: error instanceof Error ? error.message : 'Internal Server Error',
-        code: 'INTERNAL_ERROR',
-      }, { status: 500 });
     }
   } catch (error) {
-    console.error(
-      '[DEBUG] Unexpected error in POST /api/subscriptions:',
-      error
-    );
+    console.error("[DEBUG] Error in POST /api/subscriptions:", error);
     return NextResponse.json<ErrorResponse>(
       {
-        error: 'Internal Server Error',
-        code: 'INTERNAL_ERROR',
-        details: error instanceof Error ? error.message : undefined,
+        error: "Failed to create subscription",
+        code: "STRIPE_ERROR",
+        details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -459,8 +306,8 @@ export async function PUT(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized - Please sign in' },
-        { status: 401 }
+        { error: "Unauthorized - Please sign in" },
+        { status: 401 },
       );
     }
 
@@ -469,37 +316,37 @@ export async function PUT(request: NextRequest) {
 
     if (!status) {
       return NextResponse.json(
-        { error: 'Status is required' },
-        { status: 400 }
+        { error: "Status is required" },
+        { status: 400 },
       );
     }
 
     const { data: subscription, error: subError } = await supabase
-      .from('subscriptions')
+      .from("subscriptions")
       .update({
         status,
         updated_at: new Date().toISOString(),
-        ...(status === 'canceled'
+        ...(status === "canceled"
           ? { subscription_end: new Date().toISOString() }
           : {}),
       })
-      .eq('user_id', user.id)
+      .eq("user_id", user.id)
       .select()
       .single();
 
     if (subError) {
       return NextResponse.json(
-        { error: subError.message || 'Failed to update subscription' },
-        { status: 500 }
+        { error: subError.message || "Failed to update subscription" },
+        { status: 500 },
       );
     }
 
     return NextResponse.json(subscription);
   } catch (error) {
-    console.error('Error in PUT /api/subscriptions:', error);
+    console.error("Error in PUT /api/subscriptions:", error);
     return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
+      { error: "Internal Server Error" },
+      { status: 500 },
     );
   }
 }

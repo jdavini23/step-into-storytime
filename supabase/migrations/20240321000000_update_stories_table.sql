@@ -8,7 +8,7 @@ alter table public.stories
 -- Set default values for existing rows
 update public.stories
 set 
-  length = coalesce(estimated_reading_minutes, 5),
+  length = 5,
   reading_level = 'beginner',
   language = 'en',
   style = 'bedtime',

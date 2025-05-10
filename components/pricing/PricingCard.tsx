@@ -6,7 +6,55 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { PricingCardProps, FeatureKey } from '@/types/pricing';
-import { FEATURE_DESCRIPTIONS } from '@/constants/pricing';
+import { CheckIcon, XMarkIcon } from '@heroicons/react/20/solid';
+
+const ALL_POSSIBLE_FEATURES: FeatureKey[] = [
+  '5 story generations per month',
+  'Basic story genres',
+  'English language only',
+  'Basic character options',
+  '24-hour story access',
+  'Web reading only',
+  'Watermarked content',
+  'Unlimited story generations',
+  'All genres + interactive stories',
+  'Save and revisit stories',
+  'Custom character creation',
+  'Audio narration feature',
+  'Available in 3 languages',
+  'Download stories (PDF, audio)',
+  'Up to 4 family profiles',
+  'Shared family story library',
+  'Parental content controls',
+  'Profile-based preferences',
+  'Weekly featured stories',
+  'Priority support',
+  'Early feature access',
+];
+
+const FEATURE_DESCRIPTIONS_MAP: Record<FeatureKey, string> = {
+  '5 story generations per month': 'Create up to 5 stories each month.',
+  'Basic story genres': 'Access to core story genres.',
+  'English language only': 'Stories generated only in English.',
+  'Basic character options': 'Limited options for character customization.',
+  '24-hour story access': 'Generated stories are available for 24 hours.',
+  'Web reading only': 'Read stories directly on the website.',
+  'Watermarked content': 'Generated stories may contain a watermark.',
+  'Unlimited story generations': 'Create as many stories as you like!',
+  'All genres + interactive stories': 'Access all available genres, including interactive story formats.',
+  'Save and revisit stories': 'Save your favorite stories to your personal library.',
+  'Custom character creation': 'Full options for creating unique characters.',
+  'Audio narration feature': 'Listen to your stories with generated audio narration.',
+  'Available in 3 languages': 'Generate stories in English, Spanish, and French.',
+  'Download stories (PDF, audio)': 'Download stories as PDF documents or audio files.',
+  'Up to 4 family profiles': 'Create and manage profiles for up to 4 family members.',
+  'Shared family story library': 'Access a shared library of stories across family profiles.',
+  'Parental content controls': 'Set content filters and controls for child profiles.',
+  'Profile-based preferences': 'Save individual preferences for each profile.',
+  'Weekly featured stories': 'Access exclusive featured stories each week.',
+  'Priority support': 'Get faster responses from our support team.',
+  'Early feature access': 'Be the first to try new features.',
+};
 
 export function PricingCard({
   title,
@@ -22,7 +70,32 @@ export function PricingCard({
   highlighted = false,
   isLoading = false,
   onButtonClick,
+  tier,
 }: PricingCardProps) {
+  const handleCheckout = async () => {
+    try {
+      const response = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tier }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to initiate checkout');
+      }
+
+      // The redirect is now handled in the API route
+      // const { checkoutUrl } = await response.json();
+      // window.location.href = checkoutUrl;
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      alert(error.message);
+    }
+  };
+
   return (
     <div
       role="listitem"
@@ -44,7 +117,7 @@ export function PricingCard({
         tabIndex={0}
         onKeyPress={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
-            onButtonClick();
+            handleCheckout();
           }
         }}
       >
@@ -73,47 +146,60 @@ export function PricingCard({
         </div>
         <div className="bg-white p-6">
           <ul
-            className="space-y-4 mb-6"
+            className="space-y-3 mb-6"
             role="list"
             aria-label={`${title} plan features`}
           >
-            {features.map((feature, index) => (
-              <li
-                key={index}
-                className="flex items-start text-slate-700 relative group"
-                role="listitem"
-              >
-                <div
-                  className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center mr-3 flex-shrink-0 mt-0.5 group-hover:bg-violet-100 transition-colors duration-200"
-                  aria-hidden="true"
+            {ALL_POSSIBLE_FEATURES.map((featureName) => {
+              const isIncluded = features.includes(featureName);
+
+              return (
+                <li
+                  key={featureName}
+                  className="flex items-start text-slate-700 relative group"
+                  role="listitem"
                 >
-                  <Star
-                    className="h-3 w-3 text-violet-600"
-                    fill="currentColor"
-                  />
-                </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-left hover:text-violet-700 cursor-help transition-colors duration-200">
-                      {feature}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    align="start"
-                    className="z-50 bg-white px-3 py-2 rounded-lg shadow-lg border border-slate-200 max-w-[250px]"
+                  <div
+                    className={`h-5 w-5 rounded-full ${
+                      isIncluded ? 'bg-green-100' : 'bg-red-100'
+                    } flex items-center justify-center mr-3 flex-shrink-0 mt-0.5 transition-colors duration-200`}
+                    aria-hidden="true"
                   >
-                    <p className="text-sm text-slate-700">
-                      {FEATURE_DESCRIPTIONS[feature as FeatureKey]}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </li>
-            ))}
+                    {isIncluded ? (
+                      <CheckIcon className="h-3 w-3 text-green-600" />
+                    ) : (
+                      <XMarkIcon className="h-3 w-3 text-red-600" />
+                    )}
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={`text-left text-sm ${
+                          isIncluded
+                            ? 'text-slate-700 hover:text-violet-700'
+                            : 'text-slate-400 line-through'
+                        } cursor-help transition-colors duration-200`}
+                      >
+                        {featureName}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      align="start"
+                      className="z-50 bg-white px-3 py-2 rounded-lg shadow-lg border border-slate-200 max-w-[250px]"
+                    >
+                      <p className="text-sm text-slate-700">
+                        {FEATURE_DESCRIPTIONS_MAP[featureName]}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </li>
+              );
+            })}
           </ul>
           <Button
             className={`w-full ${buttonColor} text-white relative transition-all duration-200`}
-            onClick={onButtonClick}
+            onClick={handleCheckout}
             disabled={isLoading}
             aria-label={`Select ${title} plan`}
           >

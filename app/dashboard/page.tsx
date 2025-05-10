@@ -3,8 +3,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BookOpen, LogOut, Plus, Edit, Trash2 } from 'lucide-react';
+import { BookOpen, LogOut, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Card,
   CardContent,
@@ -14,17 +23,20 @@ import {
 } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth-context';
 import { useStory } from '@/contexts/story-context';
+import { useSearchParams } from 'next/navigation';
 import { SubscriptionStatus } from '@/components/subscription/subscription-status';
 import { TagPill } from '@/components/story/TagPill';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { state: authState, logout } = useAuth();
   const { state: storyState, fetchStories, deleteStory } = useStory();
   const [isLoading, setIsLoading] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [storyToDeleteId, setStoryToDeleteId] = useState<string | null>(null);
   // Extract unique tags from stories (use theme as tag)
   const uniqueTags = Array.from(
     new Set(
@@ -96,14 +108,21 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDeleteStory = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this story?')) {
+  const handleDeleteStory = (id: string) => {
+    setStoryToDeleteId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteStory = async () => {
+    if (storyToDeleteId) {
       try {
-        await deleteStory(id);
+        await deleteStory(storyToDeleteId);
+        setStoryToDeleteId(null);
       } catch (error) {
         console.error('Error deleting story:', error);
       }
     }
+    setIsDeleteDialogOpen(false);
   };
 
   // Loading state JSX
@@ -259,32 +278,23 @@ export default function DashboardPage() {
                       </p>
                     </CardContent>
                     <CardFooter className="flex justify-between">
+                      <Link href={`/story/view/${story.id}`} passHref>
+                        <Button className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700">
+                          View Story
+                        </Button>
+                      </Link>
+                      {/* Delete Button */}
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-slate-600"
-                        onClick={() => router.push(`/story/${story.id}`)}
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-600 hover:bg-red-100"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent card click
+                          handleDeleteStory(story.id);
+                        }}
                       >
-                        Read
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-slate-600"
-                          onClick={() => router.push(`/story/${story.id}/edit`)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDeleteStory(story.id || '')}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </CardFooter>
                   </Card>
                 ))}
@@ -292,6 +302,35 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              story.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <AlertDialogCancel asChild>
+              <Button variant="outline">Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteStory}
+              >
+                Delete Story
+              </Button>
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
