@@ -99,17 +99,27 @@ export function ChatContainer({ className }: ChatContainerProps) {
   // Render helpers
   const renderMainContent = () => (
     <Card className={cn(CHAT_CONTAINER_STYLES.card, className)}>
-      {/* Messages section */}
+      {/* Step 1: Messages section */}
       <div className="flex-1 relative">
         <ChatMessages messages={state.messages} isTyping={state.isTyping} />
       </div>
 
-      {/* Preview toggle */}
+      {/* Step 2: Preview section */}
       {state.currentStep === 'preview' && (
-        <PreviewToggle showPreview={showPreview} onToggle={togglePreview} />
+        <>
+          <PreviewToggle showPreview={showPreview} onToggle={togglePreview} />
+          {showPreview && (
+            <div className="border-t border-primary/5">
+              <StoryPreview
+                storyData={state.storyData}
+                className="max-w-3xl mx-auto"
+              />
+            </div>
+          )}
+        </>
       )}
 
-      {/* Input section */}
+      {/* Step 3: Input section */}
       <div className={CHAT_CONTAINER_STYLES.footer}>
         <QuickReplies
           options={getQuickReplies()}
@@ -125,11 +135,6 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const renderSidebar = () => (
     <div className="hidden xl:block xl:col-span-3">
       <ChatProgress currentStep={state.currentStep as StepId} />
-      {showPreview && state.currentStep === 'preview' && (
-        <div className="mt-8">
-          <StoryPreview storyData={state.storyData} />
-        </div>
-      )}
     </div>
   );
 

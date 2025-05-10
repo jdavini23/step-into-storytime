@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: true
+---
+---
 description: Coding rules for Supabase Edge Functions
 globs: 'supabase/functions/**/*.ts'
 ---
