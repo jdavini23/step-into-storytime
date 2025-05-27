@@ -7,6 +7,10 @@ import {
 } from '@/components/ui/tooltip';
 import { PricingCardProps, FeatureKey } from '@/types/pricing';
 import { CheckIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { User } from '@supabase/supabase-js';
 
 const ALL_POSSIBLE_FEATURES: FeatureKey[] = [
   '5 story generations per month',
@@ -72,7 +76,47 @@ export function PricingCard({
   onButtonClick,
   tier,
 }: PricingCardProps) {
+  const router = useRouter();
+  // Initialize Supabase client using useState, removing empty generic type
+  const [supabase] = useState(() => createClientComponentClient());
+
+  const [user, setUser] = useState<User | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true); // State to track initial auth check
+
+  useEffect(() => {
+    const checkUserSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error fetching session:', error.message);
+        }
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error('Unexpected error fetching session:', error);
+        setUser(null);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkUserSession();
+  }, [supabase]); // Re-run if supabase client instance changes (though unlikely)
+
   const handleCheckout = async () => {
+    if (checkingAuth) {
+      console.log('Still checking authentication state...');
+      return;
+    }
+
+    if (!user) {
+      console.log('User not logged in, redirecting to /sign-in');
+      router.push('/sign-in?redirect=/pricing');
+      return;
+    }
+
+    console.log('User logged in, proceeding with checkout for tier:', tier);
+    console.log(`User ID: ${user.id}`);
+
     try {
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
@@ -83,13 +127,21 @@ export function PricingCard({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to initiate checkout');
+        let errorMessage = 'Failed to initiate checkout';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          console.error('Checkout API Error Response:', errorData);
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          errorMessage = `Failed to initiate checkout (Status: ${response.status})`;
+        }
+        throw new Error(errorMessage);
       }
 
-      // The redirect is now handled in the API route
-      // const { checkoutUrl } = await response.json();
-      // window.location.href = checkoutUrl;
+      console.log(
+        'Checkout initiated successfully. API should handle redirect.',
+      );
     } catch (error: any) {
       console.error('Checkout error:', error);
       alert(error.message);
@@ -200,17 +252,19 @@ export function PricingCard({
           <Button
             className={`w-full ${buttonColor} text-white relative transition-all duration-200`}
             onClick={handleCheckout}
-            disabled={isLoading}
-            aria-label={`Select ${title} plan`}
+            disabled={checkingAuth || isLoading}
+            aria-label={`Choose ${title} plan`}
           >
-            {isLoading ? (
-              <div className="flex items-center justify-center">
-                <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2" />
-                Processing...
-              </div>
-            ) : (
-              buttonText
-            )}
+            {checkingAuth
+              ? 'Checking...'
+              : isLoading
+                ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2" />
+                      Processing...
+                    </div>
+                  )
+                : buttonText}
           </Button>
         </div>
       </div>

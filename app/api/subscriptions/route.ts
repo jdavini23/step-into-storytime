@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
         },
         { status: 500 },
       );
-    } // <-- Added missing closing brace here
+    }
 
     let liveSubscriptionData: Partial<DbSubscription> = {};
 
@@ -246,14 +246,48 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get("origin") ||
       process.env.NEXT_PUBLIC_APP_URL;
 
+    // Determine Price ID
+    // Compare tier against the expected string literal value
+    const priceId = tier === 'premium'
+      ? process.env.STRIPE_PREMIUM_PRICE_ID
+      : process.env.STRIPE_BASIC_PRICE_ID; // Assuming 'basic' if not premium
+
+    console.log(`[DEBUG] Attempting Stripe Checkout Session Creation:`);
+    console.log(`  - User ID: ${user.id}`);
+    console.log(`  - User Email: ${user.email}`);
+    console.log(`  - Selected Tier: ${tier}`);
+    console.log(`  - Determined Price ID: ${priceId}`);
+    console.log(
+      `  - STRIPE_PREMIUM_PRICE_ID Env Var: ${process.env.STRIPE_PREMIUM_PRICE_ID}`,
+    );
+    console.log(
+      `  - STRIPE_BASIC_PRICE_ID Env Var: ${process.env.STRIPE_BASIC_PRICE_ID}`,
+    );
+    console.log(`  - Callback Origin: ${origin}`);
+    console.log(
+      `  - Success URL: ${origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+    );
+    console.log(`  - Cancel URL: ${origin}/subscription/cancel`);
+
+    if (!priceId) {
+      console.error(
+        `[DEBUG] Stripe Price ID is missing for tier: ${tier}. Check STRIPE_PREMIUM_PRICE_ID and STRIPE_BASIC_PRICE_ID environment variables.`,
+      );
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: `Configuration error: Price ID for tier '${tier}' not found.`,
+          code: "CONFIG_ERROR",
+        },
+        { status: 500 },
+      );
+    }
+
     // Create Stripe checkout session
     try {
       const session = await stripe.checkout.sessions.create({
         line_items: [
           {
-            price: tier === "premium"
-              ? process.env.STRIPE_PREMIUM_PRICE_ID
-              : process.env.STRIPE_BASIC_PRICE_ID,
+            price: priceId, // Use determined priceId
             quantity: 1,
           },
         ],
@@ -261,23 +295,45 @@ export async function POST(request: NextRequest) {
         success_url:
           `${origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/subscription/cancel`,
-        customer_email: user.email || undefined,
+        customer_email: user.email || undefined, // Use verified user email
         metadata: {
-          userId: user.id,
+          userId: user.id, // Store user ID in metadata for webhook
+          tier: tier, // Store selected tier
         },
       });
 
       if (!session.url) {
+        console.error(
+          "[DEBUG] Stripe checkout session created, but URL is missing.",
+          session,
+        );
         throw new Error("Failed to create checkout session URL");
       }
 
+      console.log(
+        `[DEBUG] Stripe Checkout Session created successfully for user ${user.id}. Redirecting to: ${session.url}`,
+      );
+      // Use 303 See Other for POST-redirect-GET pattern
       return NextResponse.redirect(session.url, { status: 303 });
     } catch (error) {
-      console.error("Stripe checkout session creation error:", error);
+      console.error("[DEBUG] Stripe checkout session creation error:", error);
+      let errorMessage = "Failed to create checkout session";
+      let errorCode = "STRIPE_ERROR";
+      if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+        errorMessage = `Stripe Invalid Request: ${error.message}`;
+        errorCode = "STRIPE_INVALID_REQUEST";
+      } else if (error instanceof Stripe.errors.StripeAuthenticationError) {
+        errorMessage = "Stripe Authentication Error: Check your API keys.";
+        errorCode = "STRIPE_AUTH_ERROR";
+      } else if (error instanceof Stripe.errors.StripeCardError) {
+        errorMessage = `Stripe Card Error: ${error.message}`;
+        errorCode = "STRIPE_CARD_ERROR";
+      }
+
       return NextResponse.json<ErrorResponse>(
         {
-          error: "Failed to create checkout session",
-          code: "STRIPE_ERROR",
+          error: errorMessage,
+          code: errorCode,
           details: error instanceof Error ? error.message : String(error),
         },
         { status: 500 },
