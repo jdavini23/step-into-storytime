@@ -79,7 +79,7 @@ BEGIN
       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       stripe_customer_id TEXT,
       stripe_subscription_id TEXT,
-      plan_id TEXT,
+      plan_id UUID REFERENCES public.subscription_plans(id),
       price_id TEXT,
       status TEXT NOT NULL CHECK (status IN ('active', 'canceled', 'past_due', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired')),
       current_period_start TIMESTAMPTZ,
@@ -110,7 +110,7 @@ BEGIN
       AND table_name = 'user_subscriptions' 
       AND column_name = 'plan_id'
     ) THEN
-      ALTER TABLE public.user_subscriptions ADD COLUMN plan_id TEXT;
+      ALTER TABLE public.user_subscriptions ADD COLUMN plan_id UUID REFERENCES public.subscription_plans(id);
     END IF;
   END IF;
 END
@@ -158,13 +158,23 @@ $$;
 -- Update profiles table to include stripe_customer_id if not already present
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'profiles' 
-    AND column_name = 'stripe_customer_id'
+  -- Only proceed if the profiles table exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name = 'profiles'
   ) THEN
-    ALTER TABLE public.profiles ADD COLUMN stripe_customer_id TEXT;
+    -- Then check if the stripe_customer_id column already exists
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'profiles'
+      AND column_name = 'stripe_customer_id'
+    ) THEN
+      ALTER TABLE public.profiles ADD COLUMN stripe_customer_id TEXT;
+    END IF;
+  ELSE
+    RAISE NOTICE 'Table public.profiles does not exist, skipping adding stripe_customer_id column.';
   END IF;
 END
 $$;
