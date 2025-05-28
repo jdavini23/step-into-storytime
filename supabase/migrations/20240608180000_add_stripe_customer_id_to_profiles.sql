@@ -36,19 +36,34 @@ begin
 end $$;
 
 -- 3. RLS: Only allow users to update their own stripe_customer_id
--- (Assumes RLS is already enabled on profiles)
+-- First ensure RLS is enabled on profiles
 do $$
 begin
+  -- Enable RLS on profiles if not already enabled
   if not exists (
-    select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'Users can update their own stripe_customer_id'
+    select 1 from pg_tables 
+    where schemaname = 'public' 
+    and tablename = 'profiles' 
+    and rowsecurity = true
   ) then
-    execute $$
-      create policy "Users can update their own stripe_customer_id"
-      on public.profiles
-      for update
-      to authenticated
-      using (id = auth.uid())
-      with check (id = auth.uid());
-    $$; 
+    alter table public.profiles enable row level security;
   end if;
-end $$; 
+
+  -- Drop policy if it exists to avoid conflicts
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'profiles' 
+    and policyname = 'users_update_own_stripe_customer_id'
+  ) then
+    drop policy if exists "users_update_own_stripe_customer_id" on public.profiles;
+  end if;
+
+  -- Create the policy with a simpler name to avoid quoting issues
+  create policy users_update_own_stripe_customer_id
+  on public.profiles
+  for update
+  to authenticated
+  using (id = auth.uid())
+  with check (id = auth.uid());
+end $$;

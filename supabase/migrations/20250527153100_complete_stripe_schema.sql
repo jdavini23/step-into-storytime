@@ -83,10 +83,9 @@ comment on function public.validate_subscription_dates() is 'Validates subscript
 create or replace view public.active_subscriptions as
 select 
   us.*,
-  p.email as user_email
+  u.email as user_email
 from public.user_subscriptions us
 join auth.users u on us.user_id = u.id
-join public.profiles p on u.id = p.id
 where us.status in ('active', 'trialing');
 
 comment on view public.active_subscriptions is 'View of all active subscriptions with user information';
