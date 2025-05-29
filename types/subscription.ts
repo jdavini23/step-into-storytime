@@ -47,11 +47,13 @@ export interface Price {
   recurring: {
     interval: string;
   };
+  interval?: string; // For direct access to interval
 }
 
 export interface Product {
   id: string;
   name: string;
+  description: string; // Added missing description
   tier: string;
   prices?: Price[];
   features: string[];

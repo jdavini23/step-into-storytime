@@ -22,7 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import PlanCard from '../components/PlanCard';
+
 import StatusBanner from '../components/StatusBanner';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import SubscriptionBoundary from '../components/SubscriptionBoundary';
@@ -478,27 +478,7 @@ export default function ManageSubscriptionPage() {
               </Card>
 
               {/* Plan Card Section - Modularized */}
-              {availablePlans &&
-                availablePlans.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 animate-slide-fade-in">
-                    {availablePlans.map((plan: FetchedPlan) => {
-                      const price = plan.price;
-                      // Only render if price exists (or adjust PlanCard to handle undefined price)
-                      if (!price) return null;
-                      // Only allow valid SubscriptionStatus values
-                      return (
-                        <PlanCard
-                          key={plan.id}
-                          product={plan}
-                          price={price}
-                          status={effectiveStatus}
-                          isCurrent={plan.metadata?.tier === effectiveTier}
-                          onSelect={() => switchPlan(plan.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+              {/* Plan selection has been moved to /subscription page */}
 
               <div className="h-1 w-full bg-gradient-to-r from-violet-200/0 via-violet-300 to-violet-200/0 my-8 rounded-full" />
 

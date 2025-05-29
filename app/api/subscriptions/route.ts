@@ -80,12 +80,14 @@ export async function GET(request: NextRequest) {
 
     console.log(`API Route Log: User authenticated: ${user.id}`);
 
-    // Fetch subscription data
+    // Fetch subscription data - get the most recent active subscription
     const { data: subscription, error: subscriptionError } = await supabase
       .from("subscriptions")
       .select("*")
       .eq("user_id", user.id)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (subscriptionError) {
       console.error("[DEBUG] Subscription fetch error:", subscriptionError);
