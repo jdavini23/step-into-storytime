@@ -3,8 +3,10 @@
 import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/index';
-import StoryContent from '@/components/story/story-content';
-import StoryControls from '@/components/story/story-controls';
+import StoryText from '@/components/story/common/StoryText';
+import AudioControls from '@/components/story/common/AudioControls';
+import NavigationControls from '@/components/story/common/NavigationControls';
+import ActionControls from '@/components/story/common/ActionControls';
 import Footer from '@/components/sections/footer';
 import { isValidStoryId } from '@/utils/validation';
 
@@ -96,8 +98,10 @@ export default function StoryPage({ params }: StoryPageProps) {
       <Navbar />
       <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 md:py-12 z-10">
         <div className="max-w-3xl w-full mx-auto flex flex-col items-center justify-center mt-8 md:mt-12">
-          <StoryContent storyId={storyId} />
-          <StoryControls />
+          <StoryText paragraphs={[]} themeColors={{ primary: '#000000', secondary: '#ffffff', accent: '#ff0000' }} />
+          <AudioControls themeColors={{ primary: '#000', secondary: '#fff', accent: '#f00', text: '#000' }} />
+          <NavigationControls currentPage={0} totalPages={0} themeColors={{ primary: '#000', secondary: '#fff', accent: '#f00', text: '#000' }} />
+          <ActionControls themeColors={{ primary: '#000', secondary: '#fff', accent: '#f00', text: '#000' }} />
         </div>
       </main>
       <Footer />

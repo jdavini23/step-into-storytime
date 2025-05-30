@@ -10,8 +10,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export async function POST(request: Request) {
+    console.log("[API /create-checkout-session] POST request received.");
     try {
         const { priceId } = await request.json();
+        console.log(
+            "[API /create-checkout-session] Request body parsed, Price ID:",
+            priceId,
+        );
 
         // Use our enhanced server Supabase client that properly handles base64-encoded cookies
         const supabase = await createServerSupabaseClient();
@@ -28,10 +33,15 @@ export async function POST(request: Request) {
 
         // Get or create the customer
         // Use the new utility to ensure a profile exists
-        const { profile, error: profileError } = await getOrCreateUserProfile(session.user);
+        const { profile, error: profileError } = await getOrCreateUserProfile(
+            session.user,
+        );
         if (profileError) {
             return new NextResponse(
-                JSON.stringify({ error: "Could not get or create user profile", details: profileError }),
+                JSON.stringify({
+                    error: "Could not get or create user profile",
+                    details: profileError,
+                }),
                 { status: 500 },
             );
         }
@@ -54,13 +64,19 @@ export async function POST(request: Request) {
                 .eq("id", session.user.id);
             if (updateError) {
                 return new NextResponse(
-                    JSON.stringify({ error: "Could not update profile with Stripe customer ID", details: updateError }),
+                    JSON.stringify({
+                        error:
+                            "Could not update profile with Stripe customer ID",
+                        details: updateError,
+                    }),
                     { status: 500 },
                 );
             }
         }
 
-        // Create a checkout session
+        // Create a checkout session with provided URLs or default ones
+        const { success_url, cancel_url } = await request.json();
+        
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: customerId,
             line_items: [
@@ -70,9 +86,8 @@ export async function POST(request: Request) {
                 },
             ],
             mode: "subscription",
-            success_url:
-                `${SITE_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${SITE_URL}/subscription`,
+            success_url: success_url || `${SITE_URL}/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: cancel_url || `${SITE_URL}/subscription?checkout=cancelled`,
             subscription_data: {
                 metadata: {
                     supabase_uid: session.user.id,
@@ -80,7 +95,24 @@ export async function POST(request: Request) {
             },
             metadata: {
                 supabase_uid: session.user.id,
+                price_id: priceId,
             },
+            // Enable automatic tax collection if configured
+            automatic_tax: {
+                enabled: true,
+            },
+            // Allow promotion codes
+            allow_promotion_codes: true,
+            // Enable customer portal for future management
+            billing_address_collection: 'required',
+            // Add phone number collection
+            phone_number_collection: {
+                enabled: true,
+            },
+            // Add subscription data for trial periods if needed
+            // subscription_data: {
+            //     trial_period_days: 14,
+            // },
         });
 
         return new NextResponse(

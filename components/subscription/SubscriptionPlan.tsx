@@ -47,39 +47,53 @@ export function SubscriptionPlan({
       if (!session) {
         // Store intended subscription in localStorage
         localStorage.setItem('intended_price_id', priceId);
-        router.push('/sign-in');
+        // Redirect to sign-in with checkout parameter
+        router.push(`/sign-in?redirect=/subscription&checkout=true`);
         return;
       }
 
       // Use the session directly from the hook
       if (!session.access_token) {
-         toast({
+        toast({
           title: 'Unauthorized',
           description: 'Please sign in to subscribe.',
         });
         return;
       }
 
+      // Show loading state
+      toast({
+        title: 'Processing',
+        description: 'Preparing your checkout session...',
+      });
 
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ 
+          priceId,
+          successUrl: `${window.location.origin}/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/subscription?checkout=cancelled`
+        }),
       });
 
       const data = await response.json();
+      
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create checkout session');
       }
-      router.push(data.url);
+      
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
     } catch (error) {
       console.error('Subscription error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to process subscription. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to process subscription. Please try again.',
         variant: 'destructive',
       });
     }

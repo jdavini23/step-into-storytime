@@ -109,7 +109,7 @@ export async function middleware(req: NextRequest) {
       });
     }
 
-    // Handle authentication redirects
+    // Handle authentication redirects for protected routes
     if (!isPublicRoute && (!session || !verifiedUser)) {
       if (process.env.NODE_ENV !== 'production') {
         console.log(">>> REDIRECTING: Authentication required");
@@ -120,18 +120,23 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Redirect authenticated users away from auth pages
-    if (
-      session && verifiedUser &&
-      (pathname === "/sign-in" || pathname === "/signup")
-    ) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(">>> REDIRECTING: Authenticated user to dashboard");
+    // Handle authenticated user redirects
+    if (session && verifiedUser) {
+      // Allow subscription flow to complete
+      const isInSubscriptionFlow = 
+        pathname.startsWith('/subscription') || 
+        pathname === '/api/stripe/create-checkout-session';
+      
+      // Redirect away from auth pages but allow subscription flow
+      if ((pathname === "/sign-in" || pathname === "/signup") && !isInSubscriptionFlow) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(">>> REDIRECTING: Authenticated user to dashboard");
+        }
+        const redirectUrl = req.nextUrl.clone();
+        redirectUrl.pathname = "/dashboard";
+        redirectUrl.search = "";
+        return NextResponse.redirect(redirectUrl);
       }
-      const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = "/dashboard";
-      redirectUrl.search = "";
-      return NextResponse.redirect(redirectUrl);
     }
 
     return res;

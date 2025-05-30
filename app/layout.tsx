@@ -7,6 +7,7 @@ import { StoryProvider } from '@/contexts/story-context';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { SubscriptionProvider } from '@/contexts/subscription-context';
+import { RevenueCatProvider } from '@/contexts/RevenueCatContext';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/react';
 import { ThemeWrapperClient } from '@/components/theme-wrapper-client';
@@ -66,13 +67,15 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeWrapperClient>
             <AuthProvider>
-              <SubscriptionProvider>
-                <StoryProvider>
-                  {children}
-                  <Toaster />
-                  <SpeedInsights />
-                </StoryProvider>
-              </SubscriptionProvider>
+              <RevenueCatProvider>
+                <SubscriptionProvider>
+                  <StoryProvider>
+                    {children}
+                    <Toaster />
+                    <SpeedInsights />
+                  </StoryProvider>
+                </SubscriptionProvider>
+              </RevenueCatProvider>
             </AuthProvider>
           </ThemeWrapperClient>
         </ErrorBoundary>

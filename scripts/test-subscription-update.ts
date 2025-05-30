@@ -34,8 +34,8 @@ const TEST_EMAIL = process.env.TEST_EMAIL || 'test@example.com';
 const TEST_PASSWORD = process.env.TEST_PASSWORD || 'password123';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-// Use the direct API URL if available, otherwise default to localhost:3001
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+// Use the direct API URL if available, otherwise default to localhost:3000
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 console.log('Using base URL:', BASE_URL);
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -194,6 +194,10 @@ async function updateSubscription(
         ...errorInfo,
         isAbortError: error instanceof Error && error.name === 'AbortError'
       });
+      console.error('Full fetch error:', error);
+      if (error instanceof Error) {
+        console.error('Fetch error stack:', error.stack);
+      }
       throw error;
     } finally {
       clearTimeout(timeoutId);

@@ -27,8 +27,10 @@ export function SubscriptionCheckout({
   const { toast } = useToast();
 
   const handleCheckout = async () => {
+    console.log('[SubscriptionCheckout] handleCheckout called. Price ID:', priceId);
     try {
       setLoading(true);
+      console.log('[SubscriptionCheckout] Fetching /api/stripe/create-checkout-session...');
 
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
